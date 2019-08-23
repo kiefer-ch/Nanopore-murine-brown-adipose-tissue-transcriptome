@@ -37,9 +37,9 @@ sample_info <- read_csv(sample_df) %>%
     filter(!is.na(illumina))
 
 # create directories
-dir.create(file.path(HUB, "hub", "mm10"),
+dir.create(file.path(HUB, "mm10"),
     showWarnings = FALSE, recursive = TRUE)
-dir.create(file.path(HUB, "bw"),
+dir.create(file.path(HUB, "../bw"),
     showWarnings = FALSE)
 
 # create genomes.txt
@@ -54,7 +54,7 @@ cat("hub nanoporeibat",
     "email  christophak@bmb.sdu.dk",
     "descriptionUrl",
     sep = '\n',
-    file = file.path(HUB, "hub", "hub.txt"))
+    file = file.path(HUB, "hub.txt"))
 
 # create trackDb.txt
 suppressWarnings(file.remove(file.path(HUB, "hub", "mm10", "trackDb.txt")))
@@ -80,11 +80,11 @@ for (i in 1:nrow(sample_info)) {
             "")
 
         cat(track,
-            # file = file.path(HUB, "hub", "mm10", "trackDb.txt"),
+            file = file.path(HUB, "mm10", "trackDb.txt"),
             sep = '\n',
             append = TRUE)
 
-        file.copy(file.path("BW", file), file.path(HUB, "bw", file)))
+        file.copy(file.path("BW", file), file.path(HUB, "../bw", file))
     }
 }
 

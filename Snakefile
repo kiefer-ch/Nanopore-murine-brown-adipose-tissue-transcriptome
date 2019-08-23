@@ -10,6 +10,10 @@ TRANSCRIPTS_URL = expand(
 ANNOTATION_URL = expand(
     "{base_url}/gencode.vM22.primary_assembly.annotation.gtf.gz", base_url=GENCODE_URL)
 
+# PAths to software required by salmon
+BEDTOOLS = "/data/bin/bedtools/bedtools-v2.28/bedtools"
+MASHMAP = "/data/home/christophak/bin/mashmap"
+
 # Sample IDs
 SAMPLES = pd.read_csv("sample_info/illumina_sample_id.txt", sep='\t')["sample"].tolist()
 
@@ -42,6 +46,12 @@ rule get_annotation:
         " wget -q -O \
             - {ANNOTATION_URL} \
             | gunzip > {output}"
+
+rule annotation_all:
+    input:
+        "annotation/transcripts.fa"
+        "annotation/genome.fa"
+        "annotation/annotation.gtf"
 
 # STAR rules
 rule generate_STARgenome:
@@ -93,10 +103,7 @@ rule map_STAR:
 
 rule all_STAR:
     input:
-        expand("fastq/trimmed/{sample}_R1_001_trimmed.fastq.gz", sample=SAMPLES),
-        expand("fastq/trimmed/{sample}_R2_001_trimmed.fastq.gz", sample=SAMPLES),
-        expand("BAM/{sample}_Aligned.sortedByCoord.out.bam", sample=SAMPLES),
-        "indices/STAR/Genome"
+        expand("BAM/{sample}_Aligned.sortedByCoord.out.bam", sample=SAMPLES)
     params:
         genome = "indices/STAR"
     shell:
@@ -147,10 +154,84 @@ rule make_hub:
         "nanoporeibat_hub/hub/hub.txt",
         "nanoporeibat_hub/hub/genomes.txt",
         "nanoporeibat_hub/hub/mm10/trackDb.txt",
-        expand("nanoporeibat_hub/BW/{sample}_fw.bw", sample=SAMPLES),
-        expand("nanoporeibat_hub/BW/{sample}_rv.bw", sample=SAMPLES)
+        expand("nanoporeibat_hub/bw/{sample}_fw.bw", sample=SAMPLES),
+        expand("nanoporeibat_hub/bw/{sample}_rv.bw", sample=SAMPLES)
     params:
-       url = "http://bioinformatik.sdu.dk/solexa/webshare/christoph/nanoporeibat_hub"
-    script:
+        url = "http://bioinformatik.sdu.dk/solexa/webshare/christoph/nanoporeibat_hub"
+    shell:
         "bin/generateUCSChub.R {input.sample_info} {params.url}"
 
+# salmon rules
+rule prepare_decoys:
+    input:
+        transcripts = "annotation/transcripts.fa",
+        genome = "annotation/genome.fa",
+        annotation = "annotation/annotation.gtf"
+    output:
+        "indices/salmon/decoy/gentrome.fa",
+        "indices/salmon/decoy/decoys.txt"
+    params:
+        outputDir = "indices/salmon/decoy"
+    threads: 20
+    shell:
+        "bin/generateDecoyTranscriptome.sh \
+            -j {threads} \
+            -g {input.genome} \
+            -t {input.transcripts} \
+            -a {input.annotation} \
+            -b {BEDTOOLS} \
+            -m {MASHMAP} \
+            -o {params.outputDir}"
+
+rule generate_salmonIndex:
+    input:
+        gentrome = "indices/salmon/decoy/gentrome.fa",
+        decoy = "indices/salmon/decoy/decoys.txt"
+    output:
+        "indices/salmon/duplicate_clusters.tsv",
+        "indices/salmon/hash.bin",
+        "indices/salmon/rsd.bin",
+        "indices/salmon/sa.bin",
+        "indices/salmon/txpInfo.bin"
+    params:
+        outputDir = "indices/salmon"
+    threads: 20
+    shell:
+        "salmon index \
+            --gencode \
+            -t {input.gentrome} \
+            -i {params.outputDir} \
+            -d {input.decoy} \
+            -p {threads}"
+
+rule map_salmon:
+    threads: 5
+    input:
+        "indices/salmon/duplicate_clusters.tsv",
+        "indices/salmon/hash.bin",
+        "indices/salmon/rsd.bin",
+        "indices/salmon/sa.bin",
+        "indices/salmon/txpInfo.bin",
+        fastq_fw = "fastq/trimmed/{sample}_R1_001_trimmed.fastq.gz",
+        fastq_rv = "fastq/trimmed/{sample}_R2_001_trimmed.fastq.gz"
+    output:
+        "salmon/{sample}/quant.sf"
+    params:
+        inputDir = "indices/salmon",
+        outputDir = "salmon/{sample}"
+    shell:
+        "salmon quant \
+            --gcBias \
+            --seqBias \
+            --numGibbsSamples 25 \
+            -i {params.inputDir} \
+            -l A \
+            -1 {input.fastq_fw} \
+            -2 {input.fastq_rv} \
+            -p {threads} \
+            --validateMappings \
+            -o {params.outputDir}"
+
+rule all_salmon:
+    input:
+        expand("salmon/{sample}/quant.sf", sample=SAMPLES)
