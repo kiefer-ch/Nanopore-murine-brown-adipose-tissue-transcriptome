@@ -1,0 +1,32 @@
+# Ignore everything
+*
+
+# Don't ignore directories, so we can recurse into them
+!*/
+
+# Don't ignore .gitignore
+!.gitignore
+
+# Don't ignore scripts
+!bin/*.R
+!bin/*.Rmd
+!bin/*.sh
+!bin/.multiqc.conf
+
+# Don't ignore necessary data
+!data/biotype_groups.csv
+!data/mm10_Gencode_vM20_gencode.bed.gz
+
+# Don't ignore packrat
+!packrat/init.R
+!packrat/packrat.lock
+!packrat/packrat.opts
+!packrat/src/packrat/packrat_0.5.0.tar.gz
+!.Rprofile
+packrat/*lib
+
+# Root directory
+!Snakefile
+!config.sh
+!README.md
+
