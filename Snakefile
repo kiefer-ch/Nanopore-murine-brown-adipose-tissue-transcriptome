@@ -68,9 +68,11 @@ rule run_fastqc_raw:
     shell:
         "fastqc {input.fastq_fw} \
             --noextract \
+            --quiet \
             -o {params.outputDir} && \
         fastqc {input.fastq_rv} \
             --noextract \
+            --quiet \
             -o {params.outputDir}"
 
 rule qc_raw_all:
@@ -78,7 +80,8 @@ rule qc_raw_all:
         expand("qc/fastqc/raw/{sample}_R1_001_fastqc.zip", sample=SAMPLES),
         expand("qc/fastqc/raw/{sample}_R2_001_fastqc.zip", sample=SAMPLES)
     output:
-        "qc/multiqc_raw.html"
+        "qc/multiqc_raw.html",
+        "qc/multiqc_raw_data.zip"
     shell:
         "multiqc -f -z \
             qc/fastqc/raw \
@@ -91,24 +94,28 @@ rule run_fastqc_trimmed:
         fastq_fw = "fastq/trimmed/{sample}_R1_001_trimmed.fastq.gz",
         fastq_rv = "fastq/trimmed/{sample}_R2_001_trimmed.fastq.gz"
     output:
-        "qc/fastqc/trimmed/{sample}_R1_001_fastqc.html",
-        "qc/fastqc/trimmed/{sample}_R1_001_fastqc.zip",
-        "qc/fastqc/trimmed/{sample}_R2_001_fastqc.html",
-        "qc/fastqc/trimmed/{sample}_R2_001_fastqc.zip"
+        "qc/fastqc/trimmed/{sample}_R1_001_trimmed_fastqc.html",
+        "qc/fastqc/trimmed/{sample}_R1_001_trimmed_fastqc.zip",
+        "qc/fastqc/trimmed/{sample}_R2_001_trimmed_fastqc.html",
+        "qc/fastqc/trimmed/{sample}_R2_001_trimmed_fastqc.zip"
     params:
         outputDir = "qc/fastqc/trimmed"
     shell:
         "fastqc {input.fastq_fw} \
             --noextract \
+            --quiet \
             -o {params.outputDir} && \
         fastqc {input.fastq_rv} \
             --noextract \
+            --quiet \
             -o {params.outputDir}"
 
 rule qc_trimmed_all:
     input:
-        expand("qc/fastqc/trimmed/{sample}_R1_001_fastqc.zip", sample=SAMPLES),
-        expand("qc/fastqc/trimmed/{sample}_R2_001_fastqc.zip", sample=SAMPLES)
+        expand("qc/fastqc/raw/{sample}_R1_001_fastqc.zip", sample=SAMPLES),
+        expand("qc/fastqc/raw/{sample}_R2_001_fastqc.zip", sample=SAMPLES),
+        expand("qc/fastqc/trimmed/{sample}_R1_001_trimmed_fastqc.zip", sample=SAMPLES),
+        expand("qc/fastqc/trimmed/{sample}_R2_001_trimmed_fastqc.zip", sample=SAMPLES)
     output:
         "qc/multiqc_trimmed.html"
     shell:
@@ -245,6 +252,8 @@ rule make_hub:
         url = "http://bioinformatik.sdu.dk/solexa/webshare/christoph/nanoporeibat_hub"
     shell:
         "bin/generateUCSChub.R {input.sample_info} {params.url}"
+
+# R
 
 # salmon rules
 rule prepare_decoys:
