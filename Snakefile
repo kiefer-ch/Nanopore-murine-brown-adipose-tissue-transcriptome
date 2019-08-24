@@ -53,6 +53,54 @@ rule annotation_all:
         "annotation/genome.fa"
         "annotation/annotation.gtf"
 
+# fastq rules
+rule run_fastqc_raw:
+    input:
+        fastq_fw = "fastq/raw/{sample}_R1_001.fastq.gz",
+        fastq_rv = "fastq/raw/{sample}_R2_001.fastq.gz"
+    output:
+        "{sample}_R1_001_fastqc.html",
+        "{sample}_R1_001_fastqc.zip",
+        "{sample}_R2_001_fastqc.html",
+        "{sample}_R2_001_fastqc.zip"
+    params:
+        outputDir = "qc/fastqc/raw"
+    shell:
+        "fastqc {input.fastq_fw} \
+            --noextract \
+            -o {params.outputDir} && \
+        fastqc {input.fastq_rv} \
+            --noextract \
+            -o {params.outputDir}"
+
+rule qc_raw_all:
+    input:
+        expand("{sample}_R1_001_fastqc.zip", sample=SAMPLES),
+        expand("{sample}_R2_001_fastqc.zip", sample=SAMPLES)
+    output:
+        "qc_multiqc_raw.html"
+    shell:
+        "multiqc -f -z \
+            qc/fastqc/raw \
+            -o qc \
+            -n multiqc_raw.html"
+
+
+rule run_fastqc_trimmed:
+    input:
+        fastq_fw = "fastq/trimmed/{sample}_R1_001_trimmed.fastq.gz",
+        fastq_rv = "fastq/trimmed/{sample}_R2_001_trimmed.fastq.gz"
+    params:
+        outputDir = "qc/fastqc/trimmed"
+    shell:
+        "fastqc {input.fastq_fw} \
+            --noextract \
+            -o {params.outputDir} && \
+        fastqc {input.fastq_rv} \
+            --noextract \
+            -o {params.outputDir}"
+
+
 # STAR rules
 rule generate_STARgenome:
     input:
