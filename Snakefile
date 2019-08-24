@@ -15,7 +15,7 @@ BEDTOOLS = "/data/bin/bedtools/bedtools-v2.28/bedtools"
 MASHMAP = "/data/home/christophak/bin/mashmap"
 
 # Sample IDs
-SAMPLES = pd.read_csv("sample_info/illumina_sample_id.txt", sep='\t')["sample"].tolist()
+SAMPLES = pd.read_csv("sample_info/illumina_sample_id.txt", sep='\t', header=None)[0].tolist()
 
 # packrat rules
 rule packrat_init:
@@ -59,10 +59,10 @@ rule run_fastqc_raw:
         fastq_fw = "fastq/raw/{sample}_R1_001.fastq.gz",
         fastq_rv = "fastq/raw/{sample}_R2_001.fastq.gz"
     output:
-        "{sample}_R1_001_fastqc.html",
-        "{sample}_R1_001_fastqc.zip",
-        "{sample}_R2_001_fastqc.html",
-        "{sample}_R2_001_fastqc.zip"
+        "qc/fastqc/raw/{sample}_R1_001_fastqc.html",
+        "qc/fastqc/raw/{sample}_R1_001_fastqc.zip",
+        "qc/fastqc/raw/{sample}_R2_001_fastqc.html",
+        "qc/fastqc/raw/{sample}_R2_001_fastqc.zip"
     params:
         outputDir = "qc/fastqc/raw"
     shell:
@@ -75,10 +75,10 @@ rule run_fastqc_raw:
 
 rule qc_raw_all:
     input:
-        expand("{sample}_R1_001_fastqc.zip", sample=SAMPLES),
-        expand("{sample}_R2_001_fastqc.zip", sample=SAMPLES)
+        expand("qc/fastqc/raw/{sample}_R1_001_fastqc.zip", sample=SAMPLES),
+        expand("qc/fastqc/raw/{sample}_R2_001_fastqc.zip", sample=SAMPLES)
     output:
-        "qc_multiqc_raw.html"
+        "qc/multiqc_raw.html"
     shell:
         "multiqc -f -z \
             qc/fastqc/raw \
@@ -90,6 +90,11 @@ rule run_fastqc_trimmed:
     input:
         fastq_fw = "fastq/trimmed/{sample}_R1_001_trimmed.fastq.gz",
         fastq_rv = "fastq/trimmed/{sample}_R2_001_trimmed.fastq.gz"
+    output:
+        "qc/fastqc/trimmed/{sample}_R1_001_fastqc.html",
+        "qc/fastqc/trimmed/{sample}_R1_001_fastqc.zip",
+        "qc/fastqc/trimmed/{sample}_R2_001_fastqc.html",
+        "qc/fastqc/trimmed/{sample}_R2_001_fastqc.zip"
     params:
         outputDir = "qc/fastqc/trimmed"
     shell:
@@ -100,6 +105,38 @@ rule run_fastqc_trimmed:
             --noextract \
             -o {params.outputDir}"
 
+rule qc_trimmed_all:
+    input:
+        expand("qc/fastqc/trimmed/{sample}_R1_001_fastqc.zip", sample=SAMPLES),
+        expand("qc/fastqc/trimmed/{sample}_R2_001_fastqc.zip", sample=SAMPLES)
+    output:
+        "qc/multiqc_trimmed.html"
+    shell:
+        "multiqc -f -z \
+            -c bin/.multiqc.conf \
+            qc/fastqc \
+            -o qc \
+            -n multiqc_trimmed.html"
+
+# cutadapt rules
+rule trim_adapters:
+    input:
+        fastq_fw = "fastq/raw/{sample}_R1_001.fastq.gz",
+        fastq_rv = "fastq/raw/{sample}_R2_001.fastq.gz"
+    output:
+        fastq_fw = "fastq/trimmed/{sample}_R1_001_trimmed.fastq.gz",
+        fastq_rv = "fastq/trimmed/{sample}_R2_001_trimmed.fastq.gz"
+    threads: 5
+    shell:
+        "cutadapt \
+            -j {threads} \
+            -q 28 \
+            -m 30 \
+            -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCA \
+            -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT \
+            -o {output.fastq_fw} \
+            -p {output.fastq_rv} \
+            {input.fastq_fw} {input.fastq_rv}"
 
 # STAR rules
 rule generate_STARgenome:
