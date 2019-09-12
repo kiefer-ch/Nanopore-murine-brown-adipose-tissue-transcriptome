@@ -1,0 +1,484 @@
+---
+title: "Gencode gene level"
+author: "Christoph Kiefer"
+date: "25. Juli 2019"
+output: html_document
+editor_options:
+  chunk_output_type: console
+---
+
+```{r setup, include = FALSE, cache = FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, cache = TRUE)
+MA_include <- TRUE
+```
+
+```{r library, include = FALSE, message = FALSE, cache = FALSE}
+library("DESeq2")
+library("dplyr")
+library("ggplot2")
+library("ggthemes")
+library("RColorBrewer")
+library("readr")
+library("pheatmap")
+library("cowplot")
+library("purrr")
+library("topGO")
+    select <- dplyr::select
+library("Mus.musculus")
+library("ReactomePA")
+library("GGally")
+library("vsn")
+```
+
+```{r importData, include = FALSE}
+# import data
+dds <- readRDS("../data/dds_gencode.vM22.rds")
+
+# prepare countmatrices
+rld <- rlog(dds, blind = FALSE)
+ntd <- normTransform(dds)
+
+# export countmatrixes
+assay(rld) %>% 
+    as_tibble(rownames = "gene_id_ens") %>% 
+    write_csv("../res/gencode/gencode_cm_rld.csv.gz")
+assay(ntd) %>% 
+    as_tibble(rownames = "gene_id_ens") %>% 
+    write_csv("../res/gencode/gencode_cm_ntd.csv.gz")
+```
+
+# Quality control
+
+## Sampling depths
+
+```{r samplingDepth}
+# sampling depth
+sapply(split(colSums(counts(dds))/1e6, colData(dds)$cond_temp), summary)
+
+assay(rld) %>% 
+    as_tibble(rownames = "gene") %>% 
+    tidyr::gather("sample", "log2_norm_counts", -gene) %>% 
+    ggplot(aes(sample, log2_norm_counts)) +
+    geom_boxplot()
+```
+
+## Sample distances
+
+```{r sampleDist, echo = FALSE}
+# calculate sample distances
+sampleDists <- dist(t(assay(rld)))
+sampleDistMatrix <- as.matrix(sampleDists)
+
+# colorscale for the heatmap
+colors <- colorRampPalette(rev(brewer.pal(9, "YlOrRd")))(255)
+
+# plot heatmap
+pl <- pheatmap(sampleDistMatrix,
+         annotation_col = colData(dds) %>%
+             as.data.frame() %>%
+             select(cond_temp, cond_cage, cond_room, cond_isolation, RIN),
+         clustering_distance_rows = sampleDists,
+         clustering_distance_cols = sampleDists,
+         col = colors,
+         border_color = NA,
+         fontfamily = "Palatino",
+         lwd = .2)
+
+pl
+```
+
+## Pca on rlog transformed counts (blind)
+
+```{r pca, echo = FALSE}
+# calculate pcs
+pca <- prcomp(t(assay(rld)), scale. = FALSE)
+
+# importance for labels of the plot
+importance <- summary(pca)[[6]]
+pca <- as_tibble(pca$x, rownames = "sample") %>%
+    left_join(as_tibble(colData(dds), rownames = "sample"), by = "sample")
+
+# plot against room/isolation
+# room and isolation are not independent
+pl1 <- ggplot(pca, aes(PC1, PC2, colour = cond_temp)) +
+    geom_point(aes(pch = cond_room), size = 1.5) +
+#    geom_text(aes(label = sample)) +
+    stat_ellipse(type = "norm", level = .68) +
+    theme_tufte() +
+    geom_rangeframe(colour = "black", sides = 'bl') +
+    scale_y_continuous(breaks = extended_range_breaks()(pca[, 3]),
+                       labels = function(x) round(x, 1),
+                       name = sprintf("PC2 (%s %% variance)",
+                                      round(importance[2,2] * 100, 1))) +
+    scale_x_continuous(breaks = extended_range_breaks()(pca[, 2]),
+                       labels = function(x) round(x, 1),
+                       name = sprintf("PC1 (%s %% variance)",
+                                      round(importance[2,1] * 100, 1))) +
+    scale_color_viridis_d()
+
+# plot against cage
+pl2 <- ggplot(pca, aes(PC1, PC2, colour = cond_temp)) +
+    geom_point(aes(pch = cond_cage), size = 1.5) +
+#    geom_text(aes(label = sample)) +
+    stat_ellipse(type = "norm", level = .68) +
+    theme_tufte() +
+    geom_rangeframe(colour = "black", sides = 'bl') +
+    scale_y_continuous(breaks = extended_range_breaks()(pca[, 3]),
+                       labels = function(x) round(x, 1),
+                       name = sprintf("PC2 (%s %% variance)",
+                                      round(importance[2,2] * 100, 1))) +
+    scale_x_continuous(breaks = extended_range_breaks()(pca[, 2]),
+                       labels = function(x) round(x, 1),
+                       name = sprintf("PC1 (%s %% variance)",
+                                      round(importance[2,1] * 100, 1))) +
+    scale_color_viridis_d()
+
+# plot both into one
+plot_grid(pl1, pl2)
+```
+
+PC1 explains 40% of the variance and separates the cold treated from the control
+animals. PC2 (19%) seems to depend on the room/isolation (they are the same 
+unfortunately). The cage on the other hand does not seem to be of importance.
+
+# Adjusting the formula to include room
+
+It will be accounted for later on.
+
+## VSN
+
+```{r vsn, echo = TRUE}
+meanSdPlot(assay(ntd))
+meanSdPlot(assay(rld))
+```
+
+## Plotmatrix
+
+### Without variance stabilising transformation
+
+```{r plotmatrix1}
+my_plot <- function(data, mapping, ...) {
+    ggplot(data = data, mapping = mapping) +
+        geom_point(...) +
+        geom_abline(slope = 1, colour = "red")
+}
+
+assay(ntd) %>%
+    as_tibble() %>% 
+    filter(rowSums(.) > 2) %>% 
+    mutate_all(as.double) %>% 
+    ggpairs(lower = list(continuous = my_plot))
+```
+
+### With variance stabilising transformation
+
+```{r plotmatrix2}
+assay(rld) %>%
+    as_tibble() %>% 
+    filter(rowSums(.) > 2) %>% 
+    mutate_all(as.double) %>% 
+    ggpairs(lower = list(continuous = my_plot))
+```
+
+
+```{r adjustConfounders}
+design(dds) <- formula(~ cond_temp + cond_room)
+```
+
+# Differential gene expression analysis
+
+```{r runDESeq, warning = FALSE}
+#filtering lowly expressed genes and fitting models
+dds <- dds[rowSums(counts(dds)) > 10, ] %>% 
+    DESeq(., parallel = TRUE)
+
+# set reference
+colData(dds)$cond_temp <- relevel(colData(dds)$cond_temp, ref = "22")
+
+# creating results table
+res <- results(dds,
+    name = "cond_temp_22_vs_4",
+    lfcThreshold = 1,
+    alpha = .05,
+    altHypothesis = "greaterAbs",
+    parallel = TRUE)
+
+# shrinking log2 fold change
+# s value cutoff is set to .005?
+resLFC <- lfcShrink(dds, 
+    coef = "cond_temp_22_vs_4",
+    res = res,
+    lfcThreshold = 1,
+    type = "apeglm",
+    parallel = TRUE)
+
+summary(resLFC)
+```
+
+## Results table
+
+```{r results table description, echo = FALSE}
+# print description of Results table
+mcols(resLFC)$description
+```
+
+
+```{r annotation, echo = FALSE, message = FALSE}
+resLFC <- resLFC %>% 
+    as_tibble(rownames = "ensembl_gene_id_version")
+
+# get annotation from biomart
+ensembl = biomaRt::useMart("ensembl",dataset="mmusculus_gene_ensembl")
+annotation <- biomaRt::getBM(
+    attributes = c("ensembl_gene_id_version", "mgi_symbol", "description",
+        "gene_biotype"), 
+    filters = "ensembl_gene_id_version", 
+    values = resLFC$ensembl_gene_id_version, 
+    mart = ensembl)
+
+# calculate average transcript length per gene over all samples
+
+weighted_avgTxLength <- counts(dds, normalized = TRUE) * assays(dds)$avgTxLength
+meanOfCounts <- rowMeans(counts(dds, normalized = TRUE))
+avgTxLength <- rowMeans(weighted_avgTxLength) %>% 
+    `/`(meanOfCounts) %>% 
+    tibble::enframe(. ,name = "ensembl_gene_id_version", value = "avgTxLength")
+
+# get tpm from counts
+countToTpm <- function(counts, effLen) {
+    rate <- log(counts) - log(effLen)
+    denom <- log(sum(exp(rate)))
+    exp(rate - denom + log(1e6))
+}
+
+# merge annotation and TPM
+resLFC <- resLFC %>% 
+    left_join(annotation, by = "ensembl_gene_id_version") %>% 
+    left_join(avgTxLength, by = "ensembl_gene_id_version") %>% 
+    mutate(TPM = countToTpm(baseMean, avgTxLength)) %>% 
+    select(ensembl_gene_id_version, mgi_symbol, description, gene_biotype,
+        baseMean, TPM, avgTxLength, log2FoldChange,  lfcSE, svalue)
+
+# export
+resLFC %>% 
+    arrange(-abs(log2FoldChange)) %>% 
+    write_csv(gzfile("../res/gencode/gencode_results.csv.gz"))
+
+# filter and kable
+resLFC_signif <- resLFC %>% 
+    filter(svalue < .05) %>% 
+    arrange(-abs(log2FoldChange))
+
+resLFC_signif %>% 
+    knitr::kable(format = "html") %>%
+    kableExtra::kable_styling() %>%
+    kableExtra::scroll_box(width = "100%", height = "600px")
+```
+
+## MA plot
+
+```{r MA-plot, echo = FALSE, message = FALSE, include = MA_include}
+my_breaks <- function (n = 5, ...) {
+
+    function(x) {
+        dings <- .045 * (max(x) - min(x))
+        extended_range_breaks_(min(x) + dings , max(x) - dings, n, ...)
+    }
+}
+
+biotype_groups <- read_csv("../data/biotype_groups.csv") %>% 
+    rename(gene_biotype = transcript_biotype)
+
+pl <- resLFC %>%
+    left_join(biotype_groups, by = "gene_biotype") %>% 
+    mutate(signif = if_else(svalue < .05, TRUE, FALSE)) %>%
+    ggplot(aes(log10(baseMean), log2FoldChange, 
+        text = sprintf(" %s<br>%s", mgi_symbol, gene_biotype))) +
+    geom_point(aes(colour = signif, pch = grouped_biotype), size = 1.5) +
+#    theme_tufte() +
+#    geom_rangeframe() +
+    scale_y_continuous(breaks = my_breaks(),
+        labels = function(x) round(x, 1),
+        name = "log2FoldChange 4°C vs 22°C") +
+     scale_x_continuous(breaks = log10(c(1,100,10000,max(resLFC$baseMean))),
+        labels = function(x) round(10^x),
+        name = "baseMean") +
+    scale_color_viridis_d(guide = FALSE)
+
+plotly::toWebGL(plotly::ggplotly(pl, tooltip = "text"))
+```
+
+## Clustering the significantly differentially expressed genes
+
+```{r hclust, echo = FALSE}
+# filter significantly regulated genes
+hclust_df <- assay(rld) %>% 
+    as_tibble(rownames = "gene") %>% 
+    filter(gene %in% resLFC_signif$ensembl_gene_id_version) %>% 
+    as.data.frame() %>%
+    magrittr::set_rownames(.$gene) %>%
+    dplyr::select(-gene) %>%
+    (function(x) {x - rowMeans(x)})
+
+# centering the colorscale
+myColor <- colorRampPalette(rev(brewer.pal(n = 7, name = "RdYlBu")))(100)
+myBreaks <- c(seq(min(hclust_df), 0, length.out = ceiling(50) + 1),
+    seq(max(hclust_df) / 100, max(hclust_df), length.out = floor(50)))
+
+# plot heatmap
+hclust <- pheatmap(hclust_df,
+    fontfamily = "Palatino",
+    annotation_col = colData(dds) %>%
+         as.data.frame() %>%
+         select(cond_temp,cond_room),
+    clustering_method = "ward.D2",
+    clustering_distance_rows = "correlation",
+    color = myColor, breaks = myBreaks,
+    show_rownames = FALSE, show_colnames = FALSE,
+    lwd = .2,
+    cutree_rows = 2,
+    border_color = NA)
+
+hclust
+```
+
+## Gene ontology analysis
+
+using TopGO
+
+https://www.bioconductor.org/packages/release/bioc/html/topGO.html
+
+reference: all expressed genes
+
+```{r go analysis, echo = FALSE, message = FALSE}
+# reference for the GO analysis are all expressed genes
+all_genes <- resLFC$ensembl_gene_id_version
+
+get.geneList <- function(signif) {
+    gl <- as.factor(as.integer(all_genes %in% signif$ensembl_gene_id_version))
+    names(gl) <- all_genes
+    # remove version
+    names(gl) <- unlist(lapply(stringr::str_split(names(gl), "[.]"), "[[",1))
+    gl
+}
+
+# function to actually create topGO object
+make.topGO <- function(geneList, description) {
+    new("topGOdata",
+        description = description,
+        ontology = "BP",
+        allGenes = geneList,
+        nodeSize = 10,
+        annot = annFUN.org,
+        ID = "ensembl",
+        mapping = "org.Mm.eg")
+}
+
+# conveniance function to get results from topGO
+get.results <- function(topGO) {
+    topGOres <- runTest(topGO, algorithm = "parentchild", statistic = "fisher")
+    GenTable(topGO, p = topGOres, orderBy = "p", ranksOf = "p", topNodes = 10) %>%
+        as_tibble() %>%
+        mutate(p = as.double(p))
+}
+
+# conveniance function to plot the results from topGO
+make.plot <-function(results_table, title = '') {
+    rf_tibble <- tibble(x = c(1, dim(results_table)[1]),
+        y = c(0, max(-log10(results_table$p))))
+
+    results_table %>%
+        ggplot(aes(reorder(Term, -log10(p)), -log10(p))) +
+        geom_bar(stat = "identity") +
+        coord_flip() +
+        xlab(NULL) +
+        ggtitle(title) +
+        geom_rangeframe(aes(x, y), data = rf_tibble, sides = 'bl') +
+        scale_y_continuous(breaks = extended_range_breaks()(rf_tibble$y),
+            labels = function(x) round(x, 1)) +
+        theme_tufte(base_size = 6)
+}
+
+# run the analysis
+res_go <- resLFC_signif %>%
+    select(ensembl_gene_id_version, log2FoldChange) %>%
+    mutate(regulation = if_else(log2FoldChange > 0 , "up", "down")) %>% 
+        group_by(regulation) %>%
+    tidyr::nest() %>%
+    mutate(data = map(data, get.geneList)) %>%
+    mutate(topGO = map2(data, as.character(regulation), make.topGO)) %>%
+    mutate(res = map(topGO, get.results)) %>%
+    mutate(n = map(data, function(x) sum(as.integer(as.character(x))))) %>%
+    mutate(n = unlist(n))
+```
+
+### Upregulated genes
+
+```{r upGO, echo = FALSE}
+res_go$res[[1]] %>% 
+    knitr::kable(format = "html") %>%
+    kableExtra::kable_styling()
+```
+
+### Downregulated genes
+
+```{r downGO, echo = FALSE}
+res_go$res[[2]] %>% 
+    knitr::kable(format = "html") %>%
+    kableExtra::kable_styling()
+```
+
+## Reactome
+
+using ReactomePA
+
+reference: all expressed genes
+
+```{r reactome, message = FALSE, echo = FALSE}
+# annotate with entrez ids
+df_reactome <- resLFC_signif %>% 
+    pull(ensembl_gene_id_version) %>% 
+    biomaRt::getBM(
+        attributes = c("entrezgene_id", "ensembl_gene_id_version"), 
+        filters = "ensembl_gene_id_version", 
+        values = ., 
+        mart = ensembl) %>% 
+    left_join(resLFC_signif, by = "ensembl_gene_id_version")
+    
+# named vector with lfc and entrez ids
+geneList_reactome <- df_reactome$entrezgene_id
+names(geneList_reactome) <- df_reactome$log2FoldChange
+
+# reference are all expressed genes
+all_genes_reactome <- resLFC$ensembl_gene_id_version %>% 
+    biomaRt::getBM(
+        attributes = c("entrezgene_id", "ensembl_gene_id_version"), 
+        filters = "ensembl_gene_id_version", 
+        values = ., 
+        mart = ensembl) %>% 
+    pull(entrezgene_id) %>% 
+    as.character()
+
+# perform pathway analysis
+res_reactome <- geneList_reactome %>% 
+    enrichPathway(.,
+        organism = "mouse",
+        readable = TRUE,
+        universe = all_genes_reactome)
+```
+
+
+```{r plot reactome, echo = FALSE, fig.width = 12, fig.asp = 0.62}
+dotplot(res_reactome, 
+    showCategory = 15)
+
+cnetplot(res_reactome, categorySize = "pvalue",
+    foldChange = geneList_reactome)
+```
+
+# Session info
+
+```{r sessionInfo, echo = FALSE, cache = FALSE}
+sessionInfo()
+```
+

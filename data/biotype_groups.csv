@@ -1,0 +1,36 @@
+transcript_biotype,grouped_biotype
+protein_coding,coding
+bidirectional_promoter_lncRNA,long ncRNA
+lncRNA,long ncRNA
+sense_intronic,long ncRNA
+sense_overlapping,long ncRNA
+antisense,long ncRNA
+miRNA,small ncRNA
+misc_RNA,small ncRNA
+Mt_rRNA,small ncRNA
+ribozyme,small ncRNA
+rRNA,small ncRNA
+scaRNA,small ncRNA
+snoRNA,small ncRNA
+snRNA,small ncRNA
+non_stop_decay,processed_others
+nonsense_mediated_decay,processed_others
+processed_transcript,processed_others
+retained_intron,processed_others
+IG_V_pseudogene,pseudogenes
+polymorphic_pseudogene,pseudogenes
+processed_pseudogene,pseudogenes
+pseudogene,pseudogenes
+TR_V_pseudogene,pseudogenes
+transcribed_processed_pseudogene,pseudogenes
+transcribed_unitary_pseudogene,pseudogenes
+transcribed_unprocessed_pseudogene,pseudogenes
+unitary_pseudogene,pseudogenes
+unprocessed_pseudogene,pseudogenes
+TEC,others
+IG_C_gene,others
+IG_J_gene,others
+IG_V_gene,others
+TR_C_gene,others
+TR_J_gene,others
+TR_V_gene,others

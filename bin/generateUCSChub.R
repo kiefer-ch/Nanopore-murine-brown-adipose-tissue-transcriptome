@@ -34,7 +34,8 @@ sample_info <- read_csv(sample_df) %>%
     mutate(short_label = paste(sample_id, condition_temp)) %>%
     mutate(long_label = paste(sample_id, illumina, condition_temp)) %>%
     mutate(colour = brewer.pal(length(unique(condition_temp)), "Set1")[condition_temp]) %>%
-    filter(!is.na(illumina))
+    filter(!is.na(illumina)) %>%
+    arrange(condition_temp)
 
 # create directories
 dir.create(file.path(HUB, "mm10"),
@@ -69,8 +70,8 @@ for (i in 1:nrow(sample_info)) {
         track <- c(
             sprintf("track %s_%s", row$sample_id, direction),
             sprintf("bigDataUrl %s", paste0(HUB_URL, "/bw/", file)),
-            sprintf("shortLabel %s", row$short_label),
-            sprintf("longLabel %s", row$long_label),
+            sprintf("shortLabel %s %s", row$short_label, direction),
+            sprintf("longLabel %s %s", row$long_label, direction),
             "type bigWig",
             "visibility full",
             "autoScale on",
