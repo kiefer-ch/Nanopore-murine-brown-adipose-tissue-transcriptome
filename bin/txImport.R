@@ -2,27 +2,31 @@
 
 rm(list = ls())
 
-library("readr")
-library("dplyr")
-library("tximport")
-library("DESeq2")
+suppressPackageStartupMessages(library("readr"))
+suppressPackageStartupMessages(library("dplyr"))
+suppressPackageStartupMessages(library("tximport"))
+suppressPackageStartupMessages(library("DESeq2"))
 
 ################################################################################
 #
 # author: Christoph Kiefer
 # email: christophak@bmb.sdu.dk
 #
+# usage: tximport.R sample_info annotation.gtf output.rds txout
+# txout must be either TRUE or FALSE
+#
 ################################################################################
 # read command line args
 args = commandArgs(trailingOnly = TRUE)
 
-if (length(args) == 0) {
-    stop("At least one argument must be supplied (sample_info.csv).\n", call. = FALSE)
+if (length(args) == 4) {
+    stop("This script needs exactly 4 arguments to be called.\n", call. = FALSE)
 }
 
 sample_df <- args[1]
 annotation_file <- args[2]
 output_name <- args[3]
+txout <- args[4]
 
 # generate tx2gene table
 tx2g <- GenomicFeatures::makeTxDbFromGFF(annotation_file,
@@ -40,7 +44,10 @@ sample_info <- read_csv(sample_df) %>%
     mutate(path = file.path("salmon", illumina, "quant.sf"))
 
 # create and output dds
-tximport(files = sample_info$path, type = "salmon", tx2gene = tx2g) %>%
+tximport(files = sample_info$path,
+        type = "salmon",
+        tx2gene = tx2g,
+        txOut = txout) %>%
     DESeqDataSetFromTximport(.,
         colData = tibble::column_to_rownames(as.data.frame(sample_info), "illumina"),
         design = ~ condition_temp) %>%

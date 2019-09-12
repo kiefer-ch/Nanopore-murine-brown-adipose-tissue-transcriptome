@@ -15,7 +15,7 @@
 
 # Don't ignore necessary data
 !data/biotype_groups.csv
-!data/mm10_Gencode_vM20_gencode.bed.gz
+!data/mm10_Gencode_vM20_gencode.bed
 
 # Don't ignore packrat
 !packrat/init.R
