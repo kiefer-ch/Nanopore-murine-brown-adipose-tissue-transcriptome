@@ -10,18 +10,23 @@ TRANSCRIPTS_URL = expand(
 ANNOTATION_URL = expand(
     "{base_url}/gencode.vM22.primary_assembly.annotation.gtf.gz", base_url=GENCODE_URL)
 
-# PAths to software required by salmon
+# Paths to software required by salmon
 BEDTOOLS = "/data/bin/bedtools/bedtools-v2.28/bedtools"
 MASHMAP = "/data/home/christophak/bin/mashmap"
 
 # Sample IDs
-SAMPLES = pd.read_csv("sample_info/illumina_sample_id.txt", sep='\t', header=None)[0].tolist()
+SAMPLE_INFO = pd.read_csv("sample_info/sampleInfo.csv", sep=',')
+SAMPLE_INFO_illumina = SAMPLE_INFO[SAMPLE_INFO["illumina"].notnull()]
+SAMPLES = SAMPLE_INFO_illumina["illumina"].tolist()
+SAMPLE_INFO_ont = SAMPLE_INFO[SAMPLE_INFO["ont"].notnull()]
+SAMPLES_ont = SAMPLE_INFO_ont["illumina"].tolist()
 
-# packrat rules
+# packrat rule
 rule packrat_init:
     script:
         "bin/packrat_init.R"
 
+# Include other rules
 include: "bin/annotation.snakefile"
 
 include: "bin/fastq.snakefile"
