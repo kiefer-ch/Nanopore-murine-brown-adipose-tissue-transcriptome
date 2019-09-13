@@ -19,14 +19,21 @@ suppressPackageStartupMessages(library("DESeq2"))
 # read command line args
 args = commandArgs(trailingOnly = TRUE)
 
-if (length(args) == 4) {
-    stop("This script needs exactly 4 arguments to be called.\n", call. = FALSE)
+if (length(args) != 4) {
+    stop("This script needs exactly 4 arguments to be called.\n")
 }
 
 sample_df <- args[1]
 annotation_file <- args[2]
 output_name <- args[3]
-txout <- args[4]
+
+if (args[4] == "--genelevel") {
+    txout <- FALSE 
+} else if (args[4] == "--txlevel") {
+    txout <- TRUE
+} else {
+    stop("4th parameter must be one of '--txlevel' or '--genelevel'.")
+}
 
 # generate tx2gene table
 tx2g <- GenomicFeatures::makeTxDbFromGFF(annotation_file,
@@ -52,3 +59,4 @@ tximport(files = sample_info$path,
         colData = tibble::column_to_rownames(as.data.frame(sample_info), "illumina"),
         design = ~ condition_temp) %>%
     saveRDS(output_name)
+

@@ -1,0 +1,58 @@
+# STAR rules
+rule generate_STARgenome:
+    input:
+        genome = "annotation/genome.fa",
+        annotation = "annotation/annotation.gtf"
+    output: "indices/STAR/Genome"
+    params:
+        outputDir = "indices/STAR"
+    threads: 20
+    shell:
+        "STAR --runMode genomeGenerate \
+            --runThreadN {threads} \
+            --genomeDir {params.outputDir} \
+            --genomeFastaFiles {input.genome} \
+            --sjdbGTFfile {input.annotation}"
+
+rule map_STAR:
+    input:
+        genome = "indices/STAR/Genome",
+        fastq_fw = "fastq/trimmed/{sample}_R1_001_trimmed.fastq.gz",
+        fastq_rv = "fastq/trimmed/{sample}_R2_001_trimmed.fastq.gz"
+    output:
+        "BAM/{sample}_Aligned.sortedByCoord.out.bam"
+    params:
+        prefix = "BAM/{sample}_",
+        inputDir = "indices/STAR"
+    threads: 20
+    shell:
+        "STAR \
+            --runMode alignReads \
+            --genomeDir {params.inputDir} \
+            --readFilesIn {input.fastq_fw} {input.fastq_rv} \
+            --genomeLoad LoadAndKeep \
+            --runThreadN {threads} \
+            --readFilesCommand zcat \
+            --outFileNamePrefix {params.prefix} \
+            --outSAMtype BAM SortedByCoordinate \
+            --limitBAMsortRAM 15000000000 \
+            --outFilterType BySJout \
+            --outFilterMultimapNmax 20 \
+            --alignSJoverhangMin 8 \
+            --alignSJDBoverhangMin 1 \
+            --outFilterMismatchNmax 999 \
+            --outFilterMismatchNoverReadLmax 0.04 \
+            --alignIntronMin 20 \
+            --alignIntronMax 1000000 \
+            --alignMatesGapMax 1000000"
+
+rule all_STAR:
+    input:
+        expand("BAM/{sample}_Aligned.sortedByCoord.out.bam", sample=SAMPLES)
+    params:
+        genome = "indices/STAR"
+    shell:
+        "STAR \
+            --runMode alignReads \
+            --genomeDir {params.genome} \
+            --genomeLoad Remove"

@@ -12,6 +12,7 @@
 !bin/*.Rmd
 !bin/*.sh
 !bin/.multiqc.conf
+!bin/*.snakefile
 
 # Don't ignore necessary data
 !data/biotype_groups.csv
@@ -35,4 +36,3 @@ packrat/*lib
 !sample_info/sampleInfo.csv
 
 # Don't ignore raw fastq md5sum
-
