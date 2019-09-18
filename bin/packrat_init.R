@@ -9,5 +9,9 @@ rm(list = ls())
 #
 ################################################################################
 
+# Set repositories to include bioconductor. This allows packrat to use
+# install.packages() to install bioconductor packages.
+setRepositories(ind = c(1, 2, 3, 4))
+
 source("packrat/init.R")
 packrat::restore()

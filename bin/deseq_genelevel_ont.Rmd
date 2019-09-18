@@ -1,18 +1,17 @@
 ---
-title: "Gencode gene level"
+title: "nanopore iBAT, Illumina reads gene level, only samples used for ont too"
 author: "Christoph Kiefer"
-date: "25. Juli 2019"
+date: "18. September 2019"
 output: html_document
 editor_options:
   chunk_output_type: console
 ---
 
 ```{r setup, include = FALSE, cache = FALSE}
-knitr::opts_chunk$set(echo = TRUE, warning = FALSE, cache = TRUE)
-MA_include <- TRUE
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = TRUE)
 ```
 
-```{r library, include = FALSE, message = FALSE, cache = FALSE}
+```{r library, include = FALSE, cache = FALSE}
 library("DESeq2")
 library("dplyr")
 library("ggplot2")
@@ -33,27 +32,56 @@ library("vsn")
 ```{r importData, include = FALSE}
 # import data
 dds <- readRDS("../data/dds_gencode.vM22.rds")
+```
 
+```{r exportCountMatrices, dependson = c"importData"}
 # prepare countmatrices
 rld <- rlog(dds, blind = FALSE)
 ntd <- normTransform(dds)
 
-# export countmatrixes
-assay(rld) %>% 
+# annotate count matrices
+annotate_cm <- function(tibble) {
+    ks <- tibble$gene_id_ens %>% 
+        tools::file_path_sans_ext()
+    
+    sym <- mapIds(org.Mm.eg.db, keys = ks, keytype = "ENSEMBL",
+        column = "SYMBOL", multiVals = "first") %>% 
+        tibble::enframe(name = "gene_id", value = "mgi_symbol")
+    names <- mapIds(org.Mm.eg.db, keys = ks, keytype = "ENSEMBL",
+        column = "GENENAME", multiVals = "first") %>% 
+        tibble::enframe(name = "gene_id", value = "gene_name")
+    
+    tibble %>% 
+        mutate(gene_id = tools::file_path_sans_ext(gene_id_ens)) %>% 
+        left_join(sym, by = "gene_id") %>% 
+        left_join(names, by = "gene_id") %>% 
+        select(-gene_id) %>% 
+        select(gene_id_ens, mgi_symbol, gene_name, everything())
+}
+
+# export count matrices
+dir.create("../res/gencode", showWarnings = FALSE, recursive = TRUE)
+
+# with variance shrinking
+assay(rld) %>%
     as_tibble(rownames = "gene_id_ens") %>% 
-    write_csv("../res/gencode/gencode_cm_rld.csv.gz")
+    annotate_cm() %>% 
+    write_csv("../res/gencode/Gm15441-ko_gencode_cm_rld_koWt.csv.gz")
+
+# without
 assay(ntd) %>% 
     as_tibble(rownames = "gene_id_ens") %>% 
-    write_csv("../res/gencode/gencode_cm_ntd.csv.gz")
+    annotate_cm() %>% 
+    write_csv("../res/gencode/Gm15441-ko_gencode_cm_ntd_koWt.csv.gz")
 ```
 
 # Quality control
 
 ## Sampling depths
 
-```{r samplingDepth}
+```{r samplingDepth, dependson = c("importData", "exportCountMatrices")}
 # sampling depth
-sapply(split(colSums(counts(dds))/1e6, colData(dds)$cond_temp), summary)
+sapply(split(colSums(counts(dds))/1e6, colData(dds)$condition_genotype), summary)
 
 assay(rld) %>% 
     as_tibble(rownames = "gene") %>% 
@@ -64,7 +92,7 @@ assay(rld) %>%
 
 ## Sample distances
 
-```{r sampleDist, echo = FALSE}
+```{r sampleDist, echo = FALSE, dependson = "exportCountMatrices"}
 # calculate sample distances
 sampleDists <- dist(t(assay(rld)))
 sampleDistMatrix <- as.matrix(sampleDists)
@@ -76,7 +104,7 @@ colors <- colorRampPalette(rev(brewer.pal(9, "YlOrRd")))(255)
 pl <- pheatmap(sampleDistMatrix,
          annotation_col = colData(dds) %>%
              as.data.frame() %>%
-             select(cond_temp, cond_cage, cond_room, cond_isolation, RIN),
+             select(condition_genotype),
          clustering_distance_rows = sampleDists,
          clustering_distance_cols = sampleDists,
          col = colors,
@@ -87,9 +115,9 @@ pl <- pheatmap(sampleDistMatrix,
 pl
 ```
 
-## Pca on rlog transformed counts (blind)
+## Pca on rlog transformed counts
 
-```{r pca, echo = FALSE}
+```{r pca, dependson = "exportCountMatrices"}
 # calculate pcs
 pca <- prcomp(t(assay(rld)), scale. = FALSE)
 
@@ -98,12 +126,10 @@ importance <- summary(pca)[[6]]
 pca <- as_tibble(pca$x, rownames = "sample") %>%
     left_join(as_tibble(colData(dds), rownames = "sample"), by = "sample")
 
-# plot against room/isolation
-# room and isolation are not independent
-pl1 <- ggplot(pca, aes(PC1, PC2, colour = cond_temp)) +
-    geom_point(aes(pch = cond_room), size = 1.5) +
-#    geom_text(aes(label = sample)) +
-    stat_ellipse(type = "norm", level = .68) +
+# plot
+ggplot(pca, aes(PC1, PC2, colour = condition_genotype)) +
+    geom_point(size = 1.5) +
+#    stat_ellipse(type = "norm", level = .68) +
     theme_tufte() +
     geom_rangeframe(colour = "black", sides = 'bl') +
     scale_y_continuous(breaks = extended_range_breaks()(pca[, 3]),
@@ -115,39 +141,14 @@ pl1 <- ggplot(pca, aes(PC1, PC2, colour = cond_temp)) +
                        name = sprintf("PC1 (%s %% variance)",
                                       round(importance[2,1] * 100, 1))) +
     scale_color_viridis_d()
-
-# plot against cage
-pl2 <- ggplot(pca, aes(PC1, PC2, colour = cond_temp)) +
-    geom_point(aes(pch = cond_cage), size = 1.5) +
-#    geom_text(aes(label = sample)) +
-    stat_ellipse(type = "norm", level = .68) +
-    theme_tufte() +
-    geom_rangeframe(colour = "black", sides = 'bl') +
-    scale_y_continuous(breaks = extended_range_breaks()(pca[, 3]),
-                       labels = function(x) round(x, 1),
-                       name = sprintf("PC2 (%s %% variance)",
-                                      round(importance[2,2] * 100, 1))) +
-    scale_x_continuous(breaks = extended_range_breaks()(pca[, 2]),
-                       labels = function(x) round(x, 1),
-                       name = sprintf("PC1 (%s %% variance)",
-                                      round(importance[2,1] * 100, 1))) +
-    scale_color_viridis_d()
-
-# plot both into one
-plot_grid(pl1, pl2)
 ```
 
-PC1 explains 40% of the variance and separates the cold treated from the control
-animals. PC2 (19%) seems to depend on the room/isolation (they are the same 
-unfortunately). The cage on the other hand does not seem to be of importance.
-
-# Adjusting the formula to include room
-
-It will be accounted for later on.
+PCA as well as sample distances do not show clear clustering of the treatment
+groups.
 
 ## VSN
 
-```{r vsn, echo = TRUE}
+```{r vsn, echo = TRUE, dependson = "exportCountMatrices"}
 meanSdPlot(assay(ntd))
 meanSdPlot(assay(rld))
 ```
@@ -156,7 +157,7 @@ meanSdPlot(assay(rld))
 
 ### Without variance stabilising transformation
 
-```{r plotmatrix1}
+```{r plotmatrix1, dependson = "exportCountMatrices"}
 my_plot <- function(data, mapping, ...) {
     ggplot(data = data, mapping = mapping) +
         geom_point(...) +
@@ -165,39 +166,43 @@ my_plot <- function(data, mapping, ...) {
 
 assay(ntd) %>%
     as_tibble() %>% 
-    filter(rowSums(.) > 2) %>% 
+    filter(rowSums(.) > 3) %>% 
     mutate_all(as.double) %>% 
     ggpairs(lower = list(continuous = my_plot))
 ```
 
 ### With variance stabilising transformation
 
-```{r plotmatrix2}
+```{r plotmatrix2, dependson = "exportCountMatrices"}
 assay(rld) %>%
     as_tibble() %>% 
-    filter(rowSums(.) > 2) %>% 
+    filter(rowSums(.) > 3) %>% 
     mutate_all(as.double) %>% 
     ggpairs(lower = list(continuous = my_plot))
 ```
 
-
-```{r adjustConfounders}
-design(dds) <- formula(~ cond_temp + cond_room)
-```
-
 # Differential gene expression analysis
 
-```{r runDESeq, warning = FALSE}
-#filtering lowly expressed genes and fitting models
-dds <- dds[rowSums(counts(dds)) > 10, ] %>% 
-    DESeq(., parallel = TRUE)
+```{r runDESeq, echo = TRUE, dependson = "importData"}
+dds <- dds[rowSums(counts(dds)) > 10,] 
 
-# set reference
-colData(dds)$cond_temp <- relevel(colData(dds)$cond_temp, ref = "22")
+# filter genes with many 0
+is.zero <- function(x) x == 0
+keep <- counts(dds) %>% 
+    apply(., 1, function(x) sum(is.zero(x))) 
+keep <- names(keep[keep < 3])    
 
+dds <- dds[keep, ]
+
+dds$condition_genotype <- relevel(dds$condition_genotype, ref = "wt")
+dds <- dds %>% 
+    DESeq(parallel = TRUE)
+```
+
+```{r results, dependson = "runDESeq"}
 # creating results table
 res <- results(dds,
-    name = "cond_temp_22_vs_4",
+    name = "condition_genotype_ko_vs_wt",
     lfcThreshold = 1,
     alpha = .05,
     altHypothesis = "greaterAbs",
@@ -206,7 +211,7 @@ res <- results(dds,
 # shrinking log2 fold change
 # s value cutoff is set to .005?
 resLFC <- lfcShrink(dds, 
-    coef = "cond_temp_22_vs_4",
+    coef = "condition_genotype_ko_vs_wt",
     res = res,
     lfcThreshold = 1,
     type = "apeglm",
@@ -217,16 +222,14 @@ summary(resLFC)
 
 ## Results table
 
-```{r results table description, echo = FALSE}
-# print description of Results table
+```{r resultsTableDescription, dependson = "results"}
 mcols(resLFC)$description
-```
 
-
-```{r annotation, echo = FALSE, message = FALSE}
 resLFC <- resLFC %>% 
     as_tibble(rownames = "ensembl_gene_id_version")
+```
 
+```{r annotation}
 # get annotation from biomart
 ensembl = biomaRt::useMart("ensembl",dataset="mmusculus_gene_ensembl")
 annotation <- biomaRt::getBM(
@@ -237,7 +240,6 @@ annotation <- biomaRt::getBM(
     mart = ensembl)
 
 # calculate average transcript length per gene over all samples
-
 weighted_avgTxLength <- counts(dds, normalized = TRUE) * assays(dds)$avgTxLength
 meanOfCounts <- rowMeans(counts(dds, normalized = TRUE))
 avgTxLength <- rowMeans(weighted_avgTxLength) %>% 
@@ -250,7 +252,9 @@ countToTpm <- function(counts, effLen) {
     denom <- log(sum(exp(rate)))
     exp(rate - denom + log(1e6))
 }
+```
 
+```{r exportAnnotation, dependson = "runDESeq"}
 # merge annotation and TPM
 resLFC <- resLFC %>% 
     left_join(annotation, by = "ensembl_gene_id_version") %>% 
@@ -262,7 +266,7 @@ resLFC <- resLFC %>%
 # export
 resLFC %>% 
     arrange(-abs(log2FoldChange)) %>% 
-    write_csv(gzfile("../res/gencode/gencode_results.csv.gz"))
+    write_csv(gzfile("../res/gencode/Gm15441-ko_gencode_results_koWt.csv.gz"))
 
 # filter and kable
 resLFC_signif <- resLFC %>% 
@@ -275,9 +279,9 @@ resLFC_signif %>%
     kableExtra::scroll_box(width = "100%", height = "600px")
 ```
 
-## MA plot
+### MA plot
 
-```{r MA-plot, echo = FALSE, message = FALSE, include = MA_include}
+```{r MA-plot, dependson = "runDESeq"}
 my_breaks <- function (n = 5, ...) {
 
     function(x) {
@@ -293,13 +297,15 @@ pl <- resLFC %>%
     left_join(biotype_groups, by = "gene_biotype") %>% 
     mutate(signif = if_else(svalue < .05, TRUE, FALSE)) %>%
     ggplot(aes(log10(baseMean), log2FoldChange, 
-        text = sprintf(" %s<br>%s", mgi_symbol, gene_biotype))) +
+        text = sprintf("%s<br>%s<br>%s", mgi_symbol, ensembl_gene_id_version, gene_biotype))) +
     geom_point(aes(colour = signif, pch = grouped_biotype), size = 1.5) +
+    geom_hline(yintercept = 0, colour = "blue") +
+    geom_smooth(colour = "red", method = "auto") +
 #    theme_tufte() +
 #    geom_rangeframe() +
     scale_y_continuous(breaks = my_breaks(),
         labels = function(x) round(x, 1),
-        name = "log2FoldChange 4°C vs 22°C") +
+        name = "log2FoldChange ko vs het") +
      scale_x_continuous(breaks = log10(c(1,100,10000,max(resLFC$baseMean))),
         labels = function(x) round(10^x),
         name = "baseMean") +
@@ -308,11 +314,11 @@ pl <- resLFC %>%
 plotly::toWebGL(plotly::ggplotly(pl, tooltip = "text"))
 ```
 
-## Clustering the significantly differentially expressed genes
+### Clustering the significantly differentially expressed genes
 
-```{r hclust, echo = FALSE}
+```{r hclust, dependson = "runDESeq"}
 # filter significantly regulated genes
-hclust_df <- assay(rld) %>% 
+hclust_df <- assay(rld) %>%
     as_tibble(rownames = "gene") %>% 
     filter(gene %in% resLFC_signif$ensembl_gene_id_version) %>% 
     as.data.frame() %>%
@@ -330,7 +336,7 @@ hclust <- pheatmap(hclust_df,
     fontfamily = "Palatino",
     annotation_col = colData(dds) %>%
          as.data.frame() %>%
-         select(cond_temp,cond_room),
+         select(condition_genotype),
     clustering_method = "ward.D2",
     clustering_distance_rows = "correlation",
     color = myColor, breaks = myBreaks,
@@ -350,7 +356,7 @@ https://www.bioconductor.org/packages/release/bioc/html/topGO.html
 
 reference: all expressed genes
 
-```{r go analysis, echo = FALSE, message = FALSE}
+```{r goAnalysis, dependson = "runDESeq"}
 # reference for the GO analysis are all expressed genes
 all_genes <- resLFC$ensembl_gene_id_version
 
@@ -414,7 +420,7 @@ res_go <- resLFC_signif %>%
 
 ### Upregulated genes
 
-```{r upGO, echo = FALSE}
+```{r upGO, dependson = "goAnalysis"}
 res_go$res[[1]] %>% 
     knitr::kable(format = "html") %>%
     kableExtra::kable_styling()
@@ -422,7 +428,7 @@ res_go$res[[1]] %>%
 
 ### Downregulated genes
 
-```{r downGO, echo = FALSE}
+```{r downGO, dependson = "goAnalysis"}
 res_go$res[[2]] %>% 
     knitr::kable(format = "html") %>%
     kableExtra::kable_styling()
@@ -434,7 +440,7 @@ using ReactomePA
 
 reference: all expressed genes
 
-```{r reactome, message = FALSE, echo = FALSE}
+```{r reactome, dependson = "runDESeq"}
 # annotate with entrez ids
 df_reactome <- resLFC_signif %>% 
     pull(ensembl_gene_id_version) %>% 
@@ -468,17 +474,20 @@ res_reactome <- geneList_reactome %>%
 ```
 
 
-```{r plot reactome, echo = FALSE, fig.width = 12, fig.asp = 0.62}
-dotplot(res_reactome, 
-    showCategory = 15)
-
-cnetplot(res_reactome, categorySize = "pvalue",
-    foldChange = geneList_reactome)
+```{r plot reactome, fig.width = 12, fig.asp = 0.62, dependson = "reactome"}
+if (nrow(res_reactome) == 0) {
+    cat("ReactomePA did not find seignificant pathways.")
+    } else {
+    dotplot(res_reactome, 
+        showCategory = 15)
+    cnetplot(res_reactome, categorySize = "pvalue",
+        foldChange = geneList_reactome)
+}
 ```
 
 # Session info
 
-```{r sessionInfo, echo = FALSE, cache = FALSE}
+```{r sessionInfo}
 sessionInfo()
 ```
 
