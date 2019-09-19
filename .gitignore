@@ -19,12 +19,12 @@
 !data/mm10_Gencode_vM20_gencode.bed
 
 # Don't ignore packrat
-!bin/packrat/init.R
-!bin/packrat/packrat.lock
-!bin/packrat/packrat.opts
-!bin/packrat/src/packrat/packrat_0.5.0.tar.gz
-!bin/.Rprofile
-bin/packrat/*lib
+!packrat/init.R
+!packrat/packrat.lock
+!packrat/packrat.opts
+!packrat/src/packrat/packrat_0.5.0.tar.gz
+!.Rprofile
+packrat/*lib
 
 # Root directory
 !Snakefile

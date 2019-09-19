@@ -1,5 +1,5 @@
 ---
-title: "nanopore iBAT, Illumina reads gene level, only samples used for ont too"
+title: "nanopore iBAT, Illumina reads transcript level, only samples used for ont too"
 author: "Christoph Kiefer"
 date: "18. September 2019"
 output: 
@@ -27,9 +27,9 @@ library("DESeq2")
 library("Mus.musculus")
 library("vsn")
 library("topGO")
+library("ReactomePA")
     select <- dplyr::select
     rename <- dplyr::rename
-library("ReactomePA")
 ```
 
 # Export of count matrices
@@ -39,7 +39,7 @@ variance stabilising transformation described in the DESeq2 paper has been used.
 
 ```{r importData, include=FALSE}
 # import data
-dds <- readRDS("../data/dds_gencode.vM22_gene_ont.rds")
+dds <- readRDS("../data/dds_gencode.vM22_transcript_ont.rds")
 ```
 
 ```{r annotateCountMatrices, dependson="importData"}
@@ -48,14 +48,14 @@ rld <- rlog(dds, blind = FALSE)
 ntd <- normTransform(dds)
 
 # annotate count matrices
-annotate_cm <- function(tibble) {
+annotate_cm <- function(tibble, keytype = "ENSEMBL") {
     ks <- tibble$gene_id_ens %>% 
         tools::file_path_sans_ext()
     
-    sym <- mapIds(org.Mm.eg.db, keys = ks, keytype = "ENSEMBL",
+    sym <- mapIds(org.Mm.eg.db, keys = ks, keytype = keytype,
         column = "SYMBOL", multiVals = "first") %>% 
         tibble::enframe(name = "gene_id", value = "mgi_symbol")
-    names <- mapIds(org.Mm.eg.db, keys = ks, keytype = "ENSEMBL",
+    names <- mapIds(org.Mm.eg.db, keys = ks, keytype = keytype,
         column = "GENENAME", multiVals = "first") %>% 
         tibble::enframe(name = "gene_id", value = "gene_name")
     
@@ -70,20 +70,20 @@ annotate_cm <- function(tibble) {
 
 ```{r exportCountMatrices, dependson="annotateCountMatrices", echo=TRUE}
 # export count matrices
-res_folder <- "../res/genelevel_ont" 
+res_folder <- "../res/txlevel_ont" 
 dir.create(res_folder, showWarnings = FALSE, recursive = TRUE)
 
 # with variance shrinking
 assay(rld) %>%
     as_tibble(rownames = "gene_id_ens") %>% 
-    annotate_cm() %>% 
-    write_csv(file.path(res_folder, "genelevel_ont_cm_rld.csv.gz"))
+    annotate_cm(keytype = "ENSEMBLTRANS") %>% 
+    write_csv(file.path(res_folder, "txlevel_ont_cm_rld.csv.gz"))
 
 # without
 assay(ntd) %>% 
     as_tibble(rownames = "gene_id_ens") %>% 
-    annotate_cm() %>% 
-    write_csv(file.path(res_folder, "genelevel_ont_cm_ntd.csv.gz"))
+    annotate_cm(keytype = "ENSEMBLTRANS") %>% 
+    write_csv(file.path(res_folder, "txlevel_ont_cm_ntd.csv.gz"))
 ```
 
 # Quality control
@@ -112,7 +112,7 @@ assay(rld) %>%
 
 ## VSN
 
-The vertical axis in such plots is the square root of the variance over all
+The vertical axis in these plots is the square root of the variance over all
 samples, including the variance due to the experimental conditions.
 
 (Left side is without transformation, right side after rlog transformation.)
@@ -128,7 +128,7 @@ plot_grid(vsn1$gg + theme(legend.position="none"), vsn2$gg + theme(legend.positi
 
 ## Sample distances
 
-The samples cluster by temperature, as wanted.
+The samples cluster by temperature, as wanted. Not as clearly as on gene level though.
 
 ```{r sampleDist, dependson="annotateCountMatrices"}
 # calculate sample distances
@@ -155,9 +155,8 @@ pl
 
 ## Pca on rlog transformed counts
 
-PC1 (50% of the variance) is driven by the temperature. Assumably PC2 (26%) is 
-driven by the room/RNA isolation (see analysis of all samples). I will not adjust
-for confounders in this analysis.
+PC1 (31% of the variance) is driven by room/isolation! PC2 (26%) is 
+driven by the temperature. Therefore I will adjust for romm as confounding variable.
 
 ```{r pca, echo=FALSE}
 # calculate pcs
@@ -215,11 +214,16 @@ assay(rld) %>%
     ggpairs(lower = list(continuous = my_plot))
 ```
 
-Maybe 5034_S33 shows some differences compared to the other samples?
+Maybe 5034_S33 shows some differences compared to the other samples, like on genelevel?
 
-# Differential gene expression analysis
+# Differential transcript expression analysis
 
-```{r runDESeq, dependson="importData"}
+```{r adjustConfounders, echo=TRUE, dependson="importData"}
+design(dds) <- formula(~ condition_temp + condition_room)
+```
+
+
+```{r runDESeq, dependson="adjustConfounders"}
 # set reference
 colData(dds)$condition_temp <- relevel(colData(dds)$condition_temp, ref = "22")
 
@@ -243,7 +247,7 @@ resLFC <- lfcShrink(dds,
 
 ```{r results2, dependson = "results"}
 resLFC <- resLFC %>% 
-    as_tibble(rownames = "ensembl_gene_id_version")
+    as_tibble(rownames = "ensembl_transcript_id_version")
 
 summary.resLFC <- function(resLFC, lfcThreshold = 1, svalueCutoff = .05) {
     n_tot <- nrow(resLFC)
@@ -272,10 +276,11 @@ LFC < -%f (down) : %d",
 # get annotation from biomart
 ensembl = biomaRt::useMart("ensembl",dataset="mmusculus_gene_ensembl")
 annotation <- biomaRt::getBM(
-    attributes = c("ensembl_gene_id_version", "mgi_symbol", "description",
+    attributes = c("ensembl_transcript_id_version",
+        "ensembl_gene_id_version", "mgi_symbol", "description",
         "gene_biotype"), 
-    filters = "ensembl_gene_id_version", 
-    values = resLFC$ensembl_gene_id_version, 
+    filters = "ensembl_transcript_id_version", 
+    values = resLFC$ensembl_transcript_id_version, 
     mart = ensembl)
 
 # calculate average transcript length per gene over all samples
@@ -283,7 +288,7 @@ weighted_avgTxLength <- counts(dds, normalized = TRUE) * assays(dds)$avgTxLength
 meanOfCounts <- rowMeans(counts(dds, normalized = TRUE))
 avgTxLength <- rowMeans(weighted_avgTxLength) %>% 
     `/`(meanOfCounts) %>% 
-    tibble::enframe(. ,name = "ensembl_gene_id_version", value = "avgTxLength")
+    tibble::enframe(. ,name = "ensembl_transcript_id_version", value = "avgTxLength")
 
 # get tpm from counts
 countToTpm <- function(counts, effLen) {
@@ -296,16 +301,16 @@ countToTpm <- function(counts, effLen) {
 ```{r exportAnnotation, dependson="results2"}
 # merge annotation and TPM
 resLFC <- resLFC %>% 
-    left_join(annotation, by = "ensembl_gene_id_version") %>% 
-    left_join(avgTxLength, by = "ensembl_gene_id_version") %>% 
+    left_join(annotation, by = "ensembl_transcript_id_version") %>% 
+    left_join(avgTxLength, by = "ensembl_transcript_id_version") %>% 
     mutate(TPM = countToTpm(baseMean, avgTxLength)) %>% 
-    select(ensembl_gene_id_version, mgi_symbol, description, gene_biotype,
+    select(ensembl_transcript_id_version, ensembl_gene_id_version, mgi_symbol, description, gene_biotype,
         baseMean, TPM, avgTxLength, log2FoldChange,  lfcSE, svalue)
 
 # export
 resLFC %>% 
     arrange(-abs(log2FoldChange)) %>% 
-    write_csv(gzfile(file.path(res_folder, "genelevel_ont_de.csv.gz")))
+    write_csv(gzfile(file.path(res_folder, "txlevel_ont_de.csv.gz")))
 
 # filter and kable
 resLFC_signif <- resLFC %>% 
@@ -332,11 +337,11 @@ my_breaks <- function (n = 5, ...) {
 biotype_groups <- read_csv("../data/biotype_groups.csv") %>% 
     rename(gene_biotype = transcript_biotype)
 
-pl <- resLFC %>%
+resLFC %>%
     left_join(biotype_groups, by = "gene_biotype") %>% 
     mutate(signif = if_else(svalue < .05, TRUE, FALSE)) %>%
     ggplot(aes(log10(baseMean), log2FoldChange, 
-        text = sprintf("%s<br>%s<br>%s", mgi_symbol, ensembl_gene_id_version, gene_biotype))) +
+        text = sprintf("%s<br>%s<br>%s", mgi_symbol, ensembl_transcript_id_version, gene_biotype))) +
     geom_point(aes(colour = signif, pch = grouped_biotype), size = 1.5) +
     geom_hline(yintercept = 0, colour = "blue") +
 #    geom_smooth(colour = "red", method = "auto") +
@@ -349,9 +354,11 @@ pl <- resLFC %>%
         labels = function(x) round(10^x),
         name = "baseMean") +
     scale_color_viridis_d(guide = FALSE)
-
-plotly::toWebGL(plotly::ggplotly(pl, tooltip = "text"))
 ```
+
+Some tanscripts in the range 10 to 700 counts show a high log2FoldChange. They
+might be treated as outliers by the lfc shrinking algoryhtm and therefore not shrunken at all.
+It is worth investigating their expression (Maybe only one sample with high expression?).
 
 ### Clustering the significantly differentially expressed genes
 
@@ -359,7 +366,7 @@ plotly::toWebGL(plotly::ggplotly(pl, tooltip = "text"))
 # filter significantly regulated genes
 hclust_df <- assay(rld) %>%
     as_tibble(rownames = "gene") %>% 
-    filter(gene %in% resLFC_signif$ensembl_gene_id_version) %>% 
+    filter(gene %in% resLFC_signif$ensembl_transcript_id_version) %>% 
     as.data.frame() %>%
     magrittr::set_rownames(.$gene) %>%
     dplyr::select(-gene) %>%
@@ -379,13 +386,27 @@ hclust <- pheatmap(hclust_df,
     clustering_method = "ward.D2",
     clustering_distance_rows = "correlation",
     color = myColor, breaks = myBreaks,
-    show_rownames = FALSE, show_colnames = FALSE,
+    show_rownames = FALSE, show_colnames = TRUE,
     lwd = .2,
-    cutree_rows = 2,
+    cutree_rows = 3,
     border_color = NA)
 
 hclust
 ```
+
+Two clusters with transcripts clearly regulated by temperature pop up as well as 
+one cluster that shows different behaviour in S33 and S34. Those are the samples
+with the other room, showing the effect of the confounding variable (that was
+accounted for in the analysis).
+
+```{r sampleInfoTable}
+colData(dds) %>% 
+    as_tibble() %>% 
+    select(sample_id, condition_cage, condition_temp, condition_room, RIN) %>% 
+    knitr::kable(format = "html") %>%
+    kableExtra::kable_styling()
+```
+
 
 ## Gene ontology analysis
 

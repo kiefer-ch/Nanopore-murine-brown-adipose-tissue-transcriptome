@@ -40,3 +40,26 @@ include: "bin/rseqc.snakefile"
 include: "bin/salmon.snakefile"
 
 include: "bin/txImport.snakefile"
+
+# render rmd rules
+rule render_ont_gene:
+    input:
+        "data/dds_gencode.vM22_gene_ont.rds"
+    output:
+        "res/deseq_genelevel_ont.html"
+    params:
+        rmd = "bin/deseq_genelevel_ont.rmd",
+        out = "../res/deseq_genelevel_ont.html"
+    shell:
+        "Rscript -e 'rmarkdown::render(input = {params.rmd}, output_file = {params.out})'"
+
+rule render_ont_transcript:
+    input:
+        "data/dds_gencode.vM22_transcript_ont.rds"
+    output:
+        "res/deseq_txlevel_ont.html"
+    params:
+        rmd = "bin/deseq_txlevel_ont.rmd",
+        out = "../res/deseq_txlevel_ont.html"
+    shell:
+        "Rscript -e 'rmarkdown::render(input = {params.rmd}, output_file = {params.out})'"
