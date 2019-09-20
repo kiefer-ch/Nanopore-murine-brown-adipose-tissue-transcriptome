@@ -1,3 +1,6 @@
+__author__ = "Christoph Kiefer"
+__email__ = "christophak@bmb.sdu.dk"
+
 import pandas as pd
 
 # URLS to annotation
@@ -23,8 +26,11 @@ SAMPLES_ont = SAMPLE_INFO_ont["illumina"].tolist()
 
 # packrat rule
 rule packrat_init:
-    script:
-        "bin/packrat_init.R"
+    run:
+        shell("""
+            R -e 'source("packrat/init.R")'
+        """)
+        shell("R -e 'packrat::restore()'")
 
 # Include other rules
 include: "bin/annotation.snakefile"
@@ -46,20 +52,30 @@ rule render_ont_gene:
     input:
         "data/dds_gencode.vM22_gene_ont.rds"
     output:
-        "res/deseq_genelevel_ont.html"
-    params:
-        rmd = "bin/deseq_genelevel_ont.rmd",
-        out = "../res/deseq_genelevel_ont.html"
-    shell:
-        "Rscript -e 'rmarkdown::render(input = {params.rmd}, output_file = {params.out})'"
+        "res/genelevel_ont/deseq_genelevel_ont.html"
+    script:
+        "bin/deseq_genelevel_ont.Rmd"
+
+rule render_all_gene:
+    input:
+        "data/dds_gencode.vM22_gene.rds"
+    output:
+        "res/genelevel_ont/deseq_genelevel_all.html"
+    script:
+        "bin/deseq_genelevel_all.Rmd"
 
 rule render_ont_transcript:
     input:
         "data/dds_gencode.vM22_transcript_ont.rds"
     output:
-        "res/deseq_txlevel_ont.html"
-    params:
-        rmd = "bin/deseq_txlevel_ont.rmd",
-        out = "../res/deseq_txlevel_ont.html"
-    shell:
-        "Rscript -e 'rmarkdown::render(input = {params.rmd}, output_file = {params.out})'"
+        "res/txlevel_ont/deseq_txlevel_ont.html"
+    script:
+        "bin/deseq_txlevel_ont.Rmd"
+
+rule render_all_transcript:
+    input:
+        "data/dds_gencode.vM22_transcript.rds"
+    output:
+        "res/txlevel_all/deseq_txlevel_all.html"
+    script:
+        "bin/deseq_txlevel_all.Rmd"

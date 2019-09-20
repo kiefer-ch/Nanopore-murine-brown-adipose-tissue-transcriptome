@@ -22,9 +22,9 @@
 !packrat/init.R
 !packrat/packrat.lock
 !packrat/packrat.opts
-!packrat/src/packrat/packrat_0.5.0.tar.gz
+!packrat/lib/x86_64-pc-linux-gnu/3.6.1/packrat
 !.Rprofile
-packrat/*lib
+#packrat/*lib
 
 # Root directory
 !Snakefile
