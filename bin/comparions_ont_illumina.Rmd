@@ -21,13 +21,11 @@ library("ggplot2")
 library("ggiraph")
 library("ggthemes")
 library("cowplot")
+library("ggpmisc")
 ```
 
 ```{r dataImport}
-# sample info
-
-# import count matrices
-import_data <- function(illumina, ont) {
+import_data <- function(illumina, ont, tpm) {
     sample_info <- read_csv("../sample_info/sampleInfo.csv")
 
     illumina <- read_csv(illumina) %>% 
@@ -35,6 +33,9 @@ import_data <- function(illumina, ont) {
         tidyr::gather(key = "sample", value = "counts_illumina", -transcript_id_ens)
     ont <- read_tsv(ont) %>% 
         tidyr::separate(transcript, "transcript_id_ens", sep = '\\|')
+    tpm <- read_csv(tpm) %>% 
+        select(-gene_name, -mgi_symbol) %>% 
+        tidyr::gather(key = "sample", value = "tpm", -transcript_id_ens)
     
     lookup <- sample_info$illumina
     names(lookup) <- sample_info$ont
@@ -45,17 +46,20 @@ import_data <- function(illumina, ont) {
     illumina %>% 
         full_join(ont %>% tidyr::gather(key = "sample", value = "counts_ont", -transcript_id_ens),
             by = c("transcript_id_ens", "sample")) %>% 
+        left_join(tpm, by = c("transcript_id_ens", "sample")) %>% 
         rename(ensembl_transcript_id_version = "transcript_id_ens")
 }
 
 illumina <- "../res/txlevel_ont/txlevel_ont_cm_rld.csv.gz"
 ont <- "../res/wien/6samples/ChrKiefer_6samples_reg_log_transf_counts.tsv"
+tpm <- "../res/txlevel_ont/txlevel_ont_cm_tpm.csv.gz"
 
-df <- import_data(illumina, ont)
-
+df <- import_data(illumina, ont, tpm)
 ```
 
 # Filtering of lowly expressed transcripts
+
+## Before filtering
 
 ```{r densityBeforeFilter, dependson="dataImport"}
 pl1 <- df %>% 
@@ -87,6 +91,7 @@ df <- df %>%
     filter(!(ensembl_transcript_id_version %in% not_expressed))
 ```
 
+## Transcripts expressed in one of the datasets
 
 ```{r densityAfterFilter, dependson="filterNotExpressed"}
 pl1 <- df %>% 
@@ -107,17 +112,13 @@ Filtering for genes that are not expressed in either of the datasets reveals,
 that many transcripts observed in the illumina dataset are not observed in the
 ont dataset.
 
-# Correlation
-
-## Genes expressed in one of the datasets
-
 ```{r annotation, dependson="filterNotExpressed"}
 # get annotation from biomart
 ensembl = biomaRt::useMart("ensembl",dataset="mmusculus_gene_ensembl")
 annotation <- biomaRt::getBM(
     attributes = c("ensembl_transcript_id_version",
         "ensembl_gene_id_version", "mgi_symbol", "description",
-        "gene_biotype", "transcript_biotype"), 
+        "gene_biotype", "transcript_biotype", "transcript_length"), 
     filters = "ensembl_transcript_id_version", 
     values = unique(df$ensembl_transcript_id_version), 
     mart = ensembl)
@@ -138,57 +139,7 @@ df %>%
     write_csv("../res/comparison/countMatrix_transcripts.csv.gz")
 ```
 
-
-```{r correlationWithoutSamples, dependson="annotation"}
-my_breaks <- function (n = 5, ...) {
-
-    function(x) {
-        dings <- .045 * (max(x) - min(x))
-        extended_range_breaks_(min(x) + dings , max(x) - dings, n, ...)
-    }
-}
-
-df %>% 
-    group_by(ensembl_transcript_id_version) %>% 
-    summarise(counts_illumina = sum(counts_illumina),
-        counts_ont = sum(counts_ont)) %>% 
-    filter(complete.cases(.)) %>% 
-    ggplot(aes(counts_illumina, counts_ont)) +
-        geom_point() +
-        geom_smooth(colour = "red") +
-        geom_abline(slope = 1) +
-        theme_tufte() +
-        geom_rangeframe() +
-        scale_y_continuous(breaks = my_breaks(),
-            labels = function(x) round(x, 1)) +
-        scale_x_continuous(breaks = my_breaks(),
-            labels = function(x) round(x, 1))
-
-df %>% 
-    group_by(ensembl_transcript_id_version) %>% 
-    summarise(counts_illumina = sum(counts_illumina),
-        counts_ont = sum(counts_ont),
-        gene_biotype_group = unique(gene_biotype_group)) %>% 
-    filter(complete.cases(.)) %>% 
-    ggplot(aes(counts_illumina, counts_ont, colour = gene_biotype_group)) +
-        geom_point() +
-        geom_smooth(colour = "red") +
-        geom_abline(slope = 1) +
-        theme_tufte() +
-        geom_rangeframe(colour = "black") +
-        facet_wrap(~gene_biotype_group, ncol = 3) +
-        scale_y_continuous(breaks = my_breaks(),
-            labels = function(x) round(x, 1)) +
-        scale_x_continuous(breaks = my_breaks(),
-            labels = function(x) round(x, 1)) +
-        scale_color_viridis_d()
-```
-
-The red line does not really represent the data, but I think it shows some feature
-of the data: Transcripts with low expression in the illumina dataset are not
-picked up in the ont dataset. Of course stricter filtering might change this plot.
-
-## Transcripts expressed in both datasets
+## transcripts expressed in both datasets
 
 ```{r filterNotExpressed2, dependson="annotation"}
 not_expressed <- df %>% 
@@ -207,17 +158,61 @@ n_tx_in_both <- length(unique(df_both$ensembl_transcript_id_version))
 cat(sprintf("%d transcripts are exressed in one dataset.
 %d transcripts are expressed in both datasets.
 Cutoff: sum of log2 counts over all replicates > 1.", n_tx_in_one, n_tx_in_both))
+
+df_both %>% 
+    distinct(ensembl_transcript_id_version, .keep_all = TRUE) %>% 
+    pull(transcript_biotype_group) %>% 
+    table()
+
+pl1 <- df_both %>% 
+    ggplot(aes(counts_illumina)) +
+    geom_density(aes(colour = sample)) +
+    scale_colour_viridis_d()
+pl3 <- df_both %>% 
+    ggplot(aes(log10(tpm))) +
+    geom_density(aes(colour = sample)) +
+    scale_colour_viridis_d()
+pl2 <- df_both %>% 
+    ggplot(aes(counts_ont)) +
+    geom_density(aes(colour = sample)) +
+    scale_colour_viridis_d()
+
+ggdraw(plot_grid(plot_grid(pl1 + theme(legend.position="none"),
+                           pl3 + theme(legend.position="none"),
+                           pl2 + theme(legend.position="none"),
+                           ncol=1, align='v'),
+    plot_grid(NULL, get_legend(pl1), ncol=1),
+    rel_widths=c(1, 0.2)))
 ```
 
+# Correlation
 
-```{r correlationWithoutSamples2, dependson="filterNotExpressed2"}
-df_both %>% 
+## Transcripts expressed in one of the datasets
+
+### Illumina counts (rlog)
+
+```{r correlationWithoutSamples_counts, dependson="annotation"}
+df %>% 
+    distinct(ensembl_transcript_id_version, .keep_all = TRUE) %>% 
+    pull(transcript_biotype_group) %>% 
+    table()
+
+my_breaks <- function (n = 5, ...) {
+
+    function(x) {
+        dings <- .045 * (max(x) - min(x))
+        extended_range_breaks_(min(x) + dings , max(x) - dings, n, ...)
+    }
+}
+
+pl1 <- df %>% 
     group_by(ensembl_transcript_id_version) %>% 
     summarise(counts_illumina = sum(counts_illumina),
-        counts_ont = sum(counts_ont)) %>% 
+        counts_ont = sum(counts_ont),
+        gene_biotype_group = unique(gene_biotype_group)) %>% 
     filter(complete.cases(.)) %>% 
     ggplot(aes(counts_illumina, counts_ont)) +
-        geom_point() +
+        geom_point(aes(colour = gene_biotype_group)) +
         geom_smooth(colour = "red") +
         geom_abline(slope = 1) +
         theme_tufte() +
@@ -225,9 +220,10 @@ df_both %>%
         scale_y_continuous(breaks = my_breaks(),
             labels = function(x) round(x, 1)) +
         scale_x_continuous(breaks = my_breaks(),
-            labels = function(x) round(x, 1))
+            labels = function(x) round(x, 1)) +
+        scale_colour_viridis_d()
 
-df_both %>% 
+pl2 <- df %>% 
     group_by(ensembl_transcript_id_version) %>% 
     summarise(counts_illumina = sum(counts_illumina),
         counts_ont = sum(counts_ont),
@@ -245,10 +241,340 @@ df_both %>%
         scale_x_continuous(breaks = my_breaks(),
             labels = function(x) round(x, 1)) +
         scale_color_viridis_d()
+
+plot_grid(pl1 + theme(legend.position="none"),
+        pl2 + theme(legend.position="none"), 
+        get_legend(pl1),
+    ncol = 3, rel_widths = c(1,1,.3))
+   
+pl1 <- df %>% 
+    group_by(ensembl_transcript_id_version) %>% 
+    summarise(counts_illumina = sum(counts_illumina),
+        counts_ont = sum(counts_ont),
+        transcript_biotype_group = unique(transcript_biotype_group)) %>% 
+    filter(complete.cases(.)) %>% 
+    ggplot(aes(counts_illumina, counts_ont)) +
+        geom_point(aes(colour = transcript_biotype_group)) +
+        geom_smooth(colour = "red") +
+        geom_abline(slope = 1) +
+        theme_tufte() +
+        geom_rangeframe() +
+        scale_y_continuous(breaks = my_breaks(),
+            labels = function(x) round(x, 1)) +
+        scale_x_continuous(breaks = my_breaks(),
+            labels = function(x) round(x, 1)) +
+        scale_colour_viridis_d()
+
+pl2 <- df %>% 
+    group_by(ensembl_transcript_id_version) %>% 
+    summarise(counts_illumina = sum(counts_illumina),
+        counts_ont = sum(counts_ont),
+        transcript_biotype_group = unique(transcript_biotype_group)) %>% 
+    filter(complete.cases(.)) %>% 
+    ggplot(aes(counts_illumina, counts_ont, colour = transcript_biotype_group)) +
+        geom_point() +
+        geom_smooth(colour = "red") +
+        geom_abline(slope = 1) +
+        theme_tufte() +
+        geom_rangeframe(colour = "black") +
+        facet_wrap(~transcript_biotype_group, ncol = 3) +
+        scale_y_continuous(breaks = my_breaks(),
+            labels = function(x) round(x, 1)) +
+        scale_x_continuous(breaks = my_breaks(),
+            labels = function(x) round(x, 1)) +
+        scale_color_viridis_d()
+
+plot_grid(pl1 + theme(legend.position="none"),
+        pl2 + theme(legend.position="none"), 
+        get_legend(pl1),
+    ncol = 3, rel_widths = c(1,1,.3))
+```
+
+### TPM
+
+```{r correlationWithoutSamples_tpm, dependson="annotation"}
+pl1 <- df %>% 
+    group_by(ensembl_transcript_id_version) %>% 
+    summarise(tpm = sum(tpm),
+        counts_ont = sum(counts_ont),
+        gene_biotype_group = unique(gene_biotype_group)) %>% 
+    filter(complete.cases(.)) %>% 
+    ggplot(aes(log10(tpm), counts_ont)) +
+        geom_point(aes(colour = gene_biotype_group)) +
+        geom_smooth(colour = "red") +
+        geom_abline(slope = 20) +
+        theme_tufte() +
+        geom_rangeframe() +
+        scale_y_continuous(breaks = my_breaks(),
+            labels = function(x) round(x, 1)) +
+        scale_x_continuous(breaks = log10(c(1,100,10000,max(df$tpm))),
+            labels = function(x) round(10^x),
+            name = "tpm") +
+        scale_colour_viridis_d()
+
+pl2 <- df %>% 
+    group_by(ensembl_transcript_id_version) %>% 
+    summarise(tpm = sum(tpm),
+        counts_ont = sum(counts_ont),
+        gene_biotype_group = unique(gene_biotype_group)) %>% 
+    filter(complete.cases(.)) %>% 
+    ggplot(aes(log10(tpm), counts_ont, colour = gene_biotype_group)) +
+        geom_point() +
+        geom_smooth(colour = "red") +
+        geom_abline(slope = 20) +
+        theme_tufte() +
+        geom_rangeframe(colour = "black") +
+        facet_wrap(~gene_biotype_group, ncol = 3) +
+        scale_y_continuous(breaks = my_breaks(),
+            labels = function(x) round(x, 1)) +
+        scale_x_continuous(breaks = log10(c(1,100,10000,max(df$tpm))),
+            labels = function(x) round(10^x),
+            name = "tpm") +
+        scale_color_viridis_d()
+
+plot_grid(pl1 + theme(legend.position="none"),
+        pl2 + theme(legend.position="none"), 
+        get_legend(pl1),
+    ncol = 3, rel_widths = c(1,1,.3))
+
+pl1 <- df %>% 
+    group_by(ensembl_transcript_id_version) %>% 
+    summarise(tpm = sum(tpm),
+        counts_ont = sum(counts_ont),
+        transcript_biotype_group = unique(transcript_biotype_group)) %>% 
+    filter(complete.cases(.)) %>% 
+    ggplot(aes(log10(tpm), counts_ont)) +
+        geom_point(aes(colour = transcript_biotype_group)) +
+        geom_smooth(colour = "red") +
+        geom_abline(slope = 20) +
+        theme_tufte() +
+        geom_rangeframe() +
+        scale_y_continuous(breaks = my_breaks(),
+            labels = function(x) round(x, 1)) +
+        scale_x_continuous(breaks = log10(c(1,100,10000,max(df$tpm))),
+            labels = function(x) round(10^x),
+            name = "tpm") +
+        scale_colour_viridis_d()
+
+pl2 <- df %>% 
+    group_by(ensembl_transcript_id_version) %>% 
+    summarise(tpm = sum(tpm),
+        counts_ont = sum(counts_ont),
+        transcript_biotype_group = unique(transcript_biotype_group)) %>% 
+    filter(complete.cases(.)) %>% 
+    ggplot(aes(log10(tpm), counts_ont, colour = transcript_biotype_group)) +
+        geom_point() +
+        geom_smooth(colour = "red") +
+        geom_abline(slope = 20) +
+        theme_tufte() +
+        geom_rangeframe(colour = "black") +
+        facet_wrap(~transcript_biotype_group, ncol = 3) +
+        scale_y_continuous(breaks = my_breaks(),
+            labels = function(x) round(x, 1)) +
+        scale_x_continuous(breaks = log10(c(1,100,10000,max(df$tpm))),
+            labels = function(x) round(10^x),
+            name = "tpm") +
+        scale_color_viridis_d()
+
+plot_grid(pl1 + theme(legend.position="none"),
+        pl2 + theme(legend.position="none"), 
+        get_legend(pl1),
+    ncol = 3, rel_widths = c(1,1,.3))
+```
+
+The red line does not really represent the data, but I think it shows some feature
+of the data: Transcripts with low expression in the illumina dataset are not
+picked up in the ont dataset. Of course stricter filtering might change this plot.
+
+All the "counts" values so far are on log2 level! TPM makes sense.
+
+## Transcripts expressed in both datasets
+
+### Counts
+
+```{r correlationWithoutSamples_counts2, dependson="filterNotExpressed2"}
+# counts
+pl1 <- df_both %>% 
+    group_by(ensembl_transcript_id_version) %>% 
+    summarise(counts_illumina = sum(counts_illumina),
+        counts_ont = sum(counts_ont),
+        gene_biotype_group = unique(gene_biotype_group)) %>% 
+    filter(complete.cases(.)) %>% 
+    ggplot(aes(counts_illumina, counts_ont)) +
+        geom_point(aes(colour = gene_biotype_group)) +
+        geom_smooth(colour = "red") +
+        geom_abline(slope = 1) +
+        theme_tufte() +
+        geom_rangeframe() +
+        scale_y_continuous(breaks = my_breaks(),
+            labels = function(x) round(x, 1)) +
+        scale_x_continuous(breaks = my_breaks(),
+            labels = function(x) round(x, 1)) +
+        scale_color_viridis_d()
+
+
+pl2 <- df_both %>% 
+    group_by(ensembl_transcript_id_version) %>% 
+    summarise(counts_illumina = sum(counts_illumina),
+        counts_ont = sum(counts_ont),
+        gene_biotype_group = unique(gene_biotype_group)) %>% 
+    filter(complete.cases(.)) %>% 
+    ggplot(aes(counts_illumina, counts_ont, colour = gene_biotype_group)) +
+        geom_point() +
+        geom_smooth(colour = "red") +
+        geom_abline(slope = 1) +
+        theme_tufte() +
+        geom_rangeframe(colour = "black") +
+        facet_wrap(~gene_biotype_group, ncol = 3) +
+        scale_y_continuous(breaks = my_breaks(),
+            labels = function(x) round(x, 1)) +
+        scale_x_continuous(breaks = my_breaks(),
+            labels = function(x) round(x, 1)) +
+        scale_color_viridis_d()
+
+plot_grid(pl1 + theme(legend.position="none"),
+        pl2 + theme(legend.position="none"), 
+        get_legend(pl1),
+    ncol = 3, rel_widths = c(1,1,.3))
+
+pl1 <- df_both %>% 
+    group_by(ensembl_transcript_id_version) %>% 
+    summarise(counts_illumina = sum(counts_illumina),
+        counts_ont = sum(counts_ont),
+        transcript_biotype_group = unique(transcript_biotype_group)) %>% 
+    filter(complete.cases(.)) %>% 
+    ggplot(aes(counts_illumina, counts_ont)) +
+        geom_point(aes(colour = transcript_biotype_group)) +
+        geom_smooth(colour = "red") +
+        geom_abline(slope = 1) +
+        theme_tufte() +
+        geom_rangeframe() +
+        scale_y_continuous(breaks = my_breaks(),
+            labels = function(x) round(x, 1)) +
+        scale_x_continuous(breaks = my_breaks(),
+            labels = function(x) round(x, 1)) +
+        scale_colour_viridis_d()
+
+pl2 <- df_both %>% 
+    group_by(ensembl_transcript_id_version) %>% 
+    summarise(counts_illumina = sum(counts_illumina),
+        counts_ont = sum(counts_ont),
+        transcript_biotype_group = unique(transcript_biotype_group)) %>% 
+    filter(complete.cases(.)) %>% 
+    ggplot(aes(counts_illumina, counts_ont, colour = transcript_biotype_group)) +
+        geom_point() +
+        geom_smooth(colour = "red") +
+        geom_abline(slope = 1) +
+        theme_tufte() +
+        geom_rangeframe(colour = "black") +
+        facet_wrap(~transcript_biotype_group, ncol = 3) +
+        scale_y_continuous(breaks = my_breaks(),
+            labels = function(x) round(x, 1)) +
+        scale_x_continuous(breaks = my_breaks(),
+            labels = function(x) round(x, 1)) +
+        scale_color_viridis_d()
+
+plot_grid(pl1 + theme(legend.position="none"),
+        pl2 + theme(legend.position="none"), 
+        get_legend(pl1),
+    ncol = 3, rel_widths = c(1,1,.3))
+```
+
+### TPM
+
+```{r correlationWithoutSamples_tpm2, dependson="filterNotExpressed2"}
+pl1 <- df_both %>% 
+    group_by(ensembl_transcript_id_version) %>% 
+    summarise(tpm = sum(tpm),
+        counts_ont = sum(counts_ont),
+        gene_biotype_group = unique(gene_biotype_group)) %>% 
+    filter(complete.cases(.)) %>% 
+    ggplot(aes(log10(tpm), counts_ont)) +
+        geom_point(aes(colour = gene_biotype_group)) +
+        geom_smooth(colour = "red", method = "lm") +
+        geom_abline(slope = 20) +
+        theme_tufte() +
+        geom_rangeframe() +
+        scale_y_continuous(breaks = my_breaks(),
+            labels = function(x) round(x, 1)) +
+        scale_x_continuous(breaks = log10(c(1,100,10000,max(df$tpm))),
+            labels = function(x) round(10^x),
+            name = "tpm") +
+        scale_color_viridis_d()
+
+pl2 <- df_both %>% 
+    group_by(ensembl_transcript_id_version) %>% 
+    summarise(tpm = sum(tpm),
+        counts_ont = sum(counts_ont),
+        gene_biotype_group = unique(gene_biotype_group)) %>% 
+    filter(complete.cases(.)) %>% 
+    ggplot(aes(log10(tpm), counts_ont, colour = gene_biotype_group)) +
+        geom_point() +
+        geom_smooth(colour = "red", method = "lm") +
+        geom_abline(slope = 20) +
+        theme_tufte() +
+        geom_rangeframe(colour = "black") +
+        facet_wrap(~gene_biotype_group, ncol = 3) +
+        scale_y_continuous(breaks = my_breaks(),
+            labels = function(x) round(x, 1)) +
+        scale_x_continuous(breaks = log10(c(1,100,10000,max(df$tpm))),
+            labels = function(x) round(10^x),
+            name = "tpm") +
+        scale_color_viridis_d()
+
+plot_grid(pl1 + theme(legend.position="none"),
+        pl2 + theme(legend.position="none"), 
+        get_legend(pl1),
+    ncol = 3, rel_widths = c(1,1,.3))
+
+pl1 <- df_both %>% 
+    group_by(ensembl_transcript_id_version) %>% 
+    summarise(tpm = sum(tpm),
+        counts_ont = sum(counts_ont),
+        transcript_biotype_group = unique(transcript_biotype_group)) %>% 
+    filter(complete.cases(.)) %>% 
+    ggplot(aes(log10(tpm), counts_ont)) +
+        geom_point(aes(colour = transcript_biotype_group)) +
+        geom_smooth(colour = "red", method = "lm") +
+        geom_abline(slope = 20) +
+        theme_tufte() +
+        geom_rangeframe() +
+        scale_y_continuous(breaks = my_breaks(),
+            labels = function(x) round(x, 1)) +
+        scale_x_continuous(breaks = log10(c(1,100,10000,max(df$tpm))),
+            labels = function(x) round(10^x),
+            name = "tpm") +
+        scale_color_viridis_d()
+
+pl2 <- df_both %>% 
+    group_by(ensembl_transcript_id_version) %>% 
+    summarise(tpm = sum(tpm),
+        counts_ont = sum(counts_ont),
+        transcript_biotype_group = unique(transcript_biotype_group)) %>% 
+    filter(complete.cases(.)) %>% 
+    ggplot(aes(log10(tpm), counts_ont, colour = transcript_biotype_group)) +
+        geom_point() +
+        geom_smooth(colour = "red", method = "lm") +
+        geom_abline(slope = 20) +
+        theme_tufte() +
+        geom_rangeframe(colour = "black") +
+        facet_wrap(~transcript_biotype_group, ncol = 3) +
+        scale_y_continuous(breaks = my_breaks(),
+            labels = function(x) round(x, 1)) +
+        scale_x_continuous(breaks = log10(c(1,100,10000,max(df$tpm))),
+            labels = function(x) round(10^x),
+            name = "tpm") +
+        scale_color_viridis_d()
+
+plot_grid(pl1 + theme(legend.position="none"),
+        pl2 + theme(legend.position="none"), 
+        get_legend(pl1),
+    ncol = 3, rel_widths = c(1,1,.3))
 ```
 
 It seems to me, that many transcripts below log2(counts_illumina) = 30 do not
-show any expression in the ont data set.
+show any expression in the ont data set. These also seem to have a relatively high 
+part of "processed others" transcripts.
 
 Of course, small ncRNAs are not picked up in the ont dataset because of the 
 missing polyA tail. The same is probably true for the "others" category. Pseudogenes
@@ -260,7 +586,7 @@ picked up in the ont dataset.
 df_both %>% 
     filter(complete.cases(.)) %>%
     ggplot(aes(counts_illumina, counts_ont)) +
-        geom_point() +
+        geom_hex() +
         geom_smooth(colour = "red") +
         geom_abline(slope = 1) +
         theme_tufte() +
@@ -270,8 +596,144 @@ df_both %>%
             labels = function(x) round(x, 1)) +
         scale_x_continuous(breaks = my_breaks(),
             labels = function(x) round(x, 1)) +
-        scale_color_viridis_d()
-    
+        scale_fill_viridis_c()
+
+df_both %>% 
+    filter(complete.cases(.)) %>%
+    ggplot(aes(log10(tpm), counts_ont)) +
+        geom_hex() +
+        geom_smooth(colour = "red") +
+        geom_abline(slope = 20) +
+        theme_tufte() +
+        geom_rangeframe(colour = "black") +
+        facet_wrap(~sample, ncol = 3) +
+        scale_y_continuous(breaks = my_breaks(),
+            labels = function(x) round(x, 1)) +
+        scale_x_continuous(breaks = log10(c(1,100,10000,max(df$tpm))),
+            labels = function(x) round(10^x),
+            name = "tpm") +
+        scale_fill_viridis_c()
 ```
 
 All the samples show the same behaviour.
+
+# Counts by length
+
+Coding transcripts only
+
+```{r countsByLength}
+pl1 <- df_both %>% 
+    group_by(ensembl_transcript_id_version) %>% 
+    summarise(counts_illumina = sum(counts_illumina),
+        counts_ont = sum(counts_ont),
+        transcript_biotype_group = unique(transcript_biotype_group),
+        transcript_length = unique(transcript_length)) %>% 
+    filter(complete.cases(.)) %>% 
+    filter(transcript_biotype_group == "coding") %>% 
+    ggplot(aes(transcript_length, counts_illumina)) +
+        geom_point() +
+        scale_x_log10() +
+        geom_smooth(method = "lm", colour = "red") +
+        stat_poly_eq(formula = y ~ x,
+            aes(label = paste(..eq.label.., ..rr.label.., sep = "~~~")),
+            parse = TRUE, family = "serif", size = 3, colour = "grey30",
+            label.x.npc = "left", label.y.npc = "top") +
+        theme_tufte() +
+        geom_rangeframe(colour = "black")
+
+pl2 <- df_both %>% 
+    group_by(ensembl_transcript_id_version) %>% 
+    summarise(tpm = sum(tpm),
+        counts_ont = sum(counts_ont),
+        transcript_biotype_group = unique(transcript_biotype_group),
+        transcript_length = unique(transcript_length)) %>% 
+    filter(complete.cases(.)) %>% 
+    filter(transcript_biotype_group == "coding") %>% 
+    ggplot(aes(log10(transcript_length), log10(tpm))) +
+        geom_point() +
+        scale_x_continuous(breaks = log10(c(1000,10000,max(df_both$transcript_length))),
+            labels = function(x) round(10^x),
+            name = "length") +
+        scale_y_continuous(breaks = log10(c(1, 10, 100, 1000 ,10000,max(df_both$tpm, na.rm = TRUE))),
+            labels = function(x) round(10^x),
+            name = "tpm") +
+        geom_smooth(method = "lm", colour = "red") +
+        stat_poly_eq(formula = y ~ x,
+            aes(label = paste(..eq.label.., ..rr.label.., sep = "~~~")),
+            parse = TRUE, family = "serif", size = 3, colour = "grey30",
+            label.x.npc = "left", label.y.npc = "top") +
+        theme_tufte() +
+        geom_rangeframe(colour = "black")
+
+pl3 <- df_both %>% 
+    group_by(ensembl_transcript_id_version) %>% 
+    summarise(counts_illumina = sum(counts_illumina),
+        counts_ont = sum(counts_ont),
+        transcript_biotype_group = unique(transcript_biotype_group),
+        transcript_length = unique(transcript_length)) %>% 
+    filter(complete.cases(.)) %>% 
+    filter(transcript_biotype_group == "coding") %>% 
+    ggplot(aes(transcript_length, counts_ont)) +
+        geom_point() +
+        scale_x_log10() +
+        geom_smooth(method = "lm", colour = "red") +
+        stat_poly_eq(formula = y ~ x,
+            aes(label = paste(..eq.label.., ..rr.label.., sep = "~~~")),
+            parse = TRUE, family = "serif", size = 3, colour = "grey30",
+            label.x.npc = "left", label.y.npc = "top") +
+        theme_tufte() +
+        geom_rangeframe(colour = "black")
+
+plot_grid(pl1, pl2, pl3,
+    ncol = 2)
+
+pl1 <- df_both %>% 
+    group_by(ensembl_transcript_id_version) %>% 
+    summarise(counts_illumina = sum(counts_illumina),
+        counts_ont = sum(counts_ont),
+        transcript_biotype_group = unique(transcript_biotype_group),
+        transcript_length = unique(transcript_length)) %>% 
+    filter(complete.cases(.)) %>% 
+    filter(transcript_biotype_group == "coding") %>% 
+    ggplot(aes(counts_illumina, counts_ont, colour = log2(transcript_length))) +
+        geom_point() +
+        geom_smooth(colour = "red") +
+        geom_abline(slope = 1) +
+        theme_tufte() +
+        geom_rangeframe(colour = "black") +
+        facet_wrap(~transcript_biotype_group, ncol = 3) +
+        scale_y_continuous(breaks = my_breaks(),
+            labels = function(x) round(x, 1)) +
+        scale_x_continuous(breaks = my_breaks(),
+            labels = function(x) round(x, 1)) +
+        scale_color_viridis_c()
+
+pl2 <- df_both %>% 
+    group_by(ensembl_transcript_id_version) %>% 
+    summarise(tpm = sum(tpm),
+        counts_ont = sum(counts_ont),
+        transcript_biotype_group = unique(transcript_biotype_group),
+        transcript_length = unique(transcript_length)) %>% 
+    filter(complete.cases(.)) %>% 
+    filter(transcript_biotype_group == "coding") %>% 
+    ggplot(aes(log10(tpm), counts_ont, colour = log2(transcript_length))) +
+        geom_point() +
+        #geom_smooth(colour = "red") +
+        geom_quantile() +
+        geom_abline(slope = 20) +
+        theme_tufte() +
+        geom_rangeframe(colour = "black") +
+        facet_wrap(~transcript_biotype_group, ncol = 3) +
+        scale_y_continuous(breaks = my_breaks(),
+            labels = function(x) round(x, 1)) +
+        scale_x_continuous(breaks = log10(c(1, 10, 100, 1000 ,10000,max(df_both$tpm, na.rm = TRUE))),
+            labels = function(x) round(10^x),
+            name = "tpm") +
+        scale_color_viridis_c()
+
+plot_grid(pl1 + theme(legend.position="none"),
+        pl2 + theme(legend.position="none"), 
+        get_legend(pl1),
+    ncol = 3, rel_widths = c(1,1,.3))
+```
+

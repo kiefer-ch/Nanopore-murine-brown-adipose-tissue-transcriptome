@@ -48,6 +48,14 @@ dds <- readRDS("../data/dds_gencode.vM22_transcript_ont.rds")
 rld <- rlog(dds, blind = FALSE)
 ntd <- normTransform(dds)
 
+# https://haroldpimentel.wordpress.com/2014/05/08/what-the-fpkm-a-review-rna-seq-expression-units/
+fpkmToTpm <- function(fpkm) {
+    exp(log(fpkm) - log(sum(fpkm)) + log(1e6))
+}
+
+tpm <- fpkm(dds, robust = TRUE)
+tpm <- apply(tpm, 2, fpkmToTpm)
+
 # annotate count matrices
 annotate_cm <- function(tibble, keytype = "ENSEMBL") {
     ks <- tibble$gene_id_ens %>% 
@@ -87,6 +95,13 @@ assay(ntd) %>%
     annotate_cm(keytype = "ENSEMBLTRANS") %>% 
     rename(transcript_id_ens = "gene_id_ens") %>%
     write_csv(file.path(res_folder, "txlevel_ont_cm_ntd.csv.gz"))
+
+tpm %>% 
+    as_tibble(rownames = "gene_id_ens") %>% 
+    annotate_cm(keytype = "ENSEMBLTRANS") %>% 
+    rename(transcript_id_ens = "gene_id_ens") %>% 
+    write_csv(file.path(res_folder, "txlevel_ont_cm_tpm.csv.gz"))
+
 ```
 
 # Quality control
@@ -294,13 +309,6 @@ meanOfCounts <- rowMeans(counts(dds, normalized = TRUE))
 avgTxLength <- rowMeans(weighted_avgTxLength) %>% 
     `/`(meanOfCounts) %>% 
     tibble::enframe(. ,name = "ensembl_transcript_id_version", value = "avgTxLength")
-
-# get tpm from counts
-countToTpm <- function(counts, effLen) {
-    rate <- log(counts) - log(effLen)
-    denom <- log(sum(exp(rate)))
-    exp(rate - denom + log(1e6))
-}
 ```
 
 ```{r exportAnnotation, dependson="results2"}
@@ -308,7 +316,7 @@ countToTpm <- function(counts, effLen) {
 resLFC <- resLFC %>% 
     left_join(annotation, by = "ensembl_transcript_id_version") %>% 
     left_join(avgTxLength, by = "ensembl_transcript_id_version") %>% 
-    mutate(TPM = countToTpm(baseMean, avgTxLength)) %>% 
+#    mutate(TPM = countToTpm(baseMean, avgTxLength)) %>% 
     select(ensembl_transcript_id_version, ensembl_gene_id_version, mgi_symbol, description, gene_biotype,
         baseMean, TPM, avgTxLength, log2FoldChange,  lfcSE, svalue)
 
