@@ -26,6 +26,9 @@ showing you all the jobs that need to be run in order to fulfill your command.
 * samtools
 * pandas
 
+* libcairo2-dev
+* libfontconfig1-dev
+
 R dependencies are handled by packrat. Run "snakemake packrat_init" to restore
 the libraries needed for this analysis. This will create a private package
 library for this project, ensuring the same package versions are used as were

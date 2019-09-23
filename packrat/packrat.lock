@@ -1,6 +1,6 @@
 PackratFormat: 1.4
 PackratVersion: 0.5.0
-RVersion: 3.6.0
+RVersion: 3.6.1
 Repos: CRAN=https://ftp.gwdg.de/pub/misc/cran,
     BioCsoft=https://bioconductor.org/packages/3.9/bioc,
     BioCann=https://bioconductor.org/packages/3.9/data/annotation,
@@ -501,6 +501,12 @@ Source: CRAN
 Version: 1.0.1
 Hash: c5a7e0ce07509a8561881c8860270d71
 
+Package: gdtools
+Source: CRAN
+Version: 0.2.0
+Hash: 67342dad8d6f6a2c848ad882ef4c478e
+Requires: Rcpp, systemfonts
+
 Package: genefilter
 Source: Bioconductor
 Version: 1.66.0
@@ -519,6 +525,12 @@ Version: 0.2.2
 Hash: 873e56d10fa735121a55588b31628bd0
 Requires: Rcpp, RcppEigen, ggplot2, gtable, polyclip, rlang, scales,
     tweenr
+
+Package: ggiraph
+Source: CRAN
+Version: 0.6.1
+Hash: 10add64f1240b38cea210f3a4c55660e
+Requires: Rcpp, gdtools, ggplot2, htmltools, htmlwidgets, xml2
 
 Package: ggplot2
 Source: CRAN
@@ -953,6 +965,11 @@ Package: sys
 Source: CRAN
 Version: 3.2
 Hash: aaa3f56d4255306a32ea30df8ef63901
+
+Package: systemfonts
+Source: CRAN
+Version: 0.1.1
+Hash: ac1ec260f6d8907d0755ca5154607cfc
 
 Package: tibble
 Source: CRAN

@@ -10,7 +10,7 @@ editor_options:
 ---
 
 ```{r setup, include=FALSE, cache=FALSE}
-knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = TRUE)
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = FALSE)
 ```
 
 ```{r library, include=FALSE, cache=FALSE}
@@ -18,6 +18,7 @@ library("dplyr")
 library("readr")
 library("purrr")
 library("ggplot2")
+library("ggiraph")
 library("ggthemes")
 library("GGally")
 library("cowplot")
@@ -77,12 +78,14 @@ dir.create(res_folder, showWarnings = FALSE, recursive = TRUE)
 assay(rld) %>%
     as_tibble(rownames = "gene_id_ens") %>% 
     annotate_cm(keytype = "ENSEMBLTRANS") %>% 
+    rename(transcript_id_ens = "gene_id_ens") %>% 
     write_csv(file.path(res_folder, "txlevel_ont_cm_rld.csv.gz"))
 
 # without
 assay(ntd) %>% 
     as_tibble(rownames = "gene_id_ens") %>% 
     annotate_cm(keytype = "ENSEMBLTRANS") %>% 
+    rename(transcript_id_ens = "gene_id_ens") %>%
     write_csv(file.path(res_folder, "txlevel_ont_cm_ntd.csv.gz"))
 ```
 
@@ -169,10 +172,10 @@ pca <- as_tibble(pca$x, rownames = "sample") %>%
 
 # plot against room/isolation
 # room and isolation are not independent
-ggplot(pca, aes(PC1, PC2, colour = condition_temp)) +
-    geom_point(aes(pch = condition_room), size = 1.5) +
-#    geom_text(aes(label = sample)) +
-    stat_ellipse(type = "norm", level = .68) +
+pca_pl <- ggplot(pca, aes(PC1, PC2, colour = condition_temp)) +
+    geom_point_interactive(aes(pch = condition_room, 
+        tooltip = sprintf("%s<br>cage = %s", sample, condition_cage),
+        data_id = condition_cage), size = 2) +    stat_ellipse(type = "norm", level = .68) +
     theme_tufte() +
     geom_rangeframe(colour = "black", sides = 'bl') +
     scale_y_continuous(breaks = extended_range_breaks()(pca[, 3]),
@@ -184,6 +187,8 @@ ggplot(pca, aes(PC1, PC2, colour = condition_temp)) +
                        name = sprintf("PC1 (%s %% variance)",
                                       round(importance[2,1] * 100, 1))) +
     scale_color_viridis_d()
+
+girafe(code = print(pca_pl))
 ```
 
 ## Plotmatrix
@@ -359,6 +364,34 @@ resLFC %>%
 Some tanscripts in the range 10 to 700 counts show a high log2FoldChange. They
 might be treated as outliers by the lfc shrinking algoryhtm and therefore not shrunken at all.
 It is worth investigating their expression (Maybe only one sample with high expression?).
+
+```{r outliers, dependson="MA-plot"}
+order <- colData(dds) %>%
+    as_tibble(rownames = "sample") %>%
+    dplyr::arrange(condition_temp) %>% 
+    pull(sample)
+
+pl <- resLFC %>% 
+    left_join(biotype_groups, by = "gene_biotype") %>% 
+    mutate(signif = if_else(svalue < .05, TRUE, FALSE)) %>% 
+    filter(complete.cases(.)) %>% 
+    filter(abs(log2FoldChange) > 6) %>% 
+    select(ensembl_transcript_id_version, ensembl_gene_id_version, mgi_symbol,
+       grouped_biotype, baseMean, TPM) %>% 
+    left_join(counts(dds) %>% as_tibble(rownames = "ensembl_transcript_id_version"),
+        by = "ensembl_transcript_id_version") %>% 
+    tidyr::gather(key = "sample", value = "counts" ,
+        -ensembl_transcript_id_version, - ensembl_gene_id_version, 
+        -mgi_symbol, - grouped_biotype, -baseMean, -TPM) %>% 
+    mutate(sample = factor(sample, levels = order)) %>% 
+    ggplot(., aes(sample, ensembl_transcript_id_version)) +
+        geom_tile_interactive(aes(fill = log10(counts), 
+            tooltip = sprintf("%s<br>base Mean = %s<br>average TPM = %s", mgi_symbol, round(baseMean, 1), round(TPM, 2)), 
+            onclick = sprintf("http://www.ensembl.org/Mus_musculus/Gene/Summary?db=core;g=%s", ensembl_gene_id_version))) +
+    scale_fill_viridis_c()
+    
+girafe(ggobj =  pl)
+```
 
 ### Clustering the significantly differentially expressed genes
 

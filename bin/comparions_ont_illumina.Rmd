@@ -1,0 +1,277 @@
+---
+title: "nanopore iBAT, Comparison of Illumina and ONT reads on transcript level"
+author: "Christoph Kiefer"
+date: "20. September 2019"
+output: 
+    html_document:
+        toc: true
+editor_options:
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE, cache=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = TRUE)
+```
+
+```{r library, include=FALSE, cache=FALSE}
+library("dplyr")
+library("readr")
+library("purrr")
+library("ggplot2")
+library("ggiraph")
+library("ggthemes")
+library("cowplot")
+```
+
+```{r dataImport}
+# sample info
+
+# import count matrices
+import_data <- function(illumina, ont) {
+    sample_info <- read_csv("../sample_info/sampleInfo.csv")
+
+    illumina <- read_csv(illumina) %>% 
+        select(-gene_name, -mgi_symbol) %>% 
+        tidyr::gather(key = "sample", value = "counts_illumina", -transcript_id_ens)
+    ont <- read_tsv(ont) %>% 
+        tidyr::separate(transcript, "transcript_id_ens", sep = '\\|')
+    
+    lookup <- sample_info$illumina
+    names(lookup) <- sample_info$ont
+    
+    colnames(ont) <- lookup[colnames(ont)]
+    colnames(ont)[1] <- "transcript_id_ens"
+        
+    illumina %>% 
+        full_join(ont %>% tidyr::gather(key = "sample", value = "counts_ont", -transcript_id_ens),
+            by = c("transcript_id_ens", "sample")) %>% 
+        rename(ensembl_transcript_id_version = "transcript_id_ens")
+}
+
+illumina <- "../res/txlevel_ont/txlevel_ont_cm_rld.csv.gz"
+ont <- "../res/wien/6samples/ChrKiefer_6samples_reg_log_transf_counts.tsv"
+
+df <- import_data(illumina, ont)
+
+```
+
+# Filtering of lowly expressed transcripts
+
+```{r densityBeforeFilter, dependson="dataImport"}
+pl1 <- df %>% 
+    ggplot(aes(counts_illumina)) +
+    geom_density(aes(colour = sample)) +
+    scale_colour_viridis_d()
+pl2 <- df %>% 
+    ggplot(aes(counts_ont)) +
+    geom_density(aes(colour = sample)) +
+    scale_colour_viridis_d()
+
+ggdraw(plot_grid(plot_grid(pl1 + theme(legend.position="none"), pl2 + theme(legend.position="none"), ncol=1, align='v'),
+    plot_grid(NULL, get_legend(pl1), ncol=1),
+    rel_widths=c(1, 0.2)))
+```
+
+Actually most transcripts are not expressed. 
+
+```{r filterNotExpressed, echo = TRUE, dependson="dataImport"}
+# filter not expressed transcripts
+not_expressed <- df %>% 
+    group_by(ensembl_transcript_id_version) %>% 
+    summarise(counts_illumina = sum(counts_illumina),
+        counts_ont = sum(counts_ont)) %>% 
+    filter(counts_illumina < 1 & counts_ont < 1) %>% 
+    pull(ensembl_transcript_id_version)
+
+df <- df %>% 
+    filter(!(ensembl_transcript_id_version %in% not_expressed))
+```
+
+
+```{r densityAfterFilter, dependson="filterNotExpressed"}
+pl1 <- df %>% 
+    ggplot(aes(counts_illumina)) +
+    geom_density(aes(colour = sample)) +
+    scale_colour_viridis_d()
+pl2 <- df %>% 
+    ggplot(aes(counts_ont)) +
+    geom_density(aes(colour = sample)) +
+    scale_colour_viridis_d()
+
+ggdraw(plot_grid(plot_grid(pl1 + theme(legend.position="none"), pl2 + theme(legend.position="none"), ncol=1, align='v'),
+    plot_grid(NULL, get_legend(pl1), ncol=1),
+    rel_widths=c(1, 0.2)))
+```
+
+Filtering for genes that are not expressed in either of the datasets reveals,
+that many transcripts observed in the illumina dataset are not observed in the
+ont dataset.
+
+# Correlation
+
+## Genes expressed in one of the datasets
+
+```{r annotation, dependson="filterNotExpressed"}
+# get annotation from biomart
+ensembl = biomaRt::useMart("ensembl",dataset="mmusculus_gene_ensembl")
+annotation <- biomaRt::getBM(
+    attributes = c("ensembl_transcript_id_version",
+        "ensembl_gene_id_version", "mgi_symbol", "description",
+        "gene_biotype", "transcript_biotype"), 
+    filters = "ensembl_transcript_id_version", 
+    values = unique(df$ensembl_transcript_id_version), 
+    mart = ensembl)
+
+biotype_groups <- read_csv("../data/biotype_groups.csv") %>% 
+    rename(gene_biotype = transcript_biotype)
+
+df <- df %>% 
+    left_join(annotation, by = "ensembl_transcript_id_version") %>% 
+    left_join(biotype_groups, by = "gene_biotype") %>% 
+    rename(gene_biotype_group = "grouped_biotype") %>% 
+    left_join(biotype_groups %>% rename(transcript_biotype = "gene_biotype"), by = "transcript_biotype") %>% 
+    rename(transcript_biotype_group = "grouped_biotype")
+    
+
+dir.create("../res/comparison", showWarnings = FALSE)
+df %>% 
+    write_csv("../res/comparison/countMatrix_transcripts.csv.gz")
+```
+
+
+```{r correlationWithoutSamples, dependson="annotation"}
+my_breaks <- function (n = 5, ...) {
+
+    function(x) {
+        dings <- .045 * (max(x) - min(x))
+        extended_range_breaks_(min(x) + dings , max(x) - dings, n, ...)
+    }
+}
+
+df %>% 
+    group_by(ensembl_transcript_id_version) %>% 
+    summarise(counts_illumina = sum(counts_illumina),
+        counts_ont = sum(counts_ont)) %>% 
+    filter(complete.cases(.)) %>% 
+    ggplot(aes(counts_illumina, counts_ont)) +
+        geom_point() +
+        geom_smooth(colour = "red") +
+        geom_abline(slope = 1) +
+        theme_tufte() +
+        geom_rangeframe() +
+        scale_y_continuous(breaks = my_breaks(),
+            labels = function(x) round(x, 1)) +
+        scale_x_continuous(breaks = my_breaks(),
+            labels = function(x) round(x, 1))
+
+df %>% 
+    group_by(ensembl_transcript_id_version) %>% 
+    summarise(counts_illumina = sum(counts_illumina),
+        counts_ont = sum(counts_ont),
+        gene_biotype_group = unique(gene_biotype_group)) %>% 
+    filter(complete.cases(.)) %>% 
+    ggplot(aes(counts_illumina, counts_ont, colour = gene_biotype_group)) +
+        geom_point() +
+        geom_smooth(colour = "red") +
+        geom_abline(slope = 1) +
+        theme_tufte() +
+        geom_rangeframe(colour = "black") +
+        facet_wrap(~gene_biotype_group, ncol = 3) +
+        scale_y_continuous(breaks = my_breaks(),
+            labels = function(x) round(x, 1)) +
+        scale_x_continuous(breaks = my_breaks(),
+            labels = function(x) round(x, 1)) +
+        scale_color_viridis_d()
+```
+
+The red line does not really represent the data, but I think it shows some feature
+of the data: Transcripts with low expression in the illumina dataset are not
+picked up in the ont dataset. Of course stricter filtering might change this plot.
+
+## Transcripts expressed in both datasets
+
+```{r filterNotExpressed2, dependson="annotation"}
+not_expressed <- df %>% 
+    group_by(ensembl_transcript_id_version) %>% 
+    summarise(counts_illumina = sum(counts_illumina),
+        counts_ont = sum(counts_ont)) %>% 
+    filter(counts_illumina < 1 | counts_ont < 1) %>% 
+    pull(ensembl_transcript_id_version)
+
+df_both <- df %>% 
+    filter(!(ensembl_transcript_id_version %in% not_expressed))
+
+n_tx_in_one <- length(unique(df$ensembl_transcript_id_version))
+n_tx_in_both <- length(unique(df_both$ensembl_transcript_id_version))
+
+cat(sprintf("%d transcripts are exressed in one dataset.
+%d transcripts are expressed in both datasets.
+Cutoff: sum of log2 counts over all replicates > 1.", n_tx_in_one, n_tx_in_both))
+```
+
+
+```{r correlationWithoutSamples2, dependson="filterNotExpressed2"}
+df_both %>% 
+    group_by(ensembl_transcript_id_version) %>% 
+    summarise(counts_illumina = sum(counts_illumina),
+        counts_ont = sum(counts_ont)) %>% 
+    filter(complete.cases(.)) %>% 
+    ggplot(aes(counts_illumina, counts_ont)) +
+        geom_point() +
+        geom_smooth(colour = "red") +
+        geom_abline(slope = 1) +
+        theme_tufte() +
+        geom_rangeframe() +
+        scale_y_continuous(breaks = my_breaks(),
+            labels = function(x) round(x, 1)) +
+        scale_x_continuous(breaks = my_breaks(),
+            labels = function(x) round(x, 1))
+
+df_both %>% 
+    group_by(ensembl_transcript_id_version) %>% 
+    summarise(counts_illumina = sum(counts_illumina),
+        counts_ont = sum(counts_ont),
+        gene_biotype_group = unique(gene_biotype_group)) %>% 
+    filter(complete.cases(.)) %>% 
+    ggplot(aes(counts_illumina, counts_ont, colour = gene_biotype_group)) +
+        geom_point() +
+        geom_smooth(colour = "red") +
+        geom_abline(slope = 1) +
+        theme_tufte() +
+        geom_rangeframe(colour = "black") +
+        facet_wrap(~gene_biotype_group, ncol = 3) +
+        scale_y_continuous(breaks = my_breaks(),
+            labels = function(x) round(x, 1)) +
+        scale_x_continuous(breaks = my_breaks(),
+            labels = function(x) round(x, 1)) +
+        scale_color_viridis_d()
+```
+
+It seems to me, that many transcripts below log2(counts_illumina) = 30 do not
+show any expression in the ont data set.
+
+Of course, small ncRNAs are not picked up in the ont dataset because of the 
+missing polyA tail. The same is probably true for the "others" category. Pseudogenes
+might theoretically catch some reads from related genes in the illumina dataset,
+which should not be the case in the ont dataset. long ncRNAs are also not really 
+picked up in the ont dataset.
+
+```{r correlationSampleWise, dependson="filterNotExpressed2"}
+df_both %>% 
+    filter(complete.cases(.)) %>%
+    ggplot(aes(counts_illumina, counts_ont)) +
+        geom_point() +
+        geom_smooth(colour = "red") +
+        geom_abline(slope = 1) +
+        theme_tufte() +
+        geom_rangeframe(colour = "black") +
+        facet_wrap(~sample, ncol = 3) +
+        scale_y_continuous(breaks = my_breaks(),
+            labels = function(x) round(x, 1)) +
+        scale_x_continuous(breaks = my_breaks(),
+            labels = function(x) round(x, 1)) +
+        scale_color_viridis_d()
+    
+```
+
+All the samples show the same behaviour.

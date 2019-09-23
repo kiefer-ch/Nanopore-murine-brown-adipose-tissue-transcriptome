@@ -79,3 +79,10 @@ rule render_all_transcript:
         "res/txlevel_all/deseq_txlevel_all.html"
     script:
         "bin/deseq_txlevel_all.Rmd"
+
+rule render_deseq_all:
+    input:
+        "res/txlevel_all/deseq_txlevel_all.html",
+        "res/txlevel_ont/deseq_txlevel_ont.html",
+        "res/genelevel_ont/deseq_genelevel_ont.html"
+
