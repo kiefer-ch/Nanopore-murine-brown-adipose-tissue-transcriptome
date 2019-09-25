@@ -47,6 +47,14 @@ dds <- readRDS("../data/dds_gencode.vM22_gene_ont.rds")
 rld <- rlog(dds, blind = FALSE)
 ntd <- normTransform(dds)
 
+# https://haroldpimentel.wordpress.com/2014/05/08/what-the-fpkm-a-review-rna-seq-expression-units/
+fpkmToTpm <- function(fpkm) {
+    exp(log(fpkm) - log(sum(fpkm)) + log(1e6))
+}
+
+tpm <- fpkm(dds, robust = TRUE)
+tpm <- apply(tpm, 2, fpkmToTpm)
+
 # annotate count matrices
 annotate_cm <- function(tibble) {
     ks <- tibble$gene_id_ens %>% 
@@ -84,6 +92,12 @@ assay(ntd) %>%
     as_tibble(rownames = "gene_id_ens") %>% 
     annotate_cm() %>% 
     write_csv(file.path(res_folder, "genelevel_ont_cm_ntd.csv.gz"))
+
+# tpm
+tpm %>% 
+        as_tibble(rownames = "gene_id_ens") %>% 
+        annotate_cm() %>% 
+        write_csv(file.path(res_folder, "genelevel_ont_cm_tpm.csv.gz"))
 ```
 
 # Quality control
@@ -278,29 +292,18 @@ annotation <- biomaRt::getBM(
     values = resLFC$ensembl_gene_id_version, 
     mart = ensembl)
 
-# calculate average transcript length per gene over all samples
-weighted_avgTxLength <- counts(dds, normalized = TRUE) * assays(dds)$avgTxLength
-meanOfCounts <- rowMeans(counts(dds, normalized = TRUE))
-avgTxLength <- rowMeans(weighted_avgTxLength) %>% 
-    `/`(meanOfCounts) %>% 
-    tibble::enframe(. ,name = "ensembl_gene_id_version", value = "avgTxLength")
-
-# get tpm from counts
-countToTpm <- function(counts, effLen) {
-    rate <- log(counts) - log(effLen)
-    denom <- log(sum(exp(rate)))
-    exp(rate - denom + log(1e6))
-}
+baseTPM <- rowMeans(tpm) %>% 
+    tibble::enframe(name = "ensembl_gene_id_version",
+        value = "baseTPM")
 ```
 
 ```{r exportAnnotation, dependson="results2"}
 # merge annotation and TPM
 resLFC <- resLFC %>% 
     left_join(annotation, by = "ensembl_gene_id_version") %>% 
-    left_join(avgTxLength, by = "ensembl_gene_id_version") %>% 
-    mutate(TPM = countToTpm(baseMean, avgTxLength)) %>% 
+    left_join(baseTPM, by = "ensembl_gene_id_version") %>% 
     select(ensembl_gene_id_version, mgi_symbol, description, gene_biotype,
-        baseMean, TPM, avgTxLength, log2FoldChange,  lfcSE, svalue)
+        baseMean, baseTPM, log2FoldChange,  lfcSE, svalue)
 
 # export
 resLFC %>% 

@@ -101,7 +101,6 @@ tpm %>%
     annotate_cm(keytype = "ENSEMBLTRANS") %>% 
     rename(transcript_id_ens = "gene_id_ens") %>% 
     write_csv(file.path(res_folder, "txlevel_ont_cm_tpm.csv.gz"))
-
 ```
 
 # Quality control
@@ -298,27 +297,23 @@ ensembl = biomaRt::useMart("ensembl",dataset="mmusculus_gene_ensembl")
 annotation <- biomaRt::getBM(
     attributes = c("ensembl_transcript_id_version",
         "ensembl_gene_id_version", "mgi_symbol", "description",
-        "gene_biotype"), 
+        "gene_biotype", "transcript_length"), 
     filters = "ensembl_transcript_id_version", 
     values = resLFC$ensembl_transcript_id_version, 
     mart = ensembl)
 
-# calculate average transcript length per gene over all samples
-weighted_avgTxLength <- counts(dds, normalized = TRUE) * assays(dds)$avgTxLength
-meanOfCounts <- rowMeans(counts(dds, normalized = TRUE))
-avgTxLength <- rowMeans(weighted_avgTxLength) %>% 
-    `/`(meanOfCounts) %>% 
-    tibble::enframe(. ,name = "ensembl_transcript_id_version", value = "avgTxLength")
+baseTPM <- rowMeans(tpm) %>% 
+    tibble::enframe(name = "ensembl_transcript_id_version",
+        value = "baseTPM")
 ```
 
 ```{r exportAnnotation, dependson="results2"}
 # merge annotation and TPM
 resLFC <- resLFC %>% 
     left_join(annotation, by = "ensembl_transcript_id_version") %>% 
-    left_join(avgTxLength, by = "ensembl_transcript_id_version") %>% 
-#    mutate(TPM = countToTpm(baseMean, avgTxLength)) %>% 
+    left_join(baseTPM, by = "ensembl_transcript_id_version") %>% 
     select(ensembl_transcript_id_version, ensembl_gene_id_version, mgi_symbol, description, gene_biotype,
-        baseMean, TPM, avgTxLength, log2FoldChange,  lfcSE, svalue)
+        baseMean, baseTPM, transcript_length, log2FoldChange,  lfcSE, svalue)
 
 # export
 resLFC %>% 
@@ -385,16 +380,16 @@ pl <- resLFC %>%
     filter(complete.cases(.)) %>% 
     filter(abs(log2FoldChange) > 6) %>% 
     select(ensembl_transcript_id_version, ensembl_gene_id_version, mgi_symbol,
-       grouped_biotype, baseMean, TPM) %>% 
+       grouped_biotype, baseMean, baseTPM) %>% 
     left_join(counts(dds) %>% as_tibble(rownames = "ensembl_transcript_id_version"),
         by = "ensembl_transcript_id_version") %>% 
     tidyr::gather(key = "sample", value = "counts" ,
         -ensembl_transcript_id_version, - ensembl_gene_id_version, 
-        -mgi_symbol, - grouped_biotype, -baseMean, -TPM) %>% 
+        -mgi_symbol, - grouped_biotype, -baseMean, -baseTPM) %>% 
     mutate(sample = factor(sample, levels = order)) %>% 
     ggplot(., aes(sample, ensembl_transcript_id_version)) +
         geom_tile_interactive(aes(fill = log10(counts), 
-            tooltip = sprintf("%s<br>base Mean = %s<br>average TPM = %s", mgi_symbol, round(baseMean, 1), round(TPM, 2)), 
+            tooltip = sprintf("%s<br>base Mean = %s<br>average TPM = %s", mgi_symbol, round(baseMean, 1), round(baseTPM, 2)), 
             onclick = sprintf("http://www.ensembl.org/Mus_musculus/Gene/Summary?db=core;g=%s", ensembl_gene_id_version))) +
     scale_fill_viridis_c()
     

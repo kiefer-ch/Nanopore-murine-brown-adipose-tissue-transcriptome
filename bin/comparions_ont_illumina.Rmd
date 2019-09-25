@@ -10,7 +10,7 @@ editor_options:
 ---
 
 ```{r setup, include=FALSE, cache=FALSE}
-knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = TRUE)
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = FALSE)
 ```
 
 ```{r library, include=FALSE, cache=FALSE}
@@ -18,13 +18,13 @@ library("dplyr")
 library("readr")
 library("purrr")
 library("ggplot2")
-library("ggiraph")
 library("ggthemes")
 library("cowplot")
 library("ggpmisc")
+    rename <- dplyr::rename
 ```
 
-```{r dataImport}
+```{r dataImport_tx}
 import_data <- function(illumina, ont, tpm) {
     sample_info <- read_csv("../sample_info/sampleInfo.csv")
 
@@ -57,11 +57,72 @@ tpm <- "../res/txlevel_ont/txlevel_ont_cm_tpm.csv.gz"
 df <- import_data(illumina, ont, tpm)
 ```
 
-# Filtering of lowly expressed transcripts
+```{r dataImport_gene}
+  illumina <- "../res/genelevel_ont/genelevel_ont_cm_rld.csv.gz"
+  tpm <- "../res/genelevel_ont/genelevel_ont_cm_tpm.csv.gz"
+  ont <- "../res/wien/6samples/ChrKiefer_6samples_raw_gene_counts.tsv"
 
-## Before filtering
+import_data_genes <- function(tpm, ont, illumina) {
 
-```{r densityBeforeFilter, dependson="dataImport"}
+    sample_info <- read_csv("../sample_info/sampleInfo.csv")
+
+    tpm <- read_csv(tpm) %>% 
+        select(-gene_name, -mgi_symbol) %>% 
+            tidyr::gather(key = "sample", value = "tpm", -gene_id_ens)
+    
+    illumina <- read_csv(illumina) %>% 
+        select(-gene_name, -mgi_symbol) %>% 
+        tidyr::gather(key = "sample", value = "counts_illumina", -gene_id_ens)
+
+    ont <- read_tsv(ont) %>% 
+        tidyr::separate(transcript, c("transcript_id_ens", "gene_id_ens"), sep = '\\|')
+    
+    lookup <- sample_info$illumina
+    names(lookup) <- sample_info$ont
+    
+    colnames(ont) <- lookup[colnames(ont)]
+    colnames(ont)[c(1, 2)] <- c("transcript_id_ens", "gene_id_ens")
+    
+    ont <- ont %>%
+        tidyr::gather(key = "sample", value = "counts_ont",
+            -transcript_id_ens, -gene_id_ens) %>% 
+        group_by(gene_id_ens, sample) %>% 
+        summarise(counts_ont = sum(counts_ont)) %>% 
+        tidyr::spread(key = sample, value = counts_ont) %>% 
+        filter(!is.na(gene_id_ens)) %>% 
+        magrittr::set_rownames(.$gene_id_ens) %>% 
+        as.matrix() %>% 
+        `[`( ,-1)
+    
+    class(ont) <- "numeric"
+    gene_ids <- rownames(ont)
+    
+    ont <- ont %>% 
+        DESeq2::rlog() 
+    
+    ont <- ont %>% 
+        as_tibble() %>% 
+        mutate(gene_id_ens = gene_ids) %>% 
+        tidyr::gather(key = "sample", value = "counts_ont",
+            -gene_id_ens)
+        
+    tpm %>% 
+        left_join(illumina, by = c("gene_id_ens", "sample")) %>% 
+        full_join(ont, by = c("gene_id_ens", "sample")) %>% 
+        mutate(tpm = log2(tpm + 1)) %>% 
+        rename(ensembl_gene_id_version = "gene_id_ens")
+}
+
+df_genes <- import_data_genes(tpm, ont, illumina)
+```
+
+# Filtering
+
+## Transcripts
+
+### Before filtering
+
+```{r densityBeforeFilter, dependson="dataImport_tx"}
 pl1 <- df %>% 
     ggplot(aes(counts_illumina)) +
     geom_density(aes(colour = sample)) +
@@ -78,7 +139,7 @@ ggdraw(plot_grid(plot_grid(pl1 + theme(legend.position="none"), pl2 + theme(lege
 
 Actually most transcripts are not expressed. 
 
-```{r filterNotExpressed, echo = TRUE, dependson="dataImport"}
+```{r filterNotExpressed, echo = TRUE, dependson="dataImport_tx"}
 # filter not expressed transcripts
 not_expressed <- df %>% 
     group_by(ensembl_transcript_id_version) %>% 
@@ -91,7 +152,7 @@ df <- df %>%
     filter(!(ensembl_transcript_id_version %in% not_expressed))
 ```
 
-## Transcripts expressed in one of the datasets
+### Transcripts expressed in one of the datasets
 
 ```{r densityAfterFilter, dependson="filterNotExpressed"}
 pl1 <- df %>% 
@@ -139,7 +200,7 @@ df %>%
     write_csv("../res/comparison/countMatrix_transcripts.csv.gz")
 ```
 
-## transcripts expressed in both datasets
+### Transcripts expressed in both datasets
 
 ```{r filterNotExpressed2, dependson="annotation"}
 not_expressed <- df %>% 
@@ -179,6 +240,121 @@ pl2 <- df_both %>%
 
 ggdraw(plot_grid(plot_grid(pl1 + theme(legend.position="none"),
                            pl3 + theme(legend.position="none"),
+                           pl2 + theme(legend.position="none"),
+                           ncol=1, align='v'),
+    plot_grid(NULL, get_legend(pl1), ncol=1),
+    rel_widths=c(1, 0.2)))
+```
+
+## Genes
+
+all values on log2 scale
+
+### Before filtering
+
+```{r densityBeforeFilter_genes, dependson="dataImport_gene"}
+pl1 <- df_genes %>% 
+    ggplot(aes(tpm)) +
+    geom_density(aes(colour = sample)) +
+    scale_colour_viridis_d()
+pl2 <- df_genes %>% 
+    ggplot(aes(counts_ont)) +
+    geom_density(aes(colour = sample)) +
+    scale_colour_viridis_d()
+
+ggdraw(plot_grid(plot_grid(pl1 + theme(legend.position="none"), pl2 + theme(legend.position="none"),
+            ncol=1, align = "v", axis = "none"),
+        plot_grid(NULL, get_legend(pl1), ncol=1),
+        rel_widths=c(1, 0.2)))
+```
+
+### Genes expressed in one dataset only
+
+```{r filterNotExpressed_gene, echo = TRUE, dependson="dataImport_gene"}
+# filter not expressed transcripts
+not_expressed <- df_genes %>% 
+    group_by(ensembl_gene_id_version) %>% 
+    summarise(counts_illumina = sum(counts_illumina),
+        counts_ont = sum(counts_ont)) %>% 
+    filter(counts_illumina < 1 & counts_ont < 1) %>% 
+    pull(ensembl_gene_id_version)
+
+df_genes <- df_genes %>% 
+    filter(!(ensembl_gene_id_version %in% not_expressed))
+```
+
+```{r densityFilter_genes, dependson="dataImport_gene"}
+pl1 <- df_genes %>% 
+    ggplot(aes(tpm)) +
+    geom_density(aes(colour = sample)) +
+    scale_colour_viridis_d()
+pl2 <- df_genes %>% 
+    ggplot(aes(counts_ont)) +
+    geom_density(aes(colour = sample)) +
+    scale_colour_viridis_d()
+
+ggdraw(plot_grid(plot_grid(pl1 + theme(legend.position="none"), pl2 + theme(legend.position="none"),
+            ncol=1, align = "v", axis = "none"),
+        plot_grid(NULL, get_legend(pl1), ncol=1),
+        rel_widths=c(1, 0.2)))
+```
+
+### Genes expressed in both datasets
+
+```{r annotateGenes}
+annotation_genes <- biomaRt::getBM(
+    attributes = c("ensembl_gene_id_version", "mgi_symbol", "description", 
+        "gene_biotype"), 
+    filters = "ensembl_gene_id_version", 
+    values = unique(df_genes$ensembl_gene_id_version), 
+    mart = ensembl)
+
+biotype_groups <- read_csv("../data/biotype_groups.csv") %>% 
+    rename(gene_biotype = "transcript_biotype")
+
+df_genes <- df_genes %>% 
+    left_join(annotation_genes, by = "ensembl_gene_id_version") %>% 
+    left_join(biotype_groups, by = "gene_biotype") %>% 
+    rename(gene_biotype_group = "grouped_biotype")
+
+df_genes %>% 
+    write_csv("../res/comparison/countMatrix_genes.csv.gz")
+```
+
+
+```{r filterNotExpressed2_genes, dependson="annotateGenes"}
+not_expressed <- df_genes %>% 
+    group_by(ensembl_gene_id_version) %>% 
+    summarise(counts_illumina = sum(counts_illumina),
+        counts_ont = sum(counts_ont)) %>% 
+    filter(counts_illumina < 1 | counts_ont < 1) %>% 
+    pull(ensembl_gene_id_version)
+
+df_genes_both <- df_genes %>% 
+    filter(!(ensembl_gene_id_version %in% not_expressed))
+
+n_genes_in_one <- length(unique(df_genes$ensembl_gene_id_version))
+n_genes_in_both <- length(unique(df_genes_both$ensembl_gene_id_version))
+
+cat(sprintf("%d genes are exressed in one dataset.
+%d genes are expressed in both datasets.
+Cutoff: sum of log2 counts over all replicates > 1.", n_genes_in_one, n_genes_in_both))
+
+df_genes_both %>% 
+    distinct(ensembl_gene_id_version, .keep_all = TRUE) %>% 
+    pull(gene_biotype_group) %>% 
+    table()
+
+pl1 <- df_genes_both %>% 
+    ggplot(aes(tpm)) +
+    geom_density(aes(colour = sample)) +
+    scale_colour_viridis_d()
+pl2 <- df_genes_both %>% 
+    ggplot(aes(counts_ont)) +
+    geom_density(aes(colour = sample)) +
+    scale_colour_viridis_d()
+
+ggdraw(plot_grid(plot_grid(pl1 + theme(legend.position="none"),
                            pl2 + theme(legend.position="none"),
                            ncol=1, align='v'),
     plot_grid(NULL, get_legend(pl1), ncol=1),
@@ -616,6 +792,65 @@ df_both %>%
 ```
 
 All the samples show the same behaviour.
+
+## Genes expressed in one dataset
+
+```{r}
+df_genes %>% 
+    filter(complete.cases(.)) %>%
+    ggplot(aes(tpm, counts_ont)) +
+        geom_point(aes(colour = gene_biotype_group)) +
+        stat_poly_eq(aes(label = ..adj.rr.label..), formula = y ~ x, 
+               parse = TRUE) +
+        scale_y_continuous(breaks = log2(c(1, 10, 100, 1000, 10000, 100000)),
+            labels = c(1, 10, 100, 1000, 10000, 100000)) +
+        scale_x_continuous(breaks = log2(c(1, 10, 100, 1000, 10000, 100000)),
+            labels = c(1, 10, 100, 1000, 10000, 100000)) +
+        theme_tufte() +
+        geom_rangeframe(colour = "black") +
+        scale_colour_viridis_d()
+```
+
+## Genes expressed in both datasets
+
+```{r}
+df_genes_both %>% 
+    filter(complete.cases(.)) %>%
+    ggplot(aes(tpm, counts_ont)) +
+        geom_point(aes(colour = gene_biotype_group)) +
+        stat_poly_eq(aes(label = ..adj.rr.label..), formula = y ~ x, 
+               parse = TRUE) +
+        scale_y_continuous(breaks = log2(c(1, 10, 100, 1000, 10000, 100000)),
+            labels = c(1, 10, 100, 1000, 10000, 100000)) +
+        scale_x_continuous(breaks = log2(c(1, 10, 100, 1000, 10000, 100000)),
+            labels = c(1, 10, 100, 1000, 10000, 100000)) +
+        theme_tufte() +
+        geom_rangeframe(colour = "black") +
+        scale_colour_viridis_d()
+```
+
+what are these small ncRNAs?
+
+```{r}
+df_genes_both %>% 
+    filter(gene_biotype_group == "small ncRNA") %>% 
+    knitr::kable(format = "html") %>%
+    kableExtra::kable_styling() %>%
+    kableExtra::scroll_box(width = "100%", height = "600px")
+```
+
+what about the pseudogenes on the right side?
+
+```{r}
+df_genes_both %>% 
+    filter(gene_biotype_group == "pseudogenes") %>% 
+    filter(tpm > log2(100)) %>% 
+    knitr::kable(format = "html") %>%
+    kableExtra::kable_styling() %>%
+    kableExtra::scroll_box(width = "100%", height = "600px")
+```
+
+Mainly mitochondrial genes. How do they get there? PolyA?
 
 # Counts by length
 
