@@ -48,4 +48,3 @@ include: "bin/salmon.snakefile"
 include: "bin/txImport.snakefile"
 
 include: "bin/rmd.snakefile"
-
