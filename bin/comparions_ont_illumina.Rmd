@@ -195,9 +195,9 @@ df <- df %>%
     rename(transcript_biotype_group = "grouped_biotype")
     
 
-dir.create("../res/comparison", showWarnings = FALSE)
+dir.create("../res/comparisons", showWarnings = FALSE)
 df %>% 
-    write_csv("../res/comparison/countMatrix_transcripts.csv.gz")
+    write_csv("../res/comparisons/countMatrix_transcripts.csv.gz")
 ```
 
 ### Transcripts expressed in both datasets
@@ -318,7 +318,7 @@ df_genes <- df_genes %>%
     rename(gene_biotype_group = "grouped_biotype")
 
 df_genes %>% 
-    write_csv("../res/comparison/countMatrix_genes.csv.gz")
+    write_csv("../res/comparisons/countMatrix_genes.csv.gz")
 ```
 
 

@@ -451,7 +451,7 @@ make.plot <-function(results_table, title = '') {
 res_go <- resLFC_signif %>%
     select(ensembl_gene_id_version, log2FoldChange) %>%
     mutate(regulation = if_else(log2FoldChange > 0 , "up", "down")) %>% 
-        group_by(regulation) %>%
+    group_by(regulation) %>%
     tidyr::nest() %>%
     mutate(data = map(data, get.geneList)) %>%
     mutate(topGO = map2(data, as.character(regulation), make.topGO)) %>%

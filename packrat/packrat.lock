@@ -359,6 +359,13 @@ Version: 1.2.0
 Hash: 1b1a51fedcd5054a6a3ed98bfcaa33fc
 Requires: prettyunits, rlang, vctrs
 
+Package: broom
+Source: CRAN
+Version: 0.5.2
+Hash: 2c1abd749c826a39101a156ed0afc9be
+Requires: backports, dplyr, generics, purrr, reshape2, stringr, tibble,
+    tidyr
+
 Package: callr
 Source: CRAN
 Version: 3.3.1
@@ -519,6 +526,11 @@ Version: 1.62.0
 Hash: d8d2610df1c8df711f6776fc123e34c6
 Requires: AnnotationDbi, Biobase, BiocGenerics, RColorBrewer, annotate
 
+Package: generics
+Source: CRAN
+Version: 0.0.2
+Hash: 4aaf002dd434e8c854611c5d11a1d58e
+
 Package: ggforce
 Source: CRAN
 Version: 0.2.2
@@ -544,6 +556,13 @@ Source: CRAN
 Version: 0.0.3
 Hash: d2cab4290dad0ed65c6c9247f9d138b3
 Requires: ggplot2, gridGraphics, rvcheck
+
+Package: ggpmisc
+Source: CRAN
+Version: 0.3.1
+Hash: f0ad52a9d6d34a5c30472593994b044d
+Requires: broom, dplyr, ggplot2, gridExtra, lubridate, magrittr, plyr,
+    polynom, rlang, scales, splus2R, stringr, tibble, xts, zoo
 
 Package: ggraph
 Source: CRAN
@@ -712,6 +731,12 @@ Source: CRAN
 Version: 1.5-9.1
 Hash: f8adf87b055dff233b7c3f5b4a174554
 
+Package: lubridate
+Source: CRAN
+Version: 1.7.4
+Hash: 3206e6df69af4462c2c17c0e207f79a3
+Requires: Rcpp, stringr
+
 Package: magrittr
 Source: CRAN
 Version: 1.5
@@ -808,6 +833,11 @@ Package: polyclip
 Source: CRAN
 Version: 1.10-0
 Hash: 8291818c2ccc3848dd74ed475da58174
+
+Package: polynom
+Source: CRAN
+Version: 1.4-0
+Hash: 4d98429f2c0567c6860e965f03be322f
 
 Package: preprocessCore
 Source: Bioconductor
@@ -950,6 +980,11 @@ Source: CRAN
 Version: 0.1.7
 Hash: d093478ac90064e670cd4bf1a99b47b6
 
+Package: splus2R
+Source: CRAN
+Version: 1.2-2
+Hash: 684400a3f25eae912c086532af70ed9f
+
 Package: stringi
 Source: CRAN
 Version: 1.4.3
@@ -1081,6 +1116,12 @@ Source: CRAN
 Version: 1.8-4
 Hash: dc0d47261b678d26032363bebd050540
 
+Package: xts
+Source: CRAN
+Version: 0.11-2
+Hash: 3f65fbbaab9da4664ecc1c003f5e8929
+Requires: zoo
+
 Package: yaml
 Source: CRAN
 Version: 2.2.0
@@ -1095,3 +1136,8 @@ Package: zlibbioc
 Source: Bioconductor
 Version: 1.30.0
 Hash: 70f7a02a96a6a6852b8300d061a28d08
+
+Package: zoo
+Source: CRAN
+Version: 1.8-6
+Hash: 4a02754c8bc0522b2d528ddf2452c835
