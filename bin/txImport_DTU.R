@@ -13,9 +13,10 @@ suppressPackageStartupMessages(library("tximport"))
 #
 ################################################################################
 
+# Read from command line
+args = commandArgs(trailingOnly = TRUE)
 output_name <- args[1]
 filter_by <- args[2]
-
 
 # prepare sample_info
 sample_info <- read_csv("sample_info/sampleInfo.csv") %>%
