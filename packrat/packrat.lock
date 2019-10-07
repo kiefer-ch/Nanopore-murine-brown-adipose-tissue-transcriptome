@@ -1,11 +1,10 @@
 PackratFormat: 1.4
 PackratVersion: 0.5.0
 RVersion: 3.6.1
-Repos: CRAN=https://ftp.gwdg.de/pub/misc/cran,
+Repos: CRAN=https://mirrors.dotsrc.org/cran,
     BioCsoft=https://bioconductor.org/packages/3.9/bioc,
     BioCann=https://bioconductor.org/packages/3.9/data/annotation,
-    BioCexp=https://bioconductor.org/packages/3.9/data/experiment,
-    CRANextra=https://www.stats.ox.ac.uk/pub/RWin
+    BioCexp=https://bioconductor.org/packages/3.9/data/experiment
 
 Package: AnnotationDbi
 Source: Bioconductor
@@ -71,6 +70,13 @@ Version: 3.10.2
 Hash: 904a53435ad4ef99490ef9f0d026c111
 Requires: AnnotationDbi, BiocParallel, DO.db, GOSemSim, S4Vectors,
     fgsea, ggplot2, qvalue, reshape2
+
+Package: DRIMSeq
+Source: Bioconductor
+Version: 1.12.0
+Hash: 766601335e5ad4807c592ed5d1442814
+Requires: BiocGenerics, BiocParallel, GenomicRanges, IRanges,
+    S4Vectors, edgeR, ggplot2, limma, reshape2
 
 Package: DelayedArray
 Source: Bioconductor
@@ -437,6 +443,12 @@ Version: 0.8.3
 Hash: 4bab66291ba8f2600cfacde55cef23b9
 Requires: BH, R6, Rcpp, assertthat, glue, magrittr, pkgconfig, plogr,
     rlang, tibble, tidyselect
+
+Package: edgeR
+Source: Bioconductor
+Version: 3.26.8
+Hash: ca28e3f28f48e26ab396801ddf7e76e5
+Requires: Rcpp, limma, locfit
 
 Package: ellipsis
 Source: CRAN
@@ -984,6 +996,12 @@ Package: splus2R
 Source: CRAN
 Version: 1.2-2
 Hash: 684400a3f25eae912c086532af70ed9f
+
+Package: stageR
+Source: Bioconductor
+Version: 1.6.0
+Hash: 14092edaba25cd672e66d6b89ecf45ad
+Requires: SummarizedExperiment
 
 Package: stringi
 Source: CRAN

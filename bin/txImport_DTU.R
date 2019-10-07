@@ -13,9 +13,13 @@ suppressPackageStartupMessages(library("tximport"))
 #
 ################################################################################
 
+output_name <- args[1]
+filter_by <- args[2]
+
+
 # prepare sample_info
 sample_info <- read_csv("sample_info/sampleInfo.csv") %>%
-    filter(!is.na(ont)) %>%
+    filter(!is.na(get(filter_by))) %>%
     mutate_at(vars(matches("condition")), as.factor) %>%
     mutate(path = file.path("salmon", illumina, "quant.sf"))
 
@@ -27,5 +31,6 @@ txi <- tximport(files = sample_info$path,
 
 cts <- txi$counts
 cts <- cts[rowSums(cts) > 0, ]
+colnames(cts) <- sample_info$sample_id
 
-saveRDS(cts, "data/scaledTPM.rds")
+saveRDS(cts, output_name)

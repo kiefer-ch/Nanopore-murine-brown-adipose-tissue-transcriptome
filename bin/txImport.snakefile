@@ -38,14 +38,24 @@ rule tximport_transcript_ont:
     shell:
         "bin/txImport.R {input.sample_info} {input.annotation} {output} --txlevel ont"
 
-rule tximport_dtu:
+rule tximport_dtu_ont:
     input:
         expand("salmon/{sample}/quant.sf", sample=SAMPLES_ont),
         "sample_info/sampleInfo.csv"
     output:
-        "data/scaledTPM.rds"
+        "data/scaledTPM_ont.rds"
     shell:
-        "bin/txImport_DTU.R"
+        "bin/txImport_DTU.R {output} ont"
+
+rule tximport_dtu_all:
+    input:
+        expand("salmon/{sample}/quant.sf", sample=SAMPLES_ont),
+        "sample_info/sampleInfo.csv"
+    output:
+        "data/scaledTPM_all.rds"
+    shell:
+        "bin/txImport_DTU.R {output} illumina"
+
 
 rule tximport_all:
     input:
@@ -53,3 +63,4 @@ rule tximport_all:
         "data/dds_gencode.vM22_gene.rds",
         "data/dds_gencode.vM22_transcript_ont.rds",
         "data/dds_gencode.vM22_gene_ont.rds"
+
