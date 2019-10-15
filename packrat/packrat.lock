@@ -58,6 +58,15 @@ Requires: Biobase, BiocGenerics, BiocParallel, GenomicRanges, Hmisc,
     IRanges, Rcpp, RcppArmadillo, S4Vectors, SummarizedExperiment,
     genefilter, geneplotter, ggplot2, locfit
 
+Package: DEXSeq
+Source: Bioconductor
+Version: 1.30.0
+Hash: 9c8b2b0ecdaa47055b6d433b3c9c8322
+Requires: AnnotationDbi, Biobase, BiocGenerics, BiocParallel, DESeq2,
+    GenomicRanges, IRanges, RColorBrewer, Rsamtools, S4Vectors,
+    SummarizedExperiment, biomaRt, genefilter, geneplotter, hwriter,
+    statmod, stringr
+
 Package: DO.db
 Source: Bioconductor
 Version: 2.9
@@ -681,6 +690,11 @@ Version: 1.4.0
 Hash: 62d62d3ffcc9a34411b6e35a813f72dd
 Requires: R6, curl, jsonlite, mime, openssl
 
+Package: hwriter
+Source: CRAN
+Version: 1.3.2
+Hash: 4c36a3e4a7471fdc3d5ee75b5188c37d
+
 Package: igraph
 Source: CRAN
 Version: 1.2.4.1
@@ -1002,6 +1016,11 @@ Source: Bioconductor
 Version: 1.6.0
 Hash: 14092edaba25cd672e66d6b89ecf45ad
 Requires: SummarizedExperiment
+
+Package: statmod
+Source: CRAN
+Version: 1.4.32
+Hash: 78ae41a38e01fc19ac5a009739b3706c
 
 Package: stringi
 Source: CRAN
