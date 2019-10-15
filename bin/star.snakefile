@@ -1,5 +1,5 @@
 # STAR rules
-rule generate_STARgenome:
+rule star_index:
     input:
         genome = "annotation/genome.fa",
         annotation = "annotation/annotation.gtf"
@@ -14,7 +14,7 @@ rule generate_STARgenome:
             --genomeFastaFiles {input.genome} \
             --sjdbGTFfile {input.annotation}"
 
-rule map_STAR:
+rule star_align:
     input:
         genome = "indices/STAR/Genome",
         fastq_fw = "fastq/trimmed/{sample}_R1_001_trimmed.fastq.gz",
@@ -45,14 +45,3 @@ rule map_STAR:
             --alignIntronMin 20 \
             --alignIntronMax 1000000 \
             --alignMatesGapMax 1000000"
-
-rule all_STAR:
-    input:
-        expand("BAM/{sample}_Aligned.sortedByCoord.out.bam", sample=SAMPLES)
-    params:
-        genome = "indices/STAR"
-    shell:
-        "STAR \
-            --runMode alignReads \
-            --genomeDir {params.genome} \
-            --genomeLoad Remove"

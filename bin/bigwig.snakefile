@@ -1,5 +1,5 @@
 # Make bigwigs
-rule index_BAM:
+rule samtools_index_illumina:
     input:
         "BAM/{sample}_Aligned.sortedByCoord.out.bam"
     output:
@@ -7,7 +7,7 @@ rule index_BAM:
     shell:
         "samtools index {input}"
 
-rule make_bigwigs:
+rule bamCoverage_stranded:
     input:
         bam = "BAM/{sample}_Aligned.sortedByCoord.out.bam",
         bai = "BAM/{sample}_Aligned.sortedByCoord.out.bam.bai"
@@ -31,7 +31,41 @@ rule make_bigwigs:
             --effectiveGenomeSize 2652783500 \
             --normalizeUsing BPM"
 
-rule make_hub:
+rule merge_bam_ont:
+    input:
+        bam1 = "BAM/bam_ont/X1_flowcell/20190808_X1_genome_{barcode}_q7_sort.bam",
+        bai1 = "BAM/bam_ont/X1_flowcell/20190808_X1_genome_{barcode}_q7_sort.bam.bai",
+        bam2 = "BAM/bam_ont/X3_flowcell/20190808_X3_genome_{barcode}_q7_sort.bam",
+        bai2 = "BAM/bam_ont/X3_flowcell/20190808_X3_genome_{barcode}_q7_sort.bam.bai"
+    output:
+        "BAM/bam_ont/{barcode}.bam"
+    shell:
+        "samtools merge {output} {input.bam1} {input.bam2}"
+
+rule samtools_index_ont:
+    input:
+        "BAM/bam_ont/{barcode}.bam"
+    output:
+        "BAM/bam_ont/{barcode}.bam.bai"
+    shell:
+        "samtools index {input}"
+
+rule bamCoverage_nonstranded:
+    input:
+        bam = "BAM/bam_ont/{barcode}.bam",
+        bai = "BAM/bam_ont/{barcode}.bam.bai"
+    output:
+        "BW/bw_ont/{barcode}.bw"
+    threads: 10
+    shell:
+        "bamCoverage \
+            -b {input.bam} \
+            -o {output} \
+            -p {threads} \
+            --effectiveGenomeSize 2652783500  \
+            --normalizeUsing BPM"
+
+rule makeHub_illumina:
     input:
         expand("BW/{sample}_fw.bw", sample=SAMPLES),
         expand("BW/{sample}_rv.bw", sample=SAMPLES),

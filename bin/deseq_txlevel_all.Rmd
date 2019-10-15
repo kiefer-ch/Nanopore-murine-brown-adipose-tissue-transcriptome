@@ -1,5 +1,5 @@
 ---
-title: "nanopore iBAT, Illumina reads transcript level, only samples used for ont too"
+title: "nanopore iBAT, Illumina reads transcript level, all samples"
 author: "Christoph Kiefer"
 date: "18. September 2019"
 output: 
@@ -35,8 +35,22 @@ library("ReactomePA")
 
 # Export of count matrices
 
-Both are normalised using the ratio of medians method. In the rld file, the
-variance stabilising transformation described in the DESeq2 paper has been used.
+There are multiple countmatrices to be found in the res/ folder. 
+
+* rld: log2 level, between sample normalised, variance stabilised. See regularized log (rlog) transformation 
+[http://dx.doi.org/10.1186/s13059-014-0550-8]. This is the main table for any plotting and correlation analyses etc.
+
+* ntd: log2 level, between sample normalised. For genes, that are not expressed in a condition, the rlog transformed 
+values will not be 0, which might be confusing sometimes. Therfore I add this table.
+
+* tpm: between sample normalised and within sample (between genes) normalised.
+
+* cts: raw counts, count output from tximport as imported from salmon estimated
+counts: no normalisation at all. This one should be used for statistical
+analyses in DESeq or EdgeR.
+
+In the data/ folder, there is also the DESeq data set object (dds), that can be imported into R
+using readRDS() to be directly analysed.
 
 ```{r importData, include=FALSE}
 # import data
@@ -47,6 +61,14 @@ dds <- readRDS(file.path("../data/dds_gencode.vM22_transcript.rds"))
 # prepare countmatrices
 rld <- rlog(dds, blind = FALSE)
 ntd <- normTransform(dds)
+
+# https://haroldpimentel.wordpress.com/2014/05/08/what-the-fpkm-a-review-rna-seq-expression-units/
+fpkmToTpm <- function(fpkm) {
+    exp(log(fpkm) - log(sum(fpkm)) + log(1e6))
+}
+
+tpm <- fpkm(dds, robust = TRUE)
+tpm <- apply(tpm, 2, fpkmToTpm)
 
 # annotate count matrices
 annotate_cm <- function(tibble, keytype = "ENSEMBL") {
@@ -69,9 +91,9 @@ annotate_cm <- function(tibble, keytype = "ENSEMBL") {
 }
 ```
 
-```{r exportCountMatrices, dependson="annotateCountMatrices", echo=TRUE}
+```{r exportCountMatrices, dependson="annotateCountMatrices"}
 # export count matrices
-res_folder <- "../res/txlevel_ont" 
+res_folder <- "../res/txlevel_all" 
 dir.create(res_folder, showWarnings = FALSE, recursive = TRUE)
 
 # with variance shrinking
@@ -79,14 +101,25 @@ assay(rld) %>%
     as_tibble(rownames = "gene_id_ens") %>% 
     annotate_cm(keytype = "ENSEMBLTRANS") %>% 
     rename(transcript_id_ens = "gene_id_ens") %>% 
-    write_csv(file.path(res_folder, "txlevel_ont_cm_rld.csv.gz"))
+    write_csv(file.path(res_folder, "txlevel_all_cm_rld.csv.gz"))
 
 # without
 assay(ntd) %>% 
     as_tibble(rownames = "gene_id_ens") %>% 
     annotate_cm(keytype = "ENSEMBLTRANS") %>% 
     rename(transcript_id_ens = "gene_id_ens") %>%
-    write_csv(file.path(res_folder, "txlevel_ont_cm_ntd.csv.gz"))
+    write_csv(file.path(res_folder, "txlevel_all_cm_ntd.csv.gz"))
+
+tpm %>% 
+    as_tibble(rownames = "gene_id_ens") %>% 
+    annotate_cm(keytype = "ENSEMBLTRANS") %>% 
+    rename(transcript_id_ens = "gene_id_ens") %>% 
+    write_csv(file.path(res_folder, "txlevel_all_cm_tpm.csv.gz"))
+
+counts(dds, normalized = FALSE) %>% 
+    as_tibble(rownames = "gene_id_ens") %>% 
+    annotate_cm(keytype = "ENSEMBLTRANS") %>% 
+    write_csv(file.path(res_folder, "txlevel_all_cm_cts.csv.gz"))
 ```
 
 # Quality control
@@ -224,12 +257,13 @@ Maybe 5034_S33 shows some differences compared to the other samples, like on gen
 
 # Differential transcript expression analysis
 
+## Filtering and adjusting for confounders
+
 ```{r adjustConfounders, echo=TRUE, dependson="importData"}
 design(dds) <- formula(~ condition_temp + condition_room)
 ```
 
-
-```{r runDESeq, dependson="adjustConfounders"}
+```{r runDESeq, dependson="adjustConfounders", echo=TRUE}
 # set reference
 colData(dds)$condition_temp <- relevel(colData(dds)$condition_temp, ref = "22")
 
@@ -238,9 +272,11 @@ dds <- dds[rowSums(counts(dds)) > 10, ] %>%
     DESeq(., parallel = TRUE)
 ```
 
-I use lfcThreshold = 1, svalue cutoff = .05 and I shrink the lfc.
+## Results using lfc shrinkage
 
-```{r results, echo=TRUE, dependson="runDESeq"}
+I use lfcThreshold = 1, svalue cutoff = .05 and I shrink the lfc using apeglm.
+
+```{r results_shrink, echo=TRUE, dependson="runDESeq"}
 # shrinking log2 fold change
 resLFC <- lfcShrink(dds, 
     coef = "condition_temp_4_vs_22",
@@ -249,9 +285,9 @@ resLFC <- lfcShrink(dds,
     parallel = TRUE)
 ```
 
-## Results table
+### Results table
 
-```{r results2, dependson = "results"}
+```{r results_shrink_summary, dependson = "results"}
 resLFC <- resLFC %>% 
     as_tibble(rownames = "ensembl_transcript_id_version")
 
@@ -275,48 +311,38 @@ LFC < -%f (down) : %d",
         lfcThreshold, n_up,
         lfcThreshold, n_down))
 }
+
+summary.resLFC(resLFC)
 ```
 
-
-```{r annotation}
+```{r annotation_shrink}
 # get annotation from biomart
 ensembl = biomaRt::useMart("ensembl",dataset="mmusculus_gene_ensembl")
 annotation <- biomaRt::getBM(
     attributes = c("ensembl_transcript_id_version",
         "ensembl_gene_id_version", "mgi_symbol", "description",
-        "gene_biotype"), 
+        "gene_biotype", "transcript_length"), 
     filters = "ensembl_transcript_id_version", 
     values = resLFC$ensembl_transcript_id_version, 
     mart = ensembl)
 
-# calculate average transcript length per gene over all samples
-weighted_avgTxLength <- counts(dds, normalized = TRUE) * assays(dds)$avgTxLength
-meanOfCounts <- rowMeans(counts(dds, normalized = TRUE))
-avgTxLength <- rowMeans(weighted_avgTxLength) %>% 
-    `/`(meanOfCounts) %>% 
-    tibble::enframe(. ,name = "ensembl_transcript_id_version", value = "avgTxLength")
-
-# get tpm from counts
-countToTpm <- function(counts, effLen) {
-    rate <- log(counts) - log(effLen)
-    denom <- log(sum(exp(rate)))
-    exp(rate - denom + log(1e6))
-}
+baseTPM <- rowMeans(tpm) %>% 
+    tibble::enframe(name = "ensembl_transcript_id_version",
+        value = "baseTPM")
 ```
 
 ```{r exportAnnotation, dependson="results2"}
 # merge annotation and TPM
 resLFC <- resLFC %>% 
     left_join(annotation, by = "ensembl_transcript_id_version") %>% 
-    left_join(avgTxLength, by = "ensembl_transcript_id_version") %>% 
-    mutate(TPM = countToTpm(baseMean, avgTxLength)) %>% 
+    left_join(baseTPM, by = "ensembl_transcript_id_version") %>% 
     select(ensembl_transcript_id_version, ensembl_gene_id_version, mgi_symbol, description, gene_biotype,
-        baseMean, TPM, avgTxLength, log2FoldChange,  lfcSE, svalue)
+        baseMean, baseTPM, transcript_length, log2FoldChange,  lfcSE, svalue)
 
 # export
 resLFC %>% 
     arrange(-abs(log2FoldChange)) %>% 
-    write_csv(gzfile(file.path(res_folder, "txlevel_all_de.csv.gz")))
+    write_csv(gzfile(file.path(res_folder, "txlevel_all_de_shrink.csv.gz")))
 
 # filter and kable
 resLFC_signif <- resLFC %>% 
@@ -345,14 +371,14 @@ biotype_groups <- read_csv("../data/biotype_groups.csv") %>%
 
 resLFC %>%
     left_join(biotype_groups, by = "gene_biotype") %>% 
-    mutate(signif = if_else(svalue < .05, TRUE, FALSE)) %>% 
-    filter(complete.cases(.)) %>%
-    ggplot(aes(log10(baseMean), log2FoldChange)) +
-    geom_point_interactive(aes(colour = signif, pch = grouped_biotype,
-        tooltip = signif), size = 1.5) +
+    mutate(signif = if_else(svalue < .05, TRUE, FALSE)) %>%
+    ggplot(aes(log10(baseMean), log2FoldChange, 
+        text = sprintf("%s<br>%s<br>%s", mgi_symbol, ensembl_transcript_id_version, gene_biotype))) +
+    geom_point(aes(colour = signif, pch = grouped_biotype), size = 1.5) +
     geom_hline(yintercept = 0, colour = "blue") +
-    theme_tufte() +
-    geom_rangeframe() +
+#    geom_smooth(colour = "red", method = "auto") +
+#    theme_tufte() +
+#    geom_rangeframe() +
     scale_y_continuous(breaks = my_breaks(),
         labels = function(x) round(x, 1),
         name = "log2FoldChange ko vs het") +
@@ -361,45 +387,6 @@ resLFC %>%
         name = "baseMean") +
     scale_color_viridis_d(guide = FALSE)
 ```
-
-Some tanscripts in the range 10 to 700 counts show a high (positive) log2FoldChange.
-Though there are way less compared to the ont only analysis.
-They might be treated as outliers by the lfc shrinking algoryhtm and therefore not shrunken at all.
-It is worth investigating their expression (Maybe only one sample with high expression?).
-
-#### Subsetting those with lfc > 5
-
-```{r outliers, dependson="MA-plot"}
-order <- colData(dds) %>%
-    as_tibble(rownames = "sample") %>%
-    dplyr::arrange(condition_temp) %>% 
-    pull(sample)
-
-pl <- resLFC %>% 
-    left_join(biotype_groups, by = "gene_biotype") %>% 
-    mutate(signif = if_else(svalue < .05, TRUE, FALSE)) %>% 
-    filter(complete.cases(.)) %>% 
-    filter(abs(log2FoldChange) > 6) %>% 
-    select(ensembl_transcript_id_version, ensembl_gene_id_version, mgi_symbol,
-       grouped_biotype, baseMean, TPM) %>% 
-    left_join(counts(dds) %>% as_tibble(rownames = "ensembl_transcript_id_version"),
-        by = "ensembl_transcript_id_version") %>% 
-    tidyr::gather(key = "sample", value = "counts" ,
-        -ensembl_transcript_id_version, - ensembl_gene_id_version, 
-        -mgi_symbol, - grouped_biotype, -baseMean, -TPM) %>% 
-    mutate(sample = factor(sample, levels = order)) %>% 
-    ggplot(., aes(sample, ensembl_transcript_id_version)) +
-        geom_tile_interactive(aes(fill = log10(counts), 
-            tooltip = sprintf("%s<br>base Mean = %s<br>average TPM = %s", mgi_symbol, round(baseMean, 1), round(TPM, 2)), 
-            onclick = sprintf("http://www.ensembl.org/Mus_musculus/Gene/Summary?db=core;g=%s", ensembl_gene_id_version))) +
-    scale_fill_viridis_c()
-    
-girafe(ggobj =  pl)
-```
-
-Seems as those transcripts are only expressed in one condition and therefore got
-assigned a very high log2fc.
-
 
 ### Clustering the significantly differentially expressed genes
 
@@ -449,7 +436,7 @@ colData(dds) %>%
 ```
 
 
-## Gene ontology analysis
+### Gene ontology analysis
 
 using TopGO
 
@@ -519,7 +506,7 @@ res_go <- resLFC_signif %>%
     mutate(n = unlist(n))
 ```
 
-### Upregulated genes
+#### Upregulated genes
 
 ```{r upGO, cache=FALSE}
 res_go$res[[1]] %>% 
@@ -527,7 +514,7 @@ res_go$res[[1]] %>%
     kableExtra::kable_styling()
 ```
 
-### Downregulated genes
+#### Downregulated genes
 
 ```{r downGO, cache=FALSE}
 res_go$res[[2]] %>% 
@@ -535,7 +522,7 @@ res_go$res[[2]] %>%
     kableExtra::kable_styling()
 ```
 
-## Reactome
+### Reactome
 
 using ReactomePA
 
@@ -574,7 +561,6 @@ res_reactome <- geneList_reactome %>%
         universe = all_genes_reactome)
 ```
 
-
 ```{r plot reactome, fig.width = 12, fig.asp = 0.62, dependson = "reactome"}
 if (nrow(res_reactome) == 0) {
     cat("ReactomePA did not find seignificant pathways.")
@@ -584,6 +570,138 @@ if (nrow(res_reactome) == 0) {
     cnetplot(res_reactome, categorySize = "pvalue",
         foldChange = geneList_reactome)
 }
+```
+
+## Results without shrinking
+
+```{r results_noShrink, echo=TRUE, dependson="runDESeq"}
+# shrinking log2 fold change
+res <- results(dds, 
+    contrast = c("condition_temp", "4", "22"),
+    parallel = TRUE)
+```
+
+### Results table
+
+```{r results_noshrink_summary}
+res <- res %>% 
+    as_tibble(rownames = "ensembl_transcript_id_version")
+
+summary.res <- function(res, lfcThreshold = 0, pvalueCutoff = .05) {
+    n_tot <- nrow(res)
+    df <- res %>% 
+        filter(padj <= pvalueCutoff)
+    n_up <- df %>% 
+        filter(log2FoldChange > 0) %>% 
+        nrow()
+    n_down <- df %>% 
+        filter(log2FoldChange < 0) %>% 
+        nrow()
+    cat(sprintf(
+"out of %d with nonzero total read count
+s-value < %f
+LFC > %f (up)    : %d
+LFC < -%f (down) : %d",
+        n_tot, 
+        pvalueCutoff,
+        lfcThreshold, n_up,
+        lfcThreshold, n_down))
+}
+
+summary.res(res)
+```
+
+```{r annotation_noshrink}
+# get annotation from biomart
+ensembl = biomaRt::useMart("ensembl",dataset="mmusculus_gene_ensembl")
+annotation <- biomaRt::getBM(
+    attributes = c("ensembl_transcript_id_version",
+        "ensembl_gene_id_version", "mgi_symbol", "description",
+        "gene_biotype", "transcript_length"), 
+    filters = "ensembl_transcript_id_version", 
+    values = res$ensembl_transcript_id_version, 
+    mart = ensembl)
+
+baseTPM <- rowMeans(tpm) %>% 
+    tibble::enframe(name = "ensembl_transcript_id_version",
+        value = "baseTPM")
+```
+
+```{r exportAnnotation_noshrink}
+# merge annotation and TPM
+res <- res %>% 
+    left_join(annotation, by = "ensembl_transcript_id_version") %>% 
+    left_join(baseTPM, by = "ensembl_transcript_id_version") %>% 
+    select(ensembl_transcript_id_version, ensembl_gene_id_version, mgi_symbol, description, gene_biotype,
+        baseMean, baseTPM, transcript_length, log2FoldChange,  lfcSE, pvalue, padj)
+
+# export
+res %>% 
+    arrange(-abs(log2FoldChange)) %>% 
+    write_csv(gzfile(file.path(res_folder, "txlevel_all_de_noshrink.csv.gz")))
+
+# filter and kable
+res_signif <- res %>% 
+    filter(padj < .05) %>% 
+    arrange(-abs(log2FoldChange))
+
+res_signif %>% 
+    knitr::kable(format = "html") %>%
+    kableExtra::kable_styling() %>%
+    kableExtra::scroll_box(width = "100%", height = "600px")
+```
+
+### MA plot
+
+```{r MA-plot_noshrink, dependson = "runDESeq"}
+res %>%
+    left_join(biotype_groups, by = "gene_biotype") %>% 
+    mutate(signif = if_else(padj < .05, TRUE, FALSE)) %>%
+    tidyr::drop_na() %>% 
+    ggplot(aes(log10(baseMean), log2FoldChange)) +
+        geom_point(aes(colour = signif, pch = grouped_biotype), size = 1.5) +
+        geom_hline(yintercept = 0, colour = "blue") +
+        scale_y_continuous(breaks = my_breaks(),
+            labels = function(x) round(x, 1),
+            name = "log2FoldChange ko vs het") +
+        scale_x_continuous(breaks = log10(c(1,100,10000,max(res$baseMean))),
+            labels = function(x) round(10^x),
+            name = "baseMean") +
+        scale_color_viridis_d(guide = FALSE)
+```
+
+### Clustering the significantly differentially expressed genes
+
+```{r hclust_noshrink, dependson = "runDESeq"}
+# filter significantly regulated genes
+hclust_df <- assay(rld) %>%
+    as_tibble(rownames = "gene") %>% 
+    filter(gene %in% res_signif$ensembl_transcript_id_version) %>% 
+    as.data.frame() %>%
+    magrittr::set_rownames(.$gene) %>%
+    dplyr::select(-gene) %>%
+    (function(x) {x - rowMeans(x)})
+
+# centering the colorscale
+myColor <- colorRampPalette(rev(brewer.pal(n = 7, name = "RdYlBu")))(100)
+myBreaks <- c(seq(min(hclust_df), 0, length.out = ceiling(50) + 1),
+    seq(max(hclust_df) / 100, max(hclust_df), length.out = floor(50)))
+
+# plot heatmap
+hclust <- pheatmap(hclust_df,
+    fontfamily = "Palatino",
+    annotation_col = colData(dds) %>%
+         as.data.frame() %>%
+         select(condition_temp),
+    clustering_method = "ward.D2",
+    clustering_distance_rows = "correlation",
+    color = myColor, breaks = myBreaks,
+    show_rownames = FALSE, show_colnames = TRUE,
+    lwd = .2,
+    cutree_rows = 2,
+    border_color = NA)
+
+hclust
 ```
 
 # Session info

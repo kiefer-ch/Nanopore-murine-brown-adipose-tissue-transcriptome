@@ -37,12 +37,3 @@ rule sort_annotation:
         "annotation/annotation_sort.gtf"
     shell:
         "bedtools sort -i {input} > {output}"
-
-rule annotation_all:
-    input:
-        "annotation/transcripts.fa",
-        "annotation/genome.fa",
-        "annotation/annotation.gtf",
-        "annotation/genome.fa.fai",
-        "annotation/annotation_sort.gtf"
-

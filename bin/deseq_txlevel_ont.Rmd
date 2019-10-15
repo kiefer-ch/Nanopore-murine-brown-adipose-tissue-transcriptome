@@ -35,8 +35,22 @@ library("ReactomePA")
 
 # Export of count matrices
 
-Both are normalised using the ratio of medians method. In the rld file, the
-variance stabilising transformation described in the DESeq2 paper has been used.
+There are multiple countmatrices to be found in the res/ folder. 
+
+* rld: log2 level, between sample normalised, variance stabilised. See regularized log (rlog) transformation 
+[http://dx.doi.org/10.1186/s13059-014-0550-8]. This is the main table for any plotting and correlation analyses etc.
+
+* ntd: log2 level, between sample normalised. For genes, that are not expressed in a condition, the rlog transformed 
+values will not be 0, which might be confusing sometimes. Therfore I add this table.
+
+* tpm: between sample normalised and within sample (between genes) normalised.
+
+* cts: raw counts, count output from tximport as imported from salmon estimated
+counts: no normalisation at all. This one should be used for statistical
+analyses in DESeq or EdgeR.
+
+In the data/ folder, there is also the DESeq data set object (dds), that can be imported into R
+using readRDS() to be directly analysed.
 
 ```{r importData, include=FALSE}
 # import data
@@ -77,7 +91,7 @@ annotate_cm <- function(tibble, keytype = "ENSEMBL") {
 }
 ```
 
-```{r exportCountMatrices, dependson="annotateCountMatrices", echo=TRUE}
+```{r exportCountMatrices, dependson="annotateCountMatrices"}
 # export count matrices
 res_folder <- "../res/txlevel_ont" 
 dir.create(res_folder, showWarnings = FALSE, recursive = TRUE)
@@ -101,6 +115,11 @@ tpm %>%
     annotate_cm(keytype = "ENSEMBLTRANS") %>% 
     rename(transcript_id_ens = "gene_id_ens") %>% 
     write_csv(file.path(res_folder, "txlevel_ont_cm_tpm.csv.gz"))
+
+counts(dds, normalized = FALSE) %>% 
+    as_tibble(rownames = "gene_id_ens") %>% 
+    annotate_cm(keytype = "ENSEMBLTRANS") %>% 
+    write_csv(file.path(res_folder, "txlevel_ont_cm_cts.csv.gz"))
 ```
 
 # Quality control
@@ -189,7 +208,8 @@ pca <- as_tibble(pca$x, rownames = "sample") %>%
 pca_pl <- ggplot(pca, aes(PC1, PC2, colour = condition_temp)) +
     geom_point_interactive(aes(pch = condition_room, 
         tooltip = sprintf("%s<br>cage = %s", sample, condition_cage),
-        data_id = condition_cage), size = 2) +    stat_ellipse(type = "norm", level = .68) +
+        data_id = condition_cage), size = 2) +
+    stat_ellipse(type = "norm", level = .68) +
     theme_tufte() +
     geom_rangeframe(colour = "black", sides = 'bl') +
     scale_y_continuous(breaks = extended_range_breaks()(pca[, 3]),
@@ -241,7 +261,6 @@ Maybe 5034_S33 shows some differences compared to the other samples, like on gen
 design(dds) <- formula(~ condition_temp + condition_room)
 ```
 
-
 ```{r runDESeq, dependson="adjustConfounders"}
 # set reference
 colData(dds)$condition_temp <- relevel(colData(dds)$condition_temp, ref = "22")
@@ -251,7 +270,7 @@ dds <- dds[rowSums(counts(dds)) > 10, ] %>%
     DESeq(., parallel = TRUE)
 ```
 
-I use lfcThreshold = 1, svalue cutoff = .05 and I shrink the lfc.
+I use lfcThreshold = 1, svalue cutoff = .05 and I shrink the lfc using apeglm.
 
 ```{r results, echo=TRUE, dependson="runDESeq"}
 # shrinking log2 fold change
@@ -289,7 +308,6 @@ LFC < -%f (down) : %d",
         lfcThreshold, n_down))
 }
 ```
-
 
 ```{r annotation}
 # get annotation from biomart

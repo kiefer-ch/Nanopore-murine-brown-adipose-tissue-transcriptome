@@ -10,7 +10,7 @@ editor_options:
 ---
 
 ```{r setup, include=FALSE, cache=FALSE}
-knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = TRUE)
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = FALSE)
 ```
 
 ```{r library, include=FALSE, cache=FALSE}
@@ -34,8 +34,23 @@ library("ReactomePA")
 
 # Export of count matrices
 
-Both are normalised using the ratio of medians method. In the rld file, the
-variance stabilising transformation described in the DESeq2 paper has been used.
+There are multiple countmatrices to be found in the res/ folder. 
+
+* rld: log2 level, between sample normalised, variance stabilised. See regularized log (rlog) transformation 
+[http://dx.doi.org/10.1186/s13059-014-0550-8]. This is the main table for any plotting and correlation analyses etc.
+
+* ntd: log2 level, between sample normalised. For genes, that are not expressed in a condition, the rlog transformed 
+values will not be 0, which might be confusing sometimes. Therfore I add this table.
+
+* tpm: between sample normalised and within sample (between genes) normalised.
+
+* cts: raw counts, count output from tximport as imported from salmon estimated
+counts: no normalisation at all. This one should be used for statistical
+analyses in DESeq or EdgeR.
+
+In the data/ folder, there is also the DESeq data set object (dds), that can be imported into R
+using readRDS() to be directly analysed.
+
 
 ```{r importData, include=FALSE}
 # import data
@@ -76,7 +91,7 @@ annotate_cm <- function(tibble) {
 }
 ```
 
-```{r exportCountMatrices, dependson="annotateCountMatrices", echo=TRUE}
+```{r exportCountMatrices, dependson="annotateCountMatrices"}
 # export count matrices
 res_folder <- "../res/genelevel_ont" 
 dir.create(res_folder, showWarnings = FALSE, recursive = TRUE)
@@ -95,9 +110,15 @@ assay(ntd) %>%
 
 # tpm
 tpm %>% 
-        as_tibble(rownames = "gene_id_ens") %>% 
-        annotate_cm() %>% 
-        write_csv(file.path(res_folder, "genelevel_ont_cm_tpm.csv.gz"))
+    as_tibble(rownames = "gene_id_ens") %>% 
+    annotate_cm() %>% 
+    write_csv(file.path(res_folder, "genelevel_ont_cm_tpm.csv.gz"))
+
+# raw counts
+counts(dds, normalized = FALSE) %>% 
+    as_tibble(rownames = "gene_id_ens") %>% 
+    annotate_cm() %>% 
+    write_csv(file.path(res_folder, "genelevel_ont_cm_cts.csv.gz"))
 ```
 
 # Quality control

@@ -1,5 +1,5 @@
 # salmon rules
-rule prepare_decoys:
+rule salmon_prepareDecoys:
     input:
         transcripts = "annotation/transcripts.fa",
         genome = "annotation/genome.fa",
@@ -20,7 +20,7 @@ rule prepare_decoys:
             -m {MASHMAP} \
             -o {params.outputDir}"
 
-rule generate_salmonIndex:
+rule salmon_index:
     input:
         gentrome = "indices/salmon/decoy/gentrome.fa",
         decoy = "indices/salmon/decoy/decoys.txt"
@@ -41,7 +41,7 @@ rule generate_salmonIndex:
             -d {input.decoy} \
             -p {threads}"
 
-rule map_salmon:
+rule salmon_align:
     threads: 5
     input:
         "indices/salmon/duplicate_clusters.tsv",
@@ -68,36 +68,3 @@ rule map_salmon:
             -p {threads} \
             --validateMappings \
             -o {params.outputDir}"
-
-rule all_salmon:
-    input:
-        expand("salmon/{sample}/quant.sf", sample=SAMPLES)
-
-rule qc_salmon:
-    input:
-        expand("qc/RSeQC/bam_stat/{sample}", sample=SAMPLES),
-        expand("qc/RSeQC/geneBody_coverage/{sample}.geneBodyCoverage.curves.pdf", sample=SAMPLES),
-        expand("qc/RSeQC/geneBody_coverage/{sample}.geneBodyCoverage.r", sample=SAMPLES),
-        expand("qc/RSeQC/geneBody_coverage/{sample}.geneBodyCoverage.txt", sample=SAMPLES),
-        expand("qc/RSeQC/read_duplication/{sample}.DupRate_plot.pdf", sample=SAMPLES),
-        expand("qc/RSeQC/read_duplication/{sample}.DupRate_plot.r", sample=SAMPLES),
-        expand("qc/RSeQC/read_duplication/{sample}.pos.DupRate.xls", sample=SAMPLES),
-        expand("qc/RSeQC/read_duplication/{sample}.seq.DupRate.xls", sample=SAMPLES),
-        expand("qc/RSeQC/junction_annotation/{sample}", sample=SAMPLES),
-        expand("qc/RSeQC/junction_annotation/{sample}.junction.bed", sample=SAMPLES),
-        expand("qc/RSeQC/junction_annotation/{sample}.junction.xls", sample=SAMPLES),
-        expand("qc/RSeQC/junction_annotation/{sample}.junction_plot.r", sample=SAMPLES),
-        expand("qc/RSeQC/junction_annotation/{sample}.splice_events.pdf", sample=SAMPLES),
-        expand("qc/RSeQC/junction_annotation/{sample}.splice_junction.pdf", sample=SAMPLES),
-        expand("qc/RSeQC/junction_saturation/{sample}.junctionSaturation_plot.pdf", sample=SAMPLES),
-        expand("qc/RSeQC/junction_saturation/{sample}.junctionSaturation_plot.r", sample=SAMPLES),
-        expand("salmon/{sample}/quant.sf", sample=SAMPLES)
-    output:
-        "qc/multiqc_salmon.html",
-        "qc/multiqc_salmon_data.zip"
-    shell:
-        "multiqc -f -z \
-            -c bin/.multiqc.conf \
-            qc/fastqc/ BAM/ salmon/ qc/RSeQC \
-            -o qc \
-            -n multiqc_salmon"

@@ -1,5 +1,5 @@
 # RSeQC rules
-rule run_bamstat:
+rule rseqc_bamstat:
     input:
         bam = "BAM/{sample}_Aligned.sortedByCoord.out.bam",
     output:
@@ -11,7 +11,7 @@ rule run_bamstat:
             -i {input.bam} \
             > {params.outputDir}"
 
-rule extract_junctionBED:
+rule rseqc_junctionBED:
     input:
         "data/mm10_Gencode_vM20_gencode.bed.gz"
     output:
@@ -19,7 +19,7 @@ rule extract_junctionBED:
     shell:
         "gunzip {input}"
 
-rule run_genebody_coverage:
+rule rseqc_genebodyCoverage:
     input:
         bam = "BAM/{sample}_Aligned.sortedByCoord.out.bam",
         bed = "data/mm10_Gencode_vM20_gencode.bed"
@@ -35,7 +35,7 @@ rule run_genebody_coverage:
             -i {input.bam} \
             -o {params.outputDir}"
 
-rule run_read_duplication:
+rule rseqc_readDuplication:
     input:
         bam = "BAM/{sample}_Aligned.sortedByCoord.out.bam",
         bed = "data/mm10_Gencode_vM20_gencode.bed"
@@ -51,7 +51,7 @@ rule run_read_duplication:
             -i {input.bam} \
             -o {params.outputDir}"
 
-rule run_junction_annotation:
+rule rseqc_junctionAnnotation:
     input:
         bam = "BAM/{sample}_Aligned.sortedByCoord.out.bam",
         bed = "data/mm10_Gencode_vM20_gencode.bed"
@@ -71,7 +71,7 @@ rule run_junction_annotation:
             -o {params.outputDir} \
             2> {params.outputDir}"
 
-rule run_junction_saturation:
+rule rseqc_junctionSaturation:
     input:
         bam = "BAM/{sample}_Aligned.sortedByCoord.out.bam",
         bed = "data/mm10_Gencode_vM20_gencode.bed"
@@ -85,31 +85,3 @@ rule run_junction_saturation:
             -r {input.bed} \
             -i {input.bam} \
             -o {params.outputDir}"
-
-rule qc_bam_all:
-    input:
-        expand("qc/RSeQC/bam_stat/{sample}", sample=SAMPLES),
-        expand("qc/RSeQC/geneBody_coverage/{sample}.geneBodyCoverage.curves.pdf", sample=SAMPLES),
-        expand("qc/RSeQC/geneBody_coverage/{sample}.geneBodyCoverage.r", sample=SAMPLES),
-        expand("qc/RSeQC/geneBody_coverage/{sample}.geneBodyCoverage.txt", sample=SAMPLES),
-        expand("qc/RSeQC/read_duplication/{sample}.DupRate_plot.pdf", sample=SAMPLES),
-        expand("qc/RSeQC/read_duplication/{sample}.DupRate_plot.r", sample=SAMPLES),
-        expand("qc/RSeQC/read_duplication/{sample}.pos.DupRate.xls", sample=SAMPLES),
-        expand("qc/RSeQC/read_duplication/{sample}.seq.DupRate.xls", sample=SAMPLES),
-        expand("qc/RSeQC/junction_annotation/{sample}", sample=SAMPLES),
-        expand("qc/RSeQC/junction_annotation/{sample}.junction.bed", sample=SAMPLES),
-        expand("qc/RSeQC/junction_annotation/{sample}.junction.xls", sample=SAMPLES),
-        expand("qc/RSeQC/junction_annotation/{sample}.junction_plot.r", sample=SAMPLES),
-        expand("qc/RSeQC/junction_annotation/{sample}.splice_events.pdf", sample=SAMPLES),
-        expand("qc/RSeQC/junction_annotation/{sample}.splice_junction.pdf", sample=SAMPLES),
-        expand("qc/RSeQC/junction_saturation/{sample}.junctionSaturation_plot.pdf", sample=SAMPLES),
-        expand("qc/RSeQC/junction_saturation/{sample}.junctionSaturation_plot.r", sample=SAMPLES)
-    output:
-        "qc/multiqc_bam.html",
-        "qc/multiqc_bam_data.zip"
-    shell:
-        "multiqc -f -z \
-            -c bin/.multiqc.conf \
-            qc/fastqc/ BAM/ qc/RSeQC \
-            -o qc \
-            -n multiqc_bam"

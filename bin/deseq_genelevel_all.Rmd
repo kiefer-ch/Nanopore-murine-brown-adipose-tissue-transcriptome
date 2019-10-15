@@ -1,5 +1,5 @@
 ---
-title: "nanopore iBAT, Illumina reads gene level, only samples used for ont too"
+title: "nanopore iBAT, Illumina reads gene level, all samples"
 author: "Christoph Kiefer"
 date: "18. September 2019"
 output: 
@@ -10,7 +10,7 @@ editor_options:
 ---
 
 ```{r setup, include=FALSE, cache=FALSE}
-knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = TRUE)
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = FALSE)
 ```
 
 ```{r library, include=FALSE, cache=FALSE}
@@ -34,8 +34,23 @@ library("ReactomePA")
 
 # Export of count matrices
 
-Both are normalised using the ratio of medians method. In the rld file, the
-variance stabilising transformation described in the DESeq2 paper has been used.
+There are multiple countmatrices to be found in the res/ folder. 
+
+* rld: log2 level, between sample normalised, variance stabilised. See regularized log (rlog) transformation 
+[http://dx.doi.org/10.1186/s13059-014-0550-8]. This is the main table for any plotting and correlation analyses etc.
+
+* ntd: log2 level, between sample normalised. For genes, that are not expressed in a condition, the rlog transformed 
+values will not be 0, which might be confusing sometimes. Therfore I add this table.
+
+* tpm: between sample normalised and within sample (between genes) normalised.
+
+* cts: raw counts, count output from tximport as imported from salmon estimated
+counts: no normalisation at all. This one should be used for statistical
+analyses in DESeq or EdgeR.
+
+In the data/ folder, there is also the DESeq data set object (dds), that can be imported into R
+using readRDS() to be directly analysed.
+
 
 ```{r importData, include=FALSE}
 # import data
@@ -46,6 +61,14 @@ dds <- readRDS("../data/dds_gencode.vM22_gene_ont.rds")
 # prepare countmatrices
 rld <- rlog(dds, blind = FALSE)
 ntd <- normTransform(dds)
+
+# https://haroldpimentel.wordpress.com/2014/05/08/what-the-fpkm-a-review-rna-seq-expression-units/
+fpkmToTpm <- function(fpkm) {
+    exp(log(fpkm) - log(sum(fpkm)) + log(1e6))
+}
+
+tpm <- fpkm(dds, robust = TRUE)
+tpm <- apply(tpm, 2, fpkmToTpm)
 
 # annotate count matrices
 annotate_cm <- function(tibble) {
@@ -68,22 +91,34 @@ annotate_cm <- function(tibble) {
 }
 ```
 
-```{r exportCountMatrices, dependson="annotateCountMatrices", echo=TRUE}
+```{r exportCountMatrices, dependson="annotateCountMatrices"}
 # export count matrices
-res_folder <- "../res/genelevel_ont" 
+res_folder <- "../res/genelevel_all" 
 dir.create(res_folder, showWarnings = FALSE, recursive = TRUE)
 
 # with variance shrinking
 assay(rld) %>%
     as_tibble(rownames = "gene_id_ens") %>% 
     annotate_cm() %>% 
-    write_csv(file.path(res_folder, "genelevel_ont_cm_rld.csv.gz"))
+    write_csv(file.path(res_folder, "genelevel_all_cm_rld.csv.gz"))
 
 # without
 assay(ntd) %>% 
     as_tibble(rownames = "gene_id_ens") %>% 
     annotate_cm() %>% 
-    write_csv(file.path(res_folder, "genelevel_ont_cm_ntd.csv.gz"))
+    write_csv(file.path(res_folder, "genelevel_all_cm_ntd.csv.gz"))
+
+# tpm
+tpm %>% 
+    as_tibble(rownames = "gene_id_ens") %>% 
+    annotate_cm() %>% 
+    write_csv(file.path(res_folder, "genelevel_all_cm_tpm.csv.gz"))
+
+# raw counts
+counts(dds, normalized = FALSE) %>% 
+    as_tibble(rownames = "gene_id_ens") %>% 
+    annotate_cm() %>% 
+    write_csv(file.path(res_folder, "genelevel_all_cm_cts.csv.gz"))
 ```
 
 # Quality control
@@ -278,34 +313,23 @@ annotation <- biomaRt::getBM(
     values = resLFC$ensembl_gene_id_version, 
     mart = ensembl)
 
-# calculate average transcript length per gene over all samples
-weighted_avgTxLength <- counts(dds, normalized = TRUE) * assays(dds)$avgTxLength
-meanOfCounts <- rowMeans(counts(dds, normalized = TRUE))
-avgTxLength <- rowMeans(weighted_avgTxLength) %>% 
-    `/`(meanOfCounts) %>% 
-    tibble::enframe(. ,name = "ensembl_gene_id_version", value = "avgTxLength")
-
-# get tpm from counts
-countToTpm <- function(counts, effLen) {
-    rate <- log(counts) - log(effLen)
-    denom <- log(sum(exp(rate)))
-    exp(rate - denom + log(1e6))
-}
+baseTPM <- rowMeans(tpm) %>% 
+    tibble::enframe(name = "ensembl_gene_id_version",
+        value = "baseTPM")
 ```
 
 ```{r exportAnnotation, dependson="results2"}
 # merge annotation and TPM
 resLFC <- resLFC %>% 
     left_join(annotation, by = "ensembl_gene_id_version") %>% 
-    left_join(avgTxLength, by = "ensembl_gene_id_version") %>% 
-    mutate(TPM = countToTpm(baseMean, avgTxLength)) %>% 
+    left_join(baseTPM, by = "ensembl_gene_id_version") %>% 
     select(ensembl_gene_id_version, mgi_symbol, description, gene_biotype,
-        baseMean, TPM, avgTxLength, log2FoldChange,  lfcSE, svalue)
+        baseMean, baseTPM, log2FoldChange,  lfcSE, svalue)
 
 # export
 resLFC %>% 
     arrange(-abs(log2FoldChange)) %>% 
-    write_csv(gzfile(file.path(res_folder, "genelevel_ont_de.csv.gz")))
+    write_csv(gzfile(file.path(res_folder, "genelevel_all_de.csv.gz")))
 
 # filter and kable
 resLFC_signif <- resLFC %>% 

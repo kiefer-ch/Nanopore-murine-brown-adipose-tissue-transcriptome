@@ -41,7 +41,7 @@ txdf <- txdb %>%
 
 
 ```{r importScaledTpm}
-cts <- readRDS("../data/scaledTPM.rds")
+cts <- readRDS("../data/scaledTPM_all.rds")
 txdf <- txdf[match(rownames(cts),txdf$TXNAME),]
 
 counts <- cts %>% 
@@ -55,7 +55,7 @@ counts <- cts %>%
 
 ```{r importSampleInfo}
 sample_info <- read_csv("../sample_info/sampleInfo.csv") %>%
-    filter(!is.na(ont)) %>%
+    filter(!is.na(illumina)) %>%
     mutate_at(vars(matches("condition")), as.factor) %>%
     mutate(path = file.path("salmon", illumina, "quant.sf"),
         condition_temp = relevel(condition_temp, ref = "22")) %>%
@@ -68,9 +68,9 @@ dmds <- dmDSdata(counts = counts, samples = sample_info)
 
 ```{r filterLowlyExpressed, echo = TRUE}
 # total number of samples
-n <- 6
+n <- 12
 # number of samples in the smallest group
-n.small <- 3
+n.small <- 6
 
 dmds <- dmFilter(dmds,
               min_samps_feature_expr = n.small, min_feature_expr = 10,
@@ -103,7 +103,7 @@ plotPrecision(dmds) +
 
 ```{r buildResultsTables}
 res_gene <- DRIMSeq::results(dmds)
-res_tx <- DRIMSeq::results(dmds, level="feature")
+res_tx <- DRIMSeq::results(dmds, level = "feature")
 ```
 
 ```{r annotation}
@@ -126,8 +126,7 @@ annotation_tx <- biomaRt::getBM(
     mart = ensembl)
 ```
 
-
-```{r kableDrimSeqResults}
+```{r kableDrimSeqResults_gene}
 res_gene %>% 
     as_tibble() %>%
     arrange(adj_pvalue) %>% 
@@ -137,7 +136,11 @@ res_gene %>%
     knitr::kable(format = "html") %>%
     kableExtra::kable_styling() %>%
     kableExtra::scroll_box(width = "100%", height = "600px")
+```
 
+#### Transcript level
+
+```{r kableDrimSeqResults_tx}
 res_tx %>% 
     as_tibble() %>%
     arrange(adj_pvalue) %>% 
@@ -150,7 +153,6 @@ res_tx %>%
     kableExtra::kable_styling() %>%
     kableExtra::scroll_box(width = "100%", height = "600px")
 ```
-
 
 ```{r exportDrimSeqResults}
 dir.create("../res/dtu_all", showWarnings = FALSE)
@@ -196,8 +198,8 @@ tx2gene <- res_tx[ , c("feature_id", "gene_id")]
 stageRObj <- stageRTx(pScreen = pScreen, pConfirmation = pConfirmation,
         pScreenAdjusted = FALSE, tx2gene = tx2gene)
 stageRObj <- stageWiseAdjustment(stageRObj, method = "dtu", alpha = 0.05)
-drim.padj <- getAdjustedPValues(stageRObj, order = FALSE,
-    onlySignificantGenes = TRUE)
+drim.padj <- getAdjustedPValues(stageRObj, order = TRUE,
+    onlySignificantGenes = FALSE)
 ```
 
 StageR looks at the pvalues for both genes and transcripts thereby allowing to 
@@ -216,16 +218,10 @@ res_stageR %>%
     write_csv("../res/dtu_all/stageR_drimseq_dtu.csv.gz")
 
 res_stageR %>% 
+    filter(gene < .05 | transcript < .05) %>% 
     knitr::kable(format = "html") %>%
     kableExtra::kable_styling() %>%
     kableExtra::scroll_box(width = "100%", height = "600px")
-```
-
-```{r include=FALSE}
-plotProportions(dmds, gene_id = "ENSMUSG00000039205.16",
-    group_variable = "condition_temp", plot_type = "boxplot1") +
-    scale_fill_viridis_d() +
-    scale_color_viridis_d()
 ```
 
 # Session info

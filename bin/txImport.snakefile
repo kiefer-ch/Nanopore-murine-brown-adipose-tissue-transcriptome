@@ -1,4 +1,4 @@
-rule tximport_gene:
+rule tximport_gene_illumina:
     input:
         expand("salmon/{sample}/quant.sf", sample=SAMPLES),
         annotation = "annotation/annotation.gtf",
@@ -8,7 +8,7 @@ rule tximport_gene:
     shell:
         "bin/txImport.R {input.sample_info} {input.annotation} {output} --genelevel illumina"
 
-rule tximport_transcript:
+rule tximport_transcript_illumina:
     input:
         expand("salmon/{sample}/quant.sf", sample=SAMPLES),
         annotation = "annotation/annotation.gtf",
@@ -55,12 +55,3 @@ rule tximport_dtu_all:
         "data/scaledTPM_all.rds"
     shell:
         "bin/txImport_DTU.R {output} illumina"
-
-
-rule tximport_all:
-    input:
-        "data/dds_gencode.vM22_transcript.rds",
-        "data/dds_gencode.vM22_gene.rds",
-        "data/dds_gencode.vM22_transcript_ont.rds",
-        "data/dds_gencode.vM22_gene_ont.rds"
-
