@@ -1,3 +1,14 @@
+rule dexseq_prefilterIsoforms:
+    input:
+        annotation = "annotation/annotation.gtf",
+        scaledTPM = "data/scaledTPM_all.rds"
+    threads:
+        2
+    output:
+        "desxseq/annotation_prefiltered.gtf"
+    script:
+        "dexseq_prefilterIsoforms.R"
+
 # https://github.com/vivekbhr/Subread_to_DEXSeq
 rule dexseq_prepare_annotation:
     input:

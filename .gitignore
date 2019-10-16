@@ -13,6 +13,7 @@
 !bin/*.sh
 !bin/.multiqc.conf
 !bin/*.snakefile
+!bin/*.py
 
 # Don't ignore necessary data
 !data/biotype_groups.csv
