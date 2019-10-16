@@ -6,9 +6,11 @@ rule dexseq_prepare_annotation:
         "indices/dexseq/annotation_flat.gff"
     shell:
         "python3 bin/dexseq_prepare_annotation.py \
+            --aggregate no \
             {input} \
             {output}"
-rule dexseq_count:
+
+rule dexseq_count_illumina:
     input:
         annotation = "indices/dexseq/annotation_flat.gff",
         bam = "BAM/{sample}_Aligned.sortedByCoord.out.bam"
@@ -23,12 +25,10 @@ rule dexseq_count:
 
 rule dexseq_importCounts:
     input:
-#        expand("dexseq/{sample}.txt", sample=SAMPLES),
+        expand("dexseq/{sample}.txt", sample=SAMPLES),
         annotation = "indices/dexseq/annotation_flat.gff",
         sample_info = "sample_info/sampleInfo.csv"
-    params:
-        filter_by = "ont"
     output:
-        "data/dds_gencode.vM22_gene_ont.rds"
+        "data/dxd.rds",
     script:
         "dexseq_importCounts.R"
