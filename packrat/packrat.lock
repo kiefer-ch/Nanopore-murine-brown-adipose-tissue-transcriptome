@@ -1120,6 +1120,13 @@ Source: CRAN
 Version: 0.3.0
 Hash: 78bb072c4f9e729a283d4c40ec93f9c6
 
+Package: vroom
+Source: CRAN
+Version: 1.0.2
+Hash: f6dabd651263fdf278db1cf8756b2bd9
+Requires: Rcpp, crayon, glue, hms, progress, rlang, tibble, tidyselect,
+    withr
+
 Package: vsn
 Source: Bioconductor
 Version: 3.52.0

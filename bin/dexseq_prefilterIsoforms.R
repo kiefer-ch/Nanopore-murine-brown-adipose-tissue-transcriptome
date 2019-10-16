@@ -1,7 +1,7 @@
 #!/usr/bin/Rscript --no-restore --no-environ --no-save
 
 # set libpaths to packrat local library
-source("../packrat/init.R")
+source("packrat/init.R")
 
 suppressPackageStartupMessages(library("readr"))
 suppressPackageStartupMessages(library("dplyr"))
@@ -13,34 +13,30 @@ suppressPackageStartupMessages(library("dplyr"))
 #
 ################################################################################
 
-df <- read_rds(snakemake@input[["scaledTPM"]]) %>%
-    as_tibble(rownames = "ensembl_transcript_id_version")
-
-tx2g <- GenomicFeatures::makeTxDbFromGFF(snakemake@input[["annotation"]],
-        format = "gtf", circ_seqs = character()) %>%
-    AnnotationDbi::select(.,
-        keys =  AnnotationDbi::keys(., keytype = "GENEID"),
-        keytype = "GENEID",
-        columns = "TXNAME") %>%
+message("Preparing tx2g...")
+tx2g <- read_rds(path = snakemake@input[["txdb"]]) %>%
     dplyr::select(TXNAME, GENEID) %>%
     dplyr::rename(ensembl_gene_id_version = "GENEID",
         ensembl_transcript_id_version = "TXNAME")
 
-df <- df %>%
+message("Calculating which transcripts should be kept...")
+df <- read_rds(snakemake@input[["scaledTPM"]]) %>%
+    as_tibble(rownames = "ensembl_transcript_id_version") %>%
     left_join(tx2g, by = "ensembl_transcript_id_version") %>%
     tidyr::gather(key = sample, value = "scaledTPM", -ensembl_gene_id_version,
         -ensembl_transcript_id_version) %>%
     filter(scaledTPM != 0) %>%
     group_by(sample, ensembl_gene_id_version) %>%
     mutate(freq = scaledTPM / sum(scaledTPM)) %>%
-    filter(freq > .15)
+    filter(freq > snakemake@params[["threshold"]] / 100)
 
 keep_tx <- df %>%
     pull(ensembl_transcript_id_version) %>%
     unique()
 
+message("Reading gtf file...")
 read_gtf <- function(file) {
-    vroom::vroom(file = file,
+    read_delim(file = file,
         delim = "\t",
         comment = "#",
         na = c('.'),
@@ -56,13 +52,13 @@ read_gtf <- function(file) {
             strand = col_character(),
             phase = col_character(),
             attributes = col_character()),
-        num_threads = snakemake@threads[[1]],
         progress = FALSE)
 }
 
 gtf <- read_gtf(snakemake@input[["annotation"]])
 
-gtf <- gtf[1:100,] %>%
+message("Subsetting gtf...")
+gtf <- gtf %>%
     tidyr::separate(attributes, c("gene_id", "transcript_id"),
         sep = ';', remove = FALSE, extra = "drop") %>%
     mutate(transcript_id = if_else(feature == "gene", NA_character_, substr(transcript_id, 17, nchar(transcript_id) - 1))) %>%
@@ -72,8 +68,12 @@ keep_gene <- gtf %>%
     filter(feature == "transcript") %>%
     pull(gene_id)
 
-gtf %>%
+gtf <- gtf %>%
     filter(gene_id %in% keep_gene) %>%
-    dplyr::select(-gene_id, -transcript_id) %>%
-    write_tsv(snakemake@output[[1]],
-        na = '.', col_names = FALSE)
+    dplyr::select(-gene_id, -transcript_id)
+
+message("Writing to disk...")
+withr::with_options(c(scipen = 10),
+    write.table(gtf, snakemake@output[[1]],
+        col.names = FALSE, row.names = FALSE,
+        na = '.', quote = FALSE, sep = '\t'))

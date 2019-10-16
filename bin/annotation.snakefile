@@ -30,6 +30,14 @@ rule get_annotation:
             - {ANNOTATION_URL} \
             | gunzip > {output}"
 
+rule make_txdb:
+    input:
+        "annotation/annotation.gtf"
+    output:
+        "annotation/annotation.txdb.rds"
+    script:
+        "txdb.R"
+
 rule sort_annotation:
     input:
         "annotation/annotation.gtf"
