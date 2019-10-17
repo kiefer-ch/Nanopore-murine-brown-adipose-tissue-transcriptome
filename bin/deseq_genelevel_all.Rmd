@@ -11,7 +11,7 @@ editor_options:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = FALSE)
-source("../packrat/init.R")
+source("packrat/init.R")
 ```
 
 ```{r library, include=FALSE}
@@ -55,7 +55,7 @@ using readRDS() to be directly analysed.
 
 ```{r importData, include=FALSE}
 # import data
-dds <- readRDS(file.path("..", snakemake@input[[1]]))
+dds <- readRDS(snakemake@input[[1]])
 ```
 
 ```{r annotateCountMatrices}
@@ -94,7 +94,7 @@ annotate_cm <- function(tibble) {
 
 ```{r exportCountMatrices}
 # export count matrices
-res_folder <- file.path("..", snakemake@params[["out_folder"]]) 
+res_folder <- snakemake@params[["out_folder"]]
 dir.create(res_folder, showWarnings = FALSE, recursive = TRUE)
 
 # with variance shrinking

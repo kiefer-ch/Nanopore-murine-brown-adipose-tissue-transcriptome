@@ -21,7 +21,7 @@ showing you all the jobs that need to be run in order to fulfill your command.
 * deeptools
 * STAR
 * fastqc
-* snakemake
+* snakemake &gt 5.5.4
 * R
 * samtools
 * pandas

@@ -35,9 +35,9 @@ rule all:
         "qc/multiqc_aligned_data.zip",
         "res/txlevel_ont/deseq_txlevel_ont.html",
         "res/genelevel_ont/deseq_genelevel_ont.html",
-        "res/dtu_ont/ont_dtu.html"
+        "res/dtu_ont/ont_dtu.html",
         "res/txlevel_all/deseq_txlevel_all.html",
-        "res/genelevel_all/deseq_genelevel_all.html"
+        "res/genelevel_all/deseq_genelevel_all.html",
         "res/dtu_all/all_dtu.html"
 
 rule all_align:
