@@ -368,7 +368,7 @@ my_breaks <- function (n = 5, ...) {
     }
 }
 
-biotype_groups <- read_csv("../data/biotype_groups.csv") %>% 
+biotype_groups <- read_csv(snakemake@input[[2]]) %>% 
     rename(gene_biotype = transcript_biotype)
 
 resLFC %>%

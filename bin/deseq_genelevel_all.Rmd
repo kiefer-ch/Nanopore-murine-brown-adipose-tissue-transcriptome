@@ -31,6 +31,7 @@ library("topGO")
     select <- dplyr::select
     rename <- dplyr::rename
 library("ReactomePA")
+BPPARAM = BiocParallel::MulticoreParam(snakemake@threads[[1]])
 ```
 
 # Export of count matrices
@@ -263,7 +264,7 @@ colData(dds)$condition_temp <- relevel(colData(dds)$condition_temp, ref = "22")
 
 # filtering lowly expressed genes and fitting models
 dds <- dds[rowSums(counts(dds)) > 10, ] %>% 
-    DESeq(., parallel = TRUE)
+    DESeq(., parallel = TRUE, BPPARAM = BPPARAM)
 ```
 
 ## Results using lfc shrinkage
@@ -276,7 +277,8 @@ resLFC <- lfcShrink(dds,
     coef = "condition_temp_4_vs_22",
     lfcThreshold = 1,
     type = "apeglm",
-    parallel = TRUE)
+    parallel = TRUE, 
+    BPPARAM = BPPARAM)
 ```
 
 ### Results table
@@ -360,7 +362,7 @@ my_breaks <- function (n = 5, ...) {
     }
 }
 
-biotype_groups <- read_csv("../data/biotype_groups.csv") %>% 
+biotype_groups <- read_csv(snakemake@input[[2]]) %>% 
     rename(gene_biotype = transcript_biotype)
 
 pl <- resLFC %>%
@@ -623,7 +625,7 @@ res %>%
 
 # filter and kable
 res_signif <- res %>% 
-    filter(svalue < .05) %>% 
+    filter(padj < .05) %>% 
     arrange(-abs(log2FoldChange))
 
 res_signif %>% 
@@ -635,17 +637,6 @@ res_signif %>%
 ### MA plot
 
 ```{r MA-plot_noshrink}
-my_breaks <- function (n = 5, ...) {
-
-    function(x) {
-        dings <- .045 * (max(x) - min(x))
-        extended_range_breaks_(min(x) + dings , max(x) - dings, n, ...)
-    }
-}
-
-biotype_groups <- read_csv("../data/biotype_groups.csv") %>% 
-    rename(gene_biotype = transcript_biotype)
-
 pl <- res %>%
     left_join(biotype_groups, by = "gene_biotype") %>% 
     mutate(signif = if_else(svalue < .05, TRUE, FALSE)) %>%
