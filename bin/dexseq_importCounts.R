@@ -23,7 +23,7 @@ message("Creating DEXSeqDataSet...")
 DEXSeqDataSetFromHTSeq(
     countfiles = sample_info$path,
     sampleData = tibble::column_to_rownames(as.data.frame(sample_info), "illumina"),
-    design = ~ condition_temp + exon + condition_temp:exon,
+    design = ~ sample + exon + condition_temp:exon,
     flattenedfile = snakemake@input[["annotation"]]) %>%
     saveRDS(snakemake@output[[1]])
 

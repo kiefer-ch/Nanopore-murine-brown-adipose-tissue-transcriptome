@@ -12,7 +12,7 @@ rule dexseq_prefilterIsoforms:
         "dexseq_prefilterIsoforms.R"
 
 # https://github.com/vivekbhr/Subread_to_DEXSeq
-rule dexseq_prepare_annotation:
+rule dexseq_prepareAnnotation:
     input:
         "indices/dexseq/annotation_prefiltered.gtf"
     output:
@@ -23,7 +23,7 @@ rule dexseq_prepare_annotation:
             {input} \
             {output}"
 
-rule dexseq_count_illumina:
+rule dexseq_count:
     input:
         annotation = "indices/dexseq/annotation_flat.gff",
         bam = "BAM/{sample}_Aligned.sortedByCoord.out.bam"
@@ -45,3 +45,13 @@ rule dexseq_importCounts:
         "data/dxd.rds",
     script:
         "dexseq_importCounts.R"
+
+rule dexseq_analyse:
+    threads:
+        4
+    input:
+        "data/dxd.rds"
+    output:
+        "res/dexseq/desxseq.html"
+    script:
+        "dexseq_analysis.Rmd"
