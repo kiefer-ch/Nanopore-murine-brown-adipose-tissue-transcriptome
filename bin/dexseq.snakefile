@@ -2,7 +2,8 @@ rule dexseq_prefilterIsoforms:
     input:
         annotation = "annotation/annotation.gtf",
         scaledTPM = "data/scaledTPM_all.rds",
-        txdb = "annotation/annotation.txdb.rds"
+        txdb = "annotation/annotation.txdb.rds",
+        sampleInfo = "sample_info/sampleInfo.csv"
     params:
         threshold = 15
     output:

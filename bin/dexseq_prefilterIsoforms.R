@@ -19,15 +19,25 @@ tx2g <- read_rds(path = snakemake@input[["txdb"]]) %>%
     dplyr::rename(ensembl_gene_id_version = "GENEID",
         ensembl_transcript_id_version = "TXNAME")
 
+message("Collecting sample info")
+sample_info <- suppressMessages(read_csv(snakemake@input[["sampleInfo"]])) %>%
+    mutate_at(vars(matches("condition")), as.factor) %>%
+    dplyr::select(sample = "sample_id", condition_temp)
+
+
 message("Calculating which transcripts should be kept...")
+# keep only those transcripts, that in at least one condition have more then
+# threshold % of the TPM
 df <- read_rds(snakemake@input[["scaledTPM"]]) %>%
     as_tibble(rownames = "ensembl_transcript_id_version") %>%
     left_join(tx2g, by = "ensembl_transcript_id_version") %>%
     tidyr::gather(key = sample, value = "scaledTPM", -ensembl_gene_id_version,
         -ensembl_transcript_id_version) %>%
     filter(scaledTPM != 0) %>%
-    group_by(sample, ensembl_gene_id_version) %>%
-    mutate(freq = scaledTPM / sum(scaledTPM)) %>%
+    left_join(sample_info, by = "sample") %>%
+    group_by(condition_temp, ensembl_gene_id_version, ensembl_transcript_id_version) %>%
+    summarise(scaledTPM_group = sum(scaledTPM)) %>%
+    mutate(freq = scaledTPM_group / sum(scaledTPM_group)) %>%
     filter(freq > snakemake@params[["threshold"]] / 100)
 
 keep_tx <- df %>%
@@ -77,3 +87,8 @@ withr::with_options(c(scipen = 10),
     write.table(gtf, snakemake@output[[1]],
         col.names = FALSE, row.names = FALSE,
         na = '.', quote = FALSE, sep = '\t'))
+
+message("Done")
+
+
+
