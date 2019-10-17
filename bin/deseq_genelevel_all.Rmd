@@ -1,7 +1,7 @@
 ---
 title: "nanopore iBAT, Illumina reads gene level, all samples"
 author: "Christoph Kiefer"
-date: "18. September 2019"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: 
     html_document:
         toc: true
@@ -9,11 +9,12 @@ editor_options:
   chunk_output_type: console
 ---
 
-```{r setup, include=FALSE, cache=FALSE}
+```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = FALSE)
+source("../packrat/init.R")
 ```
 
-```{r library, include=FALSE, cache=FALSE}
+```{r library, include=FALSE}
 library("dplyr")
 library("readr")
 library("purrr")
@@ -54,10 +55,10 @@ using readRDS() to be directly analysed.
 
 ```{r importData, include=FALSE}
 # import data
-dds <- readRDS("../data/dds_gencode.vM22_gene_ont.rds")
+dds <- readRDS(file.path("..", snakemake@input[[1]]))
 ```
 
-```{r annotateCountMatrices, dependson="importData"}
+```{r annotateCountMatrices}
 # prepare countmatrices
 rld <- rlog(dds, blind = FALSE)
 ntd <- normTransform(dds)
@@ -91,9 +92,9 @@ annotate_cm <- function(tibble) {
 }
 ```
 
-```{r exportCountMatrices, dependson="annotateCountMatrices"}
+```{r exportCountMatrices}
 # export count matrices
-res_folder <- "../res/genelevel_all" 
+res_folder <- file.path("..", snakemake@params[["out_folder"]]) 
 dir.create(res_folder, showWarnings = FALSE, recursive = TRUE)
 
 # with variance shrinking
@@ -127,14 +128,14 @@ counts(dds, normalized = FALSE) %>%
 
 Slightly more reads per gene for the cold treatment before normalisation.
 
-```{r samplingDepth1, dependson=c("importData", "annotateCountMatrices")}
+```{r samplingDepth1}
 # sampling depth, unnormalized
 sapply(split(colSums(counts(dds))/1e6, colData(dds)$condition_temp), summary)
 ```
 
 No difference in the sampling depths after normalisation.
 
-```{r samplingDepth2, dependson=c("importData", "annotateCountMatrices")}
+```{r samplingDepth2}
 # normalized
 assay(rld) %>% 
     as_tibble(rownames = "gene") %>% 
@@ -152,7 +153,7 @@ samples, including the variance due to the experimental conditions.
 
 (Left side is without transformation, right side after rlog transformation.)
 
-```{r vsn, include = FALSE, dependson="exportCountMatrices"}
+```{r vsn, include = FALSE}
 vsn1 <- meanSdPlot(assay(ntd))
 vsn2 <- meanSdPlot(assay(rld))
 ```
@@ -165,7 +166,7 @@ plot_grid(vsn1$gg + theme(legend.position="none"), vsn2$gg + theme(legend.positi
 
 The samples cluster by temperature, as wanted.
 
-```{r sampleDist, dependson="annotateCountMatrices"}
+```{r sampleDist}
 # calculate sample distances
 sampleDists <- dist(t(assay(rld)))
 sampleDistMatrix <- as.matrix(sampleDists)
@@ -226,7 +227,7 @@ ggplot(pca, aes(PC1, PC2, colour = condition_temp)) +
 
 ### Without variance stabilising transformation
 
-```{r plotmatrix1, dependson="exportCountMatrices"}
+```{r plotmatrix1}
 my_plot <- function(data, mapping, ...) {
     ggplot(data = data, mapping = mapping) +
         geom_point(...) +
@@ -242,7 +243,7 @@ assay(ntd) %>%
 
 ### With variance stabilising transformation
 
-```{r plotmatrix2, dependson = "exportCountMatrices"}
+```{r plotmatrix2}
 assay(rld) %>%
     as_tibble() %>% 
     filter(rowSums(.) > 3) %>% 
@@ -254,7 +255,9 @@ Maybe 5034_S33 shows some differences compared to the other samples?
 
 # Differential gene expression analysis
 
-```{r runDESeq, dependson="importData"}
+## Filtering and adjusting for confounders
+
+```{r runDESeq}
 # set reference
 colData(dds)$condition_temp <- relevel(colData(dds)$condition_temp, ref = "22")
 
@@ -263,9 +266,11 @@ dds <- dds[rowSums(counts(dds)) > 10, ] %>%
     DESeq(., parallel = TRUE)
 ```
 
+## Results using lfc shrinkage
+
 I use lfcThreshold = 1, svalue cutoff = .05 and I shrink the lfc.
 
-```{r results, echo=TRUE, dependson="runDESeq"}
+```{r results, echo=TRUE}
 # shrinking log2 fold change
 resLFC <- lfcShrink(dds, 
     coef = "condition_temp_4_vs_22",
@@ -274,9 +279,9 @@ resLFC <- lfcShrink(dds,
     parallel = TRUE)
 ```
 
-## Results table
+### Results table
 
-```{r results2, dependson = "results"}
+```{r results2}
 resLFC <- resLFC %>% 
     as_tibble(rownames = "ensembl_gene_id_version")
 
@@ -300,6 +305,8 @@ LFC < -%f (down) : %d",
         lfcThreshold, n_up,
         lfcThreshold, n_down))
 }
+
+summary.resLFC(resLFC)
 ```
 
 
@@ -318,7 +325,7 @@ baseTPM <- rowMeans(tpm) %>%
         value = "baseTPM")
 ```
 
-```{r exportAnnotation, dependson="results2"}
+```{r exportAnnotation}
 # merge annotation and TPM
 resLFC <- resLFC %>% 
     left_join(annotation, by = "ensembl_gene_id_version") %>% 
@@ -344,7 +351,7 @@ resLFC_signif %>%
 
 ### MA plot
 
-```{r MA-plot, dependson = "runDESeq"}
+```{r MA-plot}
 my_breaks <- function (n = 5, ...) {
 
     function(x) {
@@ -379,7 +386,7 @@ plotly::toWebGL(plotly::ggplotly(pl, tooltip = "text"))
 
 ### Clustering the significantly differentially expressed genes
 
-```{r hclust, dependson = "runDESeq"}
+```{r hclust}
 # filter significantly regulated genes
 hclust_df <- assay(rld) %>%
     as_tibble(rownames = "gene") %>% 
@@ -419,7 +426,7 @@ https://www.bioconductor.org/packages/release/bioc/html/topGO.html
 
 reference: all expressed genes
 
-```{r goAnalysis, cache=FALSE}
+```{r goAnalysis}
 # reference for the GO analysis are all expressed genes
 all_genes <- resLFC$ensembl_gene_id_version
 
@@ -483,7 +490,7 @@ res_go <- resLFC_signif %>%
 
 ### Upregulated genes
 
-```{r upGO, cache=FALSE}
+```{r upGO}
 res_go$res[[1]] %>% 
     knitr::kable(format = "html") %>%
     kableExtra::kable_styling()
@@ -491,7 +498,7 @@ res_go$res[[1]] %>%
 
 ### Downregulated genes
 
-```{r downGO, cache=FALSE}
+```{r downGO}
 res_go$res[[2]] %>% 
     knitr::kable(format = "html") %>%
     kableExtra::kable_styling()
@@ -503,7 +510,7 @@ using ReactomePA
 
 reference: all expressed genes
 
-```{r reactome, dependson="runDESeq"}
+```{r reactome}
 # annotate with entrez ids
 df_reactome <- resLFC_signif %>% 
     pull(ensembl_gene_id_version) %>% 
@@ -537,7 +544,289 @@ res_reactome <- geneList_reactome %>%
 ```
 
 
-```{r plot reactome, fig.width = 12, fig.asp = 0.62, dependson = "reactome"}
+```{r plot reactome, fig.width = 12, fig.asp = 0.62}
+if (nrow(res_reactome) == 0) {
+    cat("ReactomePA did not find seignificant pathways.")
+    } else {
+    dotplot(res_reactome, 
+        showCategory = 15)
+    cnetplot(res_reactome, categorySize = "pvalue",
+        foldChange = geneList_reactome)
+}
+```
+
+## Results without shrinking
+
+```{r results_noshrink, echo=TRUE}
+res <- results(dds, 
+    contrast = c("condition_temp", "4", "22"),
+    parallel = TRUE)
+```
+
+### Results table
+
+```{r results2_noshrink}
+res <- res %>% 
+    as_tibble(rownames = "ensembl_gene_id_version")
+
+summary.res <- function(res, lfcThreshold = 0, pvalueCutoff = .05) {
+    n_tot <- nrow(res)
+    df <- res %>% 
+        filter(padj <= pvalueCutoff)
+    n_up <- df %>% 
+        filter(log2FoldChange > 0) %>% 
+        nrow()
+    n_down <- df %>% 
+        filter(log2FoldChange < 0) %>% 
+        nrow()
+    cat(sprintf(
+"out of %d with nonzero total read count
+padj < %f
+LFC > %f (up)    : %d
+LFC < -%f (down) : %d",
+        n_tot, 
+        pvalueCutoff,
+        lfcThreshold, n_up,
+        lfcThreshold, n_down))
+}
+
+summary.res(res)
+```
+
+```{r annotation_noshrink}
+# get annotation from biomart
+ensembl = biomaRt::useMart("ensembl",dataset="mmusculus_gene_ensembl")
+annotation <- biomaRt::getBM(
+    attributes = c("ensembl_gene_id_version", "mgi_symbol", "description",
+        "gene_biotype"), 
+    filters = "ensembl_gene_id_version", 
+    values = res$ensembl_gene_id_version, 
+    mart = ensembl)
+
+baseTPM <- rowMeans(tpm) %>% 
+    tibble::enframe(name = "ensembl_gene_id_version",
+        value = "baseTPM")
+```
+
+```{r exportAnnotation_noshrink}
+# merge annotation and TPM
+res <- res %>% 
+    left_join(annotation, by = "ensembl_gene_id_version") %>% 
+    left_join(baseTPM, by = "ensembl_gene_id_version") %>% 
+    select(ensembl_gene_id_version, mgi_symbol, description, gene_biotype,
+        baseMean, baseTPM, log2FoldChange,  lfcSE, pvalue, padj)
+
+# export
+res %>% 
+    arrange(-abs(log2FoldChange)) %>% 
+    write_csv(gzfile(file.path(res_folder, "genelevel_ont_de.csv.gz")))
+
+# filter and kable
+res_signif <- res %>% 
+    filter(svalue < .05) %>% 
+    arrange(-abs(log2FoldChange))
+
+res_signif %>% 
+    knitr::kable(format = "html") %>%
+    kableExtra::kable_styling() %>%
+    kableExtra::scroll_box(width = "100%", height = "600px")
+```
+
+### MA plot
+
+```{r MA-plot_noshrink}
+my_breaks <- function (n = 5, ...) {
+
+    function(x) {
+        dings <- .045 * (max(x) - min(x))
+        extended_range_breaks_(min(x) + dings , max(x) - dings, n, ...)
+    }
+}
+
+biotype_groups <- read_csv("../data/biotype_groups.csv") %>% 
+    rename(gene_biotype = transcript_biotype)
+
+pl <- res %>%
+    left_join(biotype_groups, by = "gene_biotype") %>% 
+    mutate(signif = if_else(svalue < .05, TRUE, FALSE)) %>%
+    ggplot(aes(log10(baseMean), log2FoldChange, 
+        text = sprintf("%s<br>%s<br>%s", mgi_symbol, ensembl_gene_id_version, gene_biotype))) +
+    geom_point(aes(colour = signif, pch = grouped_biotype), size = 1.5) +
+    geom_hline(yintercept = 0, colour = "blue") +
+#    geom_smooth(colour = "red", method = "auto") +
+#    theme_tufte() +
+#    geom_rangeframe() +
+    scale_y_continuous(breaks = my_breaks(),
+        labels = function(x) round(x, 1),
+        name = "log2FoldChange ko vs het") +
+     scale_x_continuous(breaks = log10(c(1,100,10000,max(res$baseMean))),
+        labels = function(x) round(10^x),
+        name = "baseMean") +
+    scale_color_viridis_d(guide = FALSE)
+
+plotly::toWebGL(plotly::ggplotly(pl, tooltip = "text"))
+```
+
+### Clustering the significantly differentially expressed genes
+
+```{r hclust_noshrink}
+# filter significantly regulated genes
+hclust_df <- assay(rld) %>%
+    as_tibble(rownames = "gene") %>% 
+    filter(gene %in% res_signif$ensembl_gene_id_version) %>% 
+    as.data.frame() %>%
+    magrittr::set_rownames(.$gene) %>%
+    dplyr::select(-gene) %>%
+    (function(x) {x - rowMeans(x)})
+
+# centering the colorscale
+myColor <- colorRampPalette(rev(brewer.pal(n = 7, name = "RdYlBu")))(100)
+myBreaks <- c(seq(min(hclust_df), 0, length.out = ceiling(50) + 1),
+    seq(max(hclust_df) / 100, max(hclust_df), length.out = floor(50)))
+
+# plot heatmap
+hclust <- pheatmap(hclust_df,
+    fontfamily = "Palatino",
+    annotation_col = colData(dds) %>%
+         as.data.frame() %>%
+         select(condition_temp),
+    clustering_method = "ward.D2",
+    clustering_distance_rows = "correlation",
+    color = myColor, breaks = myBreaks,
+    show_rownames = FALSE, show_colnames = FALSE,
+    lwd = .2,
+    cutree_rows = 2,
+    border_color = NA)
+
+hclust
+```
+
+### Gene ontology analysis
+
+using TopGO
+
+https://www.bioconductor.org/packages/release/bioc/html/topGO.html
+
+reference: all expressed genes
+
+```{r goAnalysis_noshrink}
+# reference for the GO analysis are all expressed genes
+all_genes <- res$ensembl_gene_id_version
+
+get.geneList <- function(signif) {
+    gl <- as.factor(as.integer(all_genes %in% signif$ensembl_gene_id_version))
+    names(gl) <- all_genes
+    # remove version
+    names(gl) <- unlist(lapply(stringr::str_split(names(gl), "[.]"), "[[",1))
+    gl
+}
+
+# function to actually create topGO object
+make.topGO <- function(geneList, description) {
+    new("topGOdata",
+        description = description,
+        ontology = "BP",
+        allGenes = geneList,
+        nodeSize = 10,
+        annot = annFUN.org,
+        ID = "ensembl",
+        mapping = "org.Mm.eg")
+}
+
+# conveniance function to get results from topGO
+get.results <- function(topGO) {
+    topGOres <- runTest(topGO, algorithm = "parentchild", statistic = "fisher")
+    GenTable(topGO, p = topGOres, orderBy = "p", ranksOf = "p", topNodes = 10) %>%
+        as_tibble() %>%
+        mutate(p = as.double(p))
+}
+
+# conveniance function to plot the results from topGO
+make.plot <-function(results_table, title = '') {
+    rf_tibble <- tibble(x = c(1, dim(results_table)[1]),
+        y = c(0, max(-log10(results_table$p))))
+
+    results_table %>%
+        ggplot(aes(reorder(Term, -log10(p)), -log10(p))) +
+        geom_bar(stat = "identity") +
+        coord_flip() +
+        xlab(NULL) +
+        ggtitle(title) +
+        geom_rangeframe(aes(x, y), data = rf_tibble, sides = 'bl') +
+        scale_y_continuous(breaks = extended_range_breaks()(rf_tibble$y),
+            labels = function(x) round(x, 1)) +
+        theme_tufte(base_size = 6)
+}
+
+# run the analysis
+res_go <- res_signif %>%
+    select(ensembl_gene_id_version, log2FoldChange) %>%
+    mutate(regulation = if_else(log2FoldChange > 0 , "up", "down")) %>% 
+    group_by(regulation) %>%
+    tidyr::nest() %>%
+    mutate(data = map(data, get.geneList)) %>%
+    mutate(topGO = map2(data, as.character(regulation), make.topGO)) %>%
+    mutate(res = map(topGO, get.results)) %>%
+    mutate(n = map(data, function(x) sum(as.integer(as.character(x))))) %>%
+    mutate(n = unlist(n))
+```
+
+#### Upregulated genes
+
+```{r upGO_noshrink}
+res_go$res[[1]] %>% 
+    knitr::kable(format = "html") %>%
+    kableExtra::kable_styling()
+```
+
+#### Downregulated genes
+
+```{r downGO_noshrink}
+res_go$res[[2]] %>% 
+    knitr::kable(format = "html") %>%
+    kableExtra::kable_styling()
+```
+
+### Reactome
+
+using ReactomePA
+
+reference: all expressed genes
+
+```{r reactome_noshrink}
+# annotate with entrez ids
+df_reactome <- resLFC_signif %>% 
+    pull(ensembl_gene_id_version) %>% 
+    biomaRt::getBM(
+        attributes = c("entrezgene_id", "ensembl_gene_id_version"), 
+        filters = "ensembl_gene_id_version", 
+        values = ., 
+        mart = ensembl) %>% 
+    left_join(resLFC_signif, by = "ensembl_gene_id_version")
+    
+# named vector with lfc and entrez ids
+geneList_reactome <- df_reactome$entrezgene_id
+names(geneList_reactome) <- df_reactome$log2FoldChange
+
+# reference are all expressed genes
+all_genes_reactome <- resLFC$ensembl_gene_id_version %>% 
+    biomaRt::getBM(
+        attributes = c("entrezgene_id", "ensembl_gene_id_version"), 
+        filters = "ensembl_gene_id_version", 
+        values = ., 
+        mart = ensembl) %>% 
+    pull(entrezgene_id) %>% 
+    as.character()
+
+# perform pathway analysis
+res_reactome <- geneList_reactome %>% 
+    enrichPathway(.,
+        organism = "mouse",
+        readable = TRUE,
+        universe = all_genes_reactome)
+```
+
+```{r plot reactome_noshrink, fig.width = 12, fig.asp = 0.62}
 if (nrow(res_reactome) == 0) {
     cat("ReactomePA did not find seignificant pathways.")
     } else {

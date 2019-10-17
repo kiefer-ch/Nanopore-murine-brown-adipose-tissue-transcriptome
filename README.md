@@ -58,5 +58,30 @@ values will not be 0, which might be confusing sometimes. Therfore I add this ta
 counts: **No normalisation at all!** This one should be used for statistical
 analyses in DESeq or EdgeR, which perform their own normalisation steps.
 
-In the data/ folder, there is also the DESeq data set object (dds), that can be imported into R
-using readRDS() to be directly analysed.
+To avoid any errors reading the count tables back into R (windows/unix, encoding?),
+use the following code:
+
+```R
+library("readr")
+library("dplyr")
+cts <- read_csv("res/genelevel/genelevel_cm_cts.csv.gz",
+        locale = locale(encoding = "UTF-8"))
+```
+
+### dds object
+
+In the data/ folder, there is also a DESeq data set object (dds), that can be imported into R
+using readRDS() to be directly analysed in DESeq2 or coerced into an edgeR DGEList object.
+
+```R
+# Read the DESeq data set object from disc
+dds <- readRDS("data/dds_gencode.vM22_gene.rds")
+
+# Extract the count table and sample info
+cts <- counts(dds)
+df <- colData(dds)
+
+# create an edgeR DGEList object
+library("edgeR")
+dgl <- DGEList(counts = cts, samples = df)
+```
