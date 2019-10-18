@@ -34,7 +34,7 @@ rule make_txdb:
     input:
         "annotation/annotation.gtf"
     output:
-        "annotation/annotation.txdb.rds"
+        "annotation/annotation_txdb.sqlite"
     script:
         "txdb.R"
 

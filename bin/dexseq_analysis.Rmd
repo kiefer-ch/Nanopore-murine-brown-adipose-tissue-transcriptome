@@ -18,11 +18,13 @@ source("packrat/init.R")
 library("dplyr")
 library("DEXSeq")
 library("readr")
+library("ggplot2")
+    select <- dplyr::select
 BPPARAM = BiocParallel::MulticoreParam(snakemake@threads[[1]])
 ```
 
 ```{r importData}
-dxd <- readRDS(snakemake@input[[1]])
+dxd <- readRDS(snakemake@input[["dxd"]])
 ```
 
 ```{r normalisation}
@@ -61,7 +63,7 @@ table(dxr1$padj < 0.05)
 ```
 
 ```{r}
-plotMA( dxr1, cex = 0.8, alpha = .05)
+plotMA(dxr1, cex = 0.8, alpha = .05)
 ```
 
 ```{r}
@@ -69,12 +71,12 @@ res <- dxr1 %>%
     as_tibble() %>% 
     select_at(vars(-matches("genomic"))) %>% 
     select_at(vars(-matches("countData"))) %>% 
-    select(-transcripts) %>% 
-    rename(ensembl_gene_id_version = "groupID")
+    select(-X4, -X22) %>% 
+    dplyr::rename(ensembl_gene_id_version = "groupID")
 ```
 
 ```{r annotation}
-ensembl = biomaRt::useMart("ensembl",dataset="mmusculus_gene_ensembl")
+ensembl = biomaRt::useMart("ensembl", dataset = "mmusculus_gene_ensembl")
 annotation <- biomaRt::getBM(
         attributes = c("ensembl_gene_id_version", "mgi_symbol", "description",
             "gene_biotype"), 
@@ -85,21 +87,118 @@ annotation <- biomaRt::getBM(
     distinct(ensembl_gene_id_version, .keep_all = TRUE)
 
 res <- res %>% 
-    left_join(annotation, by = "ensembl_gene_id_version")
+    left_join(annotation, by = "ensembl_gene_id_version") %>% 
+    select(ensembl_gene_id_version, mgi_symbol, description, gene_biotype, everything())
 ```
 
+## Resultstable
 
 ```{r resultsTable}
 res %>% 
-    filter(padj < .05) %>% 
+    filter(padj < .05) %>%
+    arrange(-abs(log2fold_22_4)) %>% 
     knitr::kable(format = "html") %>%
     kableExtra::kable_styling() %>%
     kableExtra::scroll_box(width = "100%", height = "600px")
 
 dir.create(snakemake@params[["out_folder"]], showWarnings = FALSE)
 res %>% 
-    arrange(padj) %>% 
     write_csv(file.path(snakemake@params[["out_folder"]], "all_deu.csv.gz"))
+```
+
+```{r plotGeneFunction}
+library("Gviz")
+library("Mus.musculus")
+txdb <- loadDb("annotation/annotation.txdb.rds")
+
+plot.gene <- function(gene = "ENSMUSG00000020654.15") {
+    df <- AnnotationDbi::select(txdb, keys = gene,
+            keytype = "GENEID",
+            columns = c("TXCHROM", "TXSTART", "TXEND", "TXSTRAND")) %>% 
+        as_tibble() %>% 
+        group_by(GENEID) %>% 
+        summarise(TXCHROM = unique(TXCHROM),
+            TXSTART = min(TXSTART),
+            TXEND = max(TXEND),
+            TXSTRAND = unique(TXSTRAND))
+    strand <- ifelse(df$TXSTRAND == '+', "fw", "rv")
+    
+    itrack <- IdeogramTrack(genome = "mm10", chromosome = df$TXCHROM)
+    gtrack <- GenomeAxisTrack(genome = "mm10", chromosome = df$TXCHROM)
+    atrack <- GeneRegionTrack(txdb, chromosome = df$TXCHROM,
+        from = df$TXSTART, to = df$TXEND)
+    dtrack1 <- DataTrack(range = file.path(snakemake@params[["bw_folder"]], sprintf("5034_S33_%s.bw", strand)),
+        type = "hist",
+        genome = "mm10",
+        chromosome = df$TXCHROM,
+        start = df$TXSTART,
+        end = df$TXEND,
+        transformation = function(x) log2(x + 1))
+    dtrack2 <- DataTrack(range = file.path(snakemake@params[["bw_folder"]], sprintf("5035_S34_%s.bw", strand)),
+        type = "hist",
+        genome = "mm10",
+        chromosome = df$TXCHROM,
+        start = df$TXSTART,
+        end = df$TXEND,
+        transformation = function(x) log2(x + 1))
+    dtrack3 <- DataTrack(range = file.path(snakemake@params[["bw_folder"]], sprintf("5039_S38_%s.bw", strand)),
+        type = "hist",
+        genome = "mm10",
+        chromosome = df$TXCHROM,
+        start = df$TXSTART,
+        end = df$TXEND,
+        transformation = function(x) log2(x + 1))
+    dtrack4 <- DataTrack(range = file.path(snakemake@params[["bw_folder"]], sprintf("5041_S40_%s.bw", strand)),
+        type = "hist",
+        genome = "mm10",
+        chromosome = df$TXCHROM,
+        start = df$TXSTART,
+        end = df$TXEND,
+        transformation = function(x) log2(x + 1))
+    dtrack5 <- DataTrack(range = file.path(snakemake@params[["bw_folder"]], sprintf("5043_S42_%s.bw", strand)),
+        type = "hist",
+        genome = "mm10",
+        chromosome = df$TXCHROM,
+        start = df$TXSTART,
+        end = df$TXEND,
+        transformation = function(x) log2(x + 1))
+    dtrack6 <- DataTrack(range = file.path(snakemake@params[["bw_folder"]], sprintf("5044_S43_%s.bw", strand)),
+        type = "hist",
+        genome = "mm10",
+        chromosome = df$TXCHROM,
+        start = df$TXSTART,
+        end = df$TXEND,
+        transformation = function(x) log2(x + 1))
+
+    plotTracks(list(itrack, gtrack, atrack, dtrack1, dtrack3, dtrack5, dtrack2, dtrack4, dtrack6),
+        from = df$TXSTART,
+        to = df$TXEND,
+        extend.left = 50,
+        extend.right = 50,
+        background.title = "darkblue",
+        collapseTranscripts = "meta",
+        fontsize = 15, cex.axis = .4)
+}
+```
+
+## Gene Plots
+
+```{r}
+plotDEXSeq(dxr1, "ENSMUSG00000020654.15", .05, "condition_temp",
+    norCounts = TRUE, legend = TRUE)
+plot.gene("ENSMUSG00000020654.15")
+
+dxr1 %>% 
+    as_tibble() %>% 
+    filter(groupID == "ENSMUSG00000020654.15") %>%
+    filter(featureID == "E002") %>% 
+    select_at(vars(matches("count"))) %>% 
+    tidyr::gather(key = sample, value = counts) %>% 
+    mutate(sample = substr(sample, 11, 20)) %>% 
+    left_join(as_tibble(colData(dxd)) %>% filter(exon == "this"), by = "sample") %>% 
+    ggplot(aes(condition_temp, counts)) +
+        geom_point() +
+        scale_y_log10()
 ```
 
 

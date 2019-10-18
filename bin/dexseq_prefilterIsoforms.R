@@ -14,7 +14,11 @@ suppressPackageStartupMessages(library("dplyr"))
 ################################################################################
 
 message("Preparing tx2g...")
-tx2g <- read_rds(path = snakemake@input[["txdb"]]) %>%
+tx2g <- AnnotationDbi::loadDb(path = snakemake@input[["txdb"]]) %>%
+    AnnotationDbi::select(.,
+        keys =  AnnotationDbi::keys(., keytype = "GENEID"),
+        keytype = "GENEID",
+        columns = "TXNAME") %>%
     dplyr::select(TXNAME, GENEID) %>%
     dplyr::rename(ensembl_gene_id_version = "GENEID",
         ensembl_transcript_id_version = "TXNAME")

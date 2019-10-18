@@ -13,8 +13,4 @@ suppressPackageStartupMessages(library("dplyr"))
 ################################################################################
 GenomicFeatures::makeTxDbFromGFF(snakemake@input[[1]],
         format = "gtf", circ_seqs = character()) %>%
-    AnnotationDbi::select(.,
-        keys =  AnnotationDbi::keys(., keytype = "GENEID"),
-        keytype = "GENEID",
-        columns = "TXNAME") %>%
-    saveRDS(snakemake@output[[1]])
+    AnnotationDbi::saveDb(snakemake@output[[1]])

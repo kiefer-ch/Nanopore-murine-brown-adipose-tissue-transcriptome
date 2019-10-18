@@ -48,9 +48,14 @@ rule dexseq_importCounts:
 
 rule dexseq_analyse:
     threads:
-        4
+        6
     input:
-        "data/dxd.rds"
+        expand("BW/{sample}_fw.bw", sample=SAMPLES),
+        expand("BW/{sample}_rv.bw", sample=SAMPLES),
+        dxd = "data/dxd.rds"
+    params:
+        out_folder = "data/dexseq",
+        bw_folder = "BW"
     output:
         "res/dexseq/desxseq.html"
     script:
