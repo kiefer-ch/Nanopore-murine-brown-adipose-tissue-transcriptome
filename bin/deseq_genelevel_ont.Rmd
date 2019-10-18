@@ -312,13 +312,15 @@ summary.resLFC(resLFC)
 
 ```{r annotation}
 # get annotation from biomart
-ensembl = biomaRt::useMart("ensembl",dataset="mmusculus_gene_ensembl")
+ensembl = biomaRt::useMart("ensembl", dataset = "mmusculus_gene_ensembl")
 annotation <- biomaRt::getBM(
-    attributes = c("ensembl_gene_id_version", "mgi_symbol", "description",
-        "gene_biotype"), 
-    filters = "ensembl_gene_id_version", 
-    values = resLFC$ensembl_gene_id_version, 
-    mart = ensembl)
+        attributes = c("ensembl_gene_id_version", "mgi_symbol", "description",
+            "gene_biotype"), 
+        filters = "ensembl_gene_id_version", 
+        values = unique(resLFC$ensembl_gene_id_version), 
+        mart = ensembl) %>% 
+    as_tibble() %>% 
+    distinct(ensembl_gene_id_version, .keep_all = TRUE)
 
 baseTPM <- rowMeans(tpm) %>% 
     tibble::enframe(name = "ensembl_gene_id_version",
@@ -363,16 +365,13 @@ my_breaks <- function (n = 5, ...) {
 biotype_groups <- read_csv(snakemake@input[[2]]) %>% 
     rename(gene_biotype = transcript_biotype)
 
-pl <- resLFC %>%
+resLFC %>%
     left_join(biotype_groups, by = "gene_biotype") %>% 
     mutate(signif = if_else(svalue < .05, TRUE, FALSE)) %>%
     ggplot(aes(log10(baseMean), log2FoldChange, 
         text = sprintf("%s<br>%s<br>%s", mgi_symbol, ensembl_gene_id_version, gene_biotype))) +
     geom_point(aes(colour = signif, pch = grouped_biotype), size = 1.5) +
     geom_hline(yintercept = 0, colour = "blue") +
-#    geom_smooth(colour = "red", method = "auto") +
-#    theme_tufte() +
-#    geom_rangeframe() +
     scale_y_continuous(breaks = my_breaks(),
         labels = function(x) round(x, 1),
         name = "log2FoldChange ko vs het") +
@@ -380,8 +379,6 @@ pl <- resLFC %>%
         labels = function(x) round(10^x),
         name = "baseMean") +
     scale_color_viridis_d(guide = FALSE)
-
-plotly::toWebGL(plotly::ggplotly(pl, tooltip = "text"))
 ```
 
 ### Clustering the significantly differentially expressed genes
@@ -594,13 +591,15 @@ summary.res(res)
 
 ```{r annotation_noshrink}
 # get annotation from biomart
-ensembl = biomaRt::useMart("ensembl",dataset="mmusculus_gene_ensembl")
+ensembl = biomaRt::useMart("ensembl", dataset = "mmusculus_gene_ensembl")
 annotation <- biomaRt::getBM(
-    attributes = c("ensembl_gene_id_version", "mgi_symbol", "description",
-        "gene_biotype"), 
-    filters = "ensembl_gene_id_version", 
-    values = res$ensembl_gene_id_version, 
-    mart = ensembl)
+        attributes = c("ensembl_gene_id_version", "mgi_symbol", "description",
+            "gene_biotype"), 
+        filters = "ensembl_gene_id_version", 
+        values = res$ensembl_gene_id_version, 
+        mart = ensembl) %>% 
+    as_tibble() %>% 
+    distinct(ensembl_gene_id_version, .keep_all = TRUE)
 
 baseTPM <- rowMeans(tpm) %>% 
     tibble::enframe(name = "ensembl_gene_id_version",
@@ -634,16 +633,13 @@ res_signif %>%
 ### MA plot
 
 ```{r MA-plot_noshrink}
-pl <- res %>%
+res %>%
     left_join(biotype_groups, by = "gene_biotype") %>% 
-    mutate(signif = if_else(svalue < .05, TRUE, FALSE)) %>%
+    mutate(signif = if_else(padj < .05, TRUE, FALSE)) %>%
     ggplot(aes(log10(baseMean), log2FoldChange, 
         text = sprintf("%s<br>%s<br>%s", mgi_symbol, ensembl_gene_id_version, gene_biotype))) +
     geom_point(aes(colour = signif, pch = grouped_biotype), size = 1.5) +
     geom_hline(yintercept = 0, colour = "blue") +
-#    geom_smooth(colour = "red", method = "auto") +
-#    theme_tufte() +
-#    geom_rangeframe() +
     scale_y_continuous(breaks = my_breaks(),
         labels = function(x) round(x, 1),
         name = "log2FoldChange ko vs het") +
@@ -651,8 +647,6 @@ pl <- res %>%
         labels = function(x) round(10^x),
         name = "baseMean") +
     scale_color_viridis_d(guide = FALSE)
-
-plotly::toWebGL(plotly::ggplotly(pl, tooltip = "text"))
 ```
 
 ### Clustering the significantly differentially expressed genes
@@ -783,21 +777,21 @@ reference: all expressed genes
 
 ```{r reactome_noshrink}
 # annotate with entrez ids
-df_reactome <- resLFC_signif %>% 
+df_reactome <- res_signif %>% 
     pull(ensembl_gene_id_version) %>% 
     biomaRt::getBM(
         attributes = c("entrezgene_id", "ensembl_gene_id_version"), 
         filters = "ensembl_gene_id_version", 
         values = ., 
         mart = ensembl) %>% 
-    left_join(resLFC_signif, by = "ensembl_gene_id_version")
+    left_join(res_signif, by = "ensembl_gene_id_version")
     
 # named vector with lfc and entrez ids
 geneList_reactome <- df_reactome$entrezgene_id
 names(geneList_reactome) <- df_reactome$log2FoldChange
 
 # reference are all expressed genes
-all_genes_reactome <- resLFC$ensembl_gene_id_version %>% 
+all_genes_reactome <- res$ensembl_gene_id_version %>% 
     biomaRt::getBM(
         attributes = c("entrezgene_id", "ensembl_gene_id_version"), 
         filters = "ensembl_gene_id_version", 

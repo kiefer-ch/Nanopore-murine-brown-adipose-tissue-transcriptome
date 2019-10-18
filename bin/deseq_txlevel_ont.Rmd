@@ -32,6 +32,7 @@ library("topGO")
 library("ReactomePA")
     select <- dplyr::select
     rename <- dplyr::rename
+BPPARAM <- BiocParallel::MulticoreParam(snakemake@threads[[1]])
 ```
 
 # Export of count matrices
@@ -271,7 +272,7 @@ colData(dds)$condition_temp <- relevel(colData(dds)$condition_temp, ref = "22")
 
 # filtering lowly expressed genes and fitting models
 dds <- dds[rowSums(counts(dds)) > 10, ] %>% 
-    DESeq(., parallel = TRUE)
+    DESeq(., parallel = TRUE, BPPARAM = BPPARAM)
 ```
 
 ## Results using lfc shrinkage
@@ -284,7 +285,7 @@ resLFC <- lfcShrink(dds,
     coef = "condition_temp_4_vs_22",
     lfcThreshold = 1,
     type = "apeglm",
-    parallel = TRUE)
+    parallel = TRUE, BPPARAM = BPPARAM)
 ```
 
 ### Results table
@@ -319,14 +320,16 @@ summary.resLFC(resLFC)
 
 ```{r annotation}
 # get annotation from biomart
-ensembl = biomaRt::useMart("ensembl",dataset="mmusculus_gene_ensembl")
+ensembl = biomaRt::useMart("ensembl", dataset = "mmusculus_gene_ensembl")
 annotation <- biomaRt::getBM(
-    attributes = c("ensembl_transcript_id_version",
-        "ensembl_gene_id_version", "mgi_symbol", "description",
-        "gene_biotype", "transcript_length"), 
-    filters = "ensembl_transcript_id_version", 
-    values = resLFC$ensembl_transcript_id_version, 
-    mart = ensembl)
+        attributes = c("ensembl_transcript_id_version",
+            "ensembl_gene_id_version", "mgi_symbol", "description",
+            "gene_biotype", "transcript_length"), 
+        filters = "ensembl_transcript_id_version", 
+        values = unique(resLFC$ensembl_transcript_id_version), 
+        mart = ensembl) %>% 
+    as_tibble() %>% 
+    distinct(ensembl_transcript_id_version, .keep_all = TRUE)
 
 baseTPM <- rowMeans(tpm) %>% 
     tibble::enframe(name = "ensembl_transcript_id_version",
@@ -613,7 +616,7 @@ if (nrow(res_reactome) == 0) {
 # shrinking log2 fold change
 res <- results(dds, 
     contrast = c("condition_temp", "4", "22"),
-    parallel = TRUE)
+    parallel = TRUE, BPPARAM = BPPARAM)
 ```
 
 ### Results table
@@ -648,14 +651,16 @@ summary.res(res)
 
 ```{r annotation_noshrink}
 # get annotation from biomart
-ensembl = biomaRt::useMart("ensembl",dataset="mmusculus_gene_ensembl")
+ensembl = biomaRt::useMart("ensembl", dataset = "mmusculus_gene_ensembl")
 annotation <- biomaRt::getBM(
-    attributes = c("ensembl_transcript_id_version",
-        "ensembl_gene_id_version", "mgi_symbol", "description",
-        "gene_biotype", "transcript_length"), 
-    filters = "ensembl_transcript_id_version", 
-    values = res$ensembl_transcript_id_version, 
-    mart = ensembl)
+        attributes = c("ensembl_transcript_id_version",
+            "ensembl_gene_id_version", "mgi_symbol", "description",
+            "gene_biotype", "transcript_length"), 
+        filters = "ensembl_transcript_id_version", 
+        values = res$ensembl_transcript_id_version, 
+        mart = ensembl) %>% 
+    as_tibble() %>% 
+    distinct(ensembl_transcript_id_version, .keep_all = TRUE)
 
 baseTPM <- rowMeans(tpm) %>% 
     tibble::enframe(name = "ensembl_transcript_id_version",

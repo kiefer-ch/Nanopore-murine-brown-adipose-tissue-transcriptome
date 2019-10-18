@@ -76,11 +76,11 @@ res <- dxr1 %>%
 ```{r annotation}
 ensembl = biomaRt::useMart("ensembl",dataset="mmusculus_gene_ensembl")
 annotation <- biomaRt::getBM(
-    attributes = c("ensembl_gene_id_version", "mgi_symbol", "description",
-        "gene_biotype"), 
-    filters = "ensembl_gene_id_version", 
-    values = unique(res$ensembl_gene_id_version), 
-    mart = ensembl) %>% 
+        attributes = c("ensembl_gene_id_version", "mgi_symbol", "description",
+            "gene_biotype"), 
+        filters = "ensembl_gene_id_version", 
+        values = unique(res$ensembl_gene_id_version), 
+        mart = ensembl) %>% 
     as_tibble() %>% 
     distinct(ensembl_gene_id_version, .keep_all = TRUE)
 

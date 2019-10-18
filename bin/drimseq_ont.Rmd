@@ -1,7 +1,7 @@
 ---
 title: "DTU, Illumina reads transcript level, only samples used for ont too"
 author: "Christoph Kiefer"
-date: "07. Oktober 2019"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: 
     html_document:
         toc: true
@@ -9,23 +9,24 @@ editor_options:
   chunk_output_type: console
 ---
 
-```{r setup, include=FALSE, cache=FALSE}
+```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = FALSE)
+source("packrat/init.R")
 ```
 
-```{r library, include=FALSE, cache=FALSE}
+```{r library, include=FALSE}
 library("dplyr")
 library("readr")
 library("DRIMSeq")
 library("ggplot2")
 library("stageR")
-message("all packages loaded")
+BPPARAM = BiocParallel::MulticoreParam(snakemake@threads[[1]])
 ```
 
 # Data import
 
 ```{r createTxdb}
-txdb <- GenomicFeatures::makeTxDbFromGFF("../annotation/annotation.gtf",
+txdb <- GenomicFeatures::makeTxDbFromGFF(snakemake@input[["annotation"]],
         format = "gtf", circ_seqs = character())
 
 txdf <- txdb %>%
@@ -41,7 +42,7 @@ txdf <- txdb %>%
 
 
 ```{r importScaledTpm}
-cts <- readRDS("../data/scaledTPM_ont.rds")
+cts <- readRDS(snakemake@input[["tpm"]])
 txdf <- txdf[match(rownames(cts),txdf$TXNAME),]
 
 counts <- cts %>% 
@@ -54,7 +55,7 @@ counts <- cts %>%
 
 
 ```{r importSampleInfo}
-sample_info <- read_csv("../sample_info/sampleInfo.csv") %>%
+sample_info <- read_csv(snakemake@input[["sample_info"]]) %>%
     filter(!is.na(ont)) %>%
     mutate_at(vars(matches("condition")), as.factor) %>%
     mutate(path = file.path("salmon", illumina, "quant.sf"),
@@ -90,7 +91,7 @@ table(table(counts(dmds)$gene_id))
 design_full <- model.matrix(~condition_temp, data = DRIMSeq::samples(dmds))
 
 dmds <- dmPrecision(dmds, design = design_full, 
-    BPPARAM = BiocParallel::MulticoreParam())
+    BPPARAM = BPPARAM)
 dmds <- dmFit(dmds, design = design_full)
 dmds <- dmTest(dmds, coef = "condition_temp4")
 ```
@@ -158,14 +159,14 @@ res_tx %>%
 
 
 ```{r exportDrimSeqResults}
-dir.create("../res/dtu_ont", showWarnings = FALSE)
+dir.create(snakemake@params[["out_folder"]], showWarnings = FALSE)
 
 res_gene %>% 
     as_tibble() %>%
     arrange(adj_pvalue) %>% 
     dplyr::rename(ensembl_gene_id_version = "gene_id") %>% 
     left_join(annotation_gene, by = "ensembl_gene_id_version") %>% 
-    write_csv("../res/dtu_ont/genelevel_drimseq_dtu.csv.gz")
+    write_csv(file.path(snakemake@params[["out_folder"]], "genelevel_drimseq_dtu.csv.gz"))
 
 
 res_tx %>% 
@@ -177,7 +178,7 @@ res_tx %>%
         "ensembl_gene_id_version")) %>%
     as_tibble() %>% 
     arrange(adj_pvalue) %>% 
-    write_csv("../res/dtu_ont/txlevel_drimseq_dtu.csv.gz")
+    write_csv(file.path(snakemake@params[["out_folder"]], "txlevel_drimseq_dtu.csv.gz"))
 ```
 
 ```{r exchangeNAfor1}
@@ -218,7 +219,7 @@ res_stageR <- drim.padj %>%
     left_join(annotation_tx, by = c("ensembl_transcript_id_version", "ensembl_gene_id_version"))
 
 res_stageR %>% 
-    write_csv("../res/dtu_ont/stageR_drimseq_dtu.csv.gz")
+    write_csv(file.path(snakemake@params[["out_folder"]], "stageR_drimseq_dtu.csv.gz"))
 
 res_stageR %>%
     filter(gene < .05 | transcript < .05) %>% 

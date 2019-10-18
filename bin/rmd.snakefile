@@ -1,22 +1,3 @@
-# DTU
-rule render_ont_dtu:
-    threads: 4
-    input:
-        "data/scaledTPM_ont.rds"
-    output:
-        "res/dtu_ont/ont_dtu.html"
-    script:
-        "bin/drimseq_ont.Rmd"
-
-rule render_all_dtu:
-    threads: 4
-    input:
-        "data/scaledTPM_all.rds"
-    output:
-        "res/dtu_all/all_dtu.html"
-    script:
-        "bin/drimseq_all.Rmd"
-
 # comparisons
 rule render_correlations:
     input:
