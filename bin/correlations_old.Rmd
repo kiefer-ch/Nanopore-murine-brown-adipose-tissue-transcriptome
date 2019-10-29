@@ -1,7 +1,7 @@
 ---
-title: "nanopore iBAT, Comparison of Illumina and ONT reads on transcript level"
+title: "Nanopore iBAT, expression levels by technology"
 author: "Christoph Kiefer"
-date: "20. September 2019"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: 
     html_document:
         toc: true
@@ -9,11 +9,16 @@ editor_options:
   chunk_output_type: console
 ---
 
-```{r setup, include=FALSE, cache=FALSE}
+```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = FALSE)
 ```
 
-```{r library, include=FALSE, cache=FALSE}
+```{r}
+save.image("correlations.RData")
+```
+
+```{r loadPackages}
+source("packrat/init.R")
 library("dplyr")
 library("readr")
 library("purrr")
@@ -26,7 +31,7 @@ library("ggpmisc")
 
 ```{r dataImport_tx}
 import_data <- function(illumina, ont, tpm) {
-    sample_info <- read_csv("../sample_info/sampleInfo.csv")
+    sample_info <- read_csv(snakemake@input[["sample_info"]])
 
     illumina <- read_csv(illumina) %>% 
         select(-gene_name, -mgi_symbol) %>% 
@@ -50,21 +55,14 @@ import_data <- function(illumina, ont, tpm) {
         rename(ensembl_transcript_id_version = "transcript_id_ens")
 }
 
-illumina <- "../res/txlevel_ont/txlevel_ont_cm_rld.csv.gz"
-ont <- "../res/wien/6samples/ChrKiefer_6samples_reg_log_transf_counts.tsv"
-tpm <- "../res/txlevel_ont/txlevel_ont_cm_tpm.csv.gz"
-
-df <- import_data(illumina, ont, tpm)
+df <- import_data(snakemake@params[["illumina_tx_rlog"]],
+    snakemake@input[["ont_tx_rlog"]], snakemake@params[["illumina_tx_tpm"]])
 ```
 
 ```{r dataImport_gene}
-  illumina <- "../res/genelevel_ont/genelevel_ont_cm_rld.csv.gz"
-  tpm <- "../res/genelevel_ont/genelevel_ont_cm_tpm.csv.gz"
-  ont <- "../res/wien/6samples/ChrKiefer_6samples_raw_gene_counts.tsv"
+import_data_genes <- function(illumina, ont, tpm) {
 
-import_data_genes <- function(tpm, ont, illumina) {
-
-    sample_info <- read_csv("../sample_info/sampleInfo.csv")
+    sample_info <- read_csv(snakemake@input[["sample_info"]])
 
     tpm <- read_csv(tpm) %>% 
         select(-gene_name, -mgi_symbol) %>% 
@@ -113,7 +111,8 @@ import_data_genes <- function(tpm, ont, illumina) {
         rename(ensembl_gene_id_version = "gene_id_ens")
 }
 
-df_genes <- import_data_genes(tpm, ont, illumina)
+df_genes <- import_data_genes(snakemake@params[["illumina_gene_rlog"]],
+    snakemake@input[["ont_gene_raw"]], snakemake@params[["illumina_gene_tpm"]])
 ```
 
 # Filtering
@@ -123,50 +122,107 @@ df_genes <- import_data_genes(tpm, ont, illumina)
 ### Before filtering
 
 ```{r densityBeforeFilter, dependson="dataImport_tx"}
-pl1 <- df %>% 
+pl_countsIllumina <- df %>% 
     ggplot(aes(counts_illumina)) +
     geom_density(aes(colour = sample)) +
-    scale_colour_viridis_d()
-pl2 <- df %>% 
-    ggplot(aes(counts_ont)) +
-    geom_density(aes(colour = sample)) +
+    scale_x_continuous(
+        breaks = c(log2(c(1, 10, 100, 1000, 10000)), max(df$counts_illumina, na.rm = TRUE)),
+        labels = function(x) signif(2^x)) +
     scale_colour_viridis_d()
 
-ggdraw(plot_grid(plot_grid(pl1 + theme(legend.position="none"), pl2 + theme(legend.position="none"), ncol=1, align='v'),
-    plot_grid(NULL, get_legend(pl1), ncol=1),
-    rel_widths=c(1, 0.2)))
+pl_tpm <- df %>% 
+    ggplot(aes(log10(tpm + 1))) +
+    geom_density(aes(colour = sample)) +
+    scale_x_continuous(breaks = log10(c(.01, 1, 10, 100, 1000, 10000, max(df$tpm, na.rm = TRUE)) + 1),
+            labels = function(x) signif(10^x - 1),
+            name = "tpm") +
+    scale_colour_viridis_d()
+
+pl_countsOnt <- df %>% 
+    ggplot(aes(counts_ont)) +
+    geom_density(aes(colour = sample)) +
+    scale_x_continuous(
+        breaks = c(log2(c(1, 10, 100, 1000, 10000)), max(df$counts_ont, na.rm = TRUE)),
+        labels = function(x) signif(2^x)) +
+    scale_colour_viridis_d()
+
+ggdraw(plot_grid(plot_grid(pl_countsIllumina + theme(legend.position = "none"),
+        pl_tpm + theme(legend.position = "none"),
+        pl_countsOnt + theme(legend.position = "none"),
+        ncol = 1, align = 'v'),
+    plot_grid(NULL, get_legend(pl1), ncol = 1),
+        rel_widths = c(1, 0.2)))
 ```
 
 Actually most transcripts are not expressed. 
 
-```{r filterNotExpressed, echo = TRUE, dependson="dataImport_tx"}
-# filter not expressed transcripts
-not_expressed <- df %>% 
-    group_by(ensembl_transcript_id_version) %>% 
-    summarise(counts_illumina = sum(counts_illumina),
-        counts_ont = sum(counts_ont)) %>% 
-    filter(counts_illumina < 1 & counts_ont < 1) %>% 
-    pull(ensembl_transcript_id_version)
-
-df <- df %>% 
-    filter(!(ensembl_transcript_id_version %in% not_expressed))
-```
-
 ### Transcripts expressed in one of the datasets
 
+Cutoff is at least 3 counts in the teloprime dataset (as in Soneson et al., 2019)
+and 10 in the illumina dataset.
+
+```{r cutOffs}
+cutoff_illumina = 10
+cutoff_ont = 3
+```
+
+```{r filterNotExpressed, echo = TRUE, dependson="dataImport_tx"}
+# filter not expressed transcripts
+expressedInONT <- df %>% 
+    group_by(ensembl_transcript_id_version) %>% 
+    summarise(counts_ont = sum(counts_ont)) %>% 
+    filter(counts_ont > log2(cutoff_ont)) %>% 
+    pull(ensembl_transcript_id_version)
+
+expressedInIllumina <- df %>% 
+    group_by(ensembl_transcript_id_version) %>% 
+    summarise(counts_illumina = sum(counts_illumina)) %>% 
+    filter(counts_illumina > log2(cutoff_illumina)) %>% 
+    pull(ensembl_transcript_id_version)
+
+df_expressedInBoth <- df %>% 
+    filter(ensembl_transcript_id_version %in% expressedInONT &
+        ensembl_transcript_id_version %in% expressedInIllumina)
+```
+
+```{r vennTranscripts}
+library("nVennR")
+plotVenn(list(Teloprime = expressedInONT, Illumina = expressedInIllumina),
+    nCycles = 2000)
+```
+
+
 ```{r densityAfterFilter, dependson="filterNotExpressed"}
-pl1 <- df %>% 
+pl_countsIllumina <- df_expressedInBoth %>% 
     ggplot(aes(counts_illumina)) +
     geom_density(aes(colour = sample)) +
-    scale_colour_viridis_d()
-pl2 <- df %>% 
-    ggplot(aes(counts_ont)) +
-    geom_density(aes(colour = sample)) +
+    scale_x_continuous(
+        breaks = c(log2(c(1, 10, 100, 1000, 10000)), max(df$counts_illumina, na.rm = TRUE)),
+        labels = function(x) signif(2^x)) +
     scale_colour_viridis_d()
 
-ggdraw(plot_grid(plot_grid(pl1 + theme(legend.position="none"), pl2 + theme(legend.position="none"), ncol=1, align='v'),
-    plot_grid(NULL, get_legend(pl1), ncol=1),
-    rel_widths=c(1, 0.2)))
+pl_tpm <- df_expressedInBoth %>% 
+    ggplot(aes(log10(tpm + 1))) +
+    geom_density(aes(colour = sample)) +
+    scale_x_continuous(breaks = log10(c(.01, 1, 10, 100, 1000, 10000, max(df$tpm, na.rm = TRUE)) + 1),
+            labels = function(x) signif(10^x - 1),
+            name = "tpm") +
+    scale_colour_viridis_d()
+
+pl_countsOnt <- df_expressedInBoth %>% 
+    ggplot(aes(counts_ont)) +
+    geom_density(aes(colour = sample)) +
+    scale_x_continuous(
+        breaks = c(log2(c(1, 10, 100, 1000, 10000)), max(df$counts_ont, na.rm = TRUE)),
+        labels = function(x) signif(2^x)) +
+    scale_colour_viridis_d()
+
+ggdraw(plot_grid(plot_grid(pl_countsIllumina + theme(legend.position = "none"),
+        pl_tpm + theme(legend.position = "none"),
+        pl_countsOnt + theme(legend.position = "none"),
+        ncol = 1, align = 'v'),
+    plot_grid(NULL, get_legend(pl1), ncol = 1),
+        rel_widths = c(1, 0.2)))
 ```
 
 Filtering for genes that are not expressed in either of the datasets reveals,

@@ -18,6 +18,8 @@ source("packrat/init.R")
 library("dplyr")
 library("DEXSeq")
 library("readr")
+library("Gviz")
+library("Mus.musculus")
 library("ggplot2")
     select <- dplyr::select
 BPPARAM = BiocParallel::MulticoreParam(snakemake@threads[[1]])
@@ -106,10 +108,12 @@ res %>%
     write_csv(file.path(snakemake@params[["out_folder"]], "all_deu.csv.gz"))
 ```
 
+```{r}
+save.image()
+```
+
 ```{r plotGeneFunction}
-library("Gviz")
-library("Mus.musculus")
-txdb <- loadDb("annotation/annotation.txdb.rds")
+txdb <- loadDb(snakemake@input[["txdb"]])
 
 plot.gene <- function(gene = "ENSMUSG00000020654.15") {
     df <- AnnotationDbi::select(txdb, keys = gene,
@@ -123,60 +127,64 @@ plot.gene <- function(gene = "ENSMUSG00000020654.15") {
             TXSTRAND = unique(TXSTRAND))
     strand <- ifelse(df$TXSTRAND == '+', "fw", "rv")
     
-    itrack <- IdeogramTrack(genome = "mm10", chromosome = df$TXCHROM)
-    gtrack <- GenomeAxisTrack(genome = "mm10", chromosome = df$TXCHROM)
+#    itrack <- IdeogramTrack(genome = "mm10", chromosome = df$TXCHROM)
+    gtrack <- GenomeAxisTrack(genome = "mm10", chromosome = df$TXCHROM,
+        name = "M23")
     atrack <- GeneRegionTrack(txdb, chromosome = df$TXCHROM,
-        from = df$TXSTART, to = df$TXEND)
+        from = df$TXSTART, to = df$TXEND, strand = df$TXSTRAND)
     dtrack1 <- DataTrack(range = file.path(snakemake@params[["bw_folder"]], sprintf("5034_S33_%s.bw", strand)),
         type = "hist",
         genome = "mm10",
+        name = "warm1",
         chromosome = df$TXCHROM,
         start = df$TXSTART,
-        end = df$TXEND,
-        transformation = function(x) log2(x + 1))
+        end = df$TXEND)
     dtrack2 <- DataTrack(range = file.path(snakemake@params[["bw_folder"]], sprintf("5035_S34_%s.bw", strand)),
         type = "hist",
         genome = "mm10",
+        name = "cold1",
         chromosome = df$TXCHROM,
         start = df$TXSTART,
-        end = df$TXEND,
-        transformation = function(x) log2(x + 1))
+        end = df$TXEND)
     dtrack3 <- DataTrack(range = file.path(snakemake@params[["bw_folder"]], sprintf("5039_S38_%s.bw", strand)),
         type = "hist",
         genome = "mm10",
+        name = "warm2",
         chromosome = df$TXCHROM,
         start = df$TXSTART,
-        end = df$TXEND,
-        transformation = function(x) log2(x + 1))
+        end = df$TXEND)
     dtrack4 <- DataTrack(range = file.path(snakemake@params[["bw_folder"]], sprintf("5041_S40_%s.bw", strand)),
         type = "hist",
         genome = "mm10",
+        name = "cold2",
         chromosome = df$TXCHROM,
         start = df$TXSTART,
-        end = df$TXEND,
-        transformation = function(x) log2(x + 1))
+        end = df$TXEND)
     dtrack5 <- DataTrack(range = file.path(snakemake@params[["bw_folder"]], sprintf("5043_S42_%s.bw", strand)),
         type = "hist",
         genome = "mm10",
         chromosome = df$TXCHROM,
         start = df$TXSTART,
-        end = df$TXEND,
-        transformation = function(x) log2(x + 1))
+        end = df$TXEND)
     dtrack6 <- DataTrack(range = file.path(snakemake@params[["bw_folder"]], sprintf("5044_S43_%s.bw", strand)),
         type = "hist",
         genome = "mm10",
         chromosome = df$TXCHROM,
         start = df$TXSTART,
-        end = df$TXEND,
-        transformation = function(x) log2(x + 1))
+        end = df$TXEND)
 
-    plotTracks(list(itrack, gtrack, atrack, dtrack1, dtrack3, dtrack5, dtrack2, dtrack4, dtrack6),
+    plotTracks(list(
+#            itrack, 
+            dtrack1, #dtrack3, #dtrack5,
+            dtrack2, #dtrack4, #dtrack6,
+            atrack, gtrack),
+        showId = FALSE,
         from = df$TXSTART,
         to = df$TXEND,
         extend.left = 50,
         extend.right = 50,
         background.title = "darkblue",
-        collapseTranscripts = "meta",
+#        collapseTranscripts = "meta",
         fontsize = 15, cex.axis = .4)
 }
 ```
@@ -186,7 +194,7 @@ plot.gene <- function(gene = "ENSMUSG00000020654.15") {
 ```{r}
 plotDEXSeq(dxr1, "ENSMUSG00000020654.15", .05, "condition_temp",
     norCounts = TRUE, legend = TRUE)
-plot.gene("ENSMUSG00000020654.15")
+pl <- plot.gene("ENSMUSG00000020654.15")
 
 dxr1 %>% 
     as_tibble() %>% 

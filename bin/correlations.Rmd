@@ -1,0 +1,206 @@
+---
+title: "Nanopore iBAT, expression levels by technology"
+author: "Christoph Kiefer"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+    html_document:
+        toc: true
+editor_options:
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = FALSE)
+```
+
+```{r}
+save.image("correlations.RData")
+```
+
+```{r loadPackages}
+source("packrat/init.R")
+library("dplyr")
+library("readr")
+library("purrr")
+library("ggplot2")
+library("ggthemes")
+library("cowplot")
+library("ggpmisc")
+    rename <- dplyr::rename
+```
+
+```{r dataImport_tx}
+import_data <- function(illumina, ont, tpm) {
+    sample_info <- read_csv(snakemake@input[["sample_info"]])
+
+    illumina <- read_csv(illumina) %>% 
+        select(-gene_name, -mgi_symbol) %>% 
+        tidyr::gather(key = "sample", value = "counts_illumina", -transcript_id_ens)
+    ont <- read_tsv(ont) %>% 
+        tidyr::separate(transcript, "transcript_id_ens", sep = '\\|')
+    tpm <- read_csv(tpm) %>% 
+        select(-gene_name, -mgi_symbol) %>% 
+        tidyr::gather(key = "sample", value = "tpm", -transcript_id_ens)
+    
+    lookup <- sample_info$illumina
+    names(lookup) <- sample_info$ont
+    
+    colnames(ont) <- lookup[colnames(ont)]
+    colnames(ont)[1] <- "transcript_id_ens"
+        
+    illumina %>% 
+        full_join(ont %>% tidyr::gather(key = "sample", value = "counts_ont", -transcript_id_ens),
+            by = c("transcript_id_ens", "sample")) %>% 
+        left_join(tpm, by = c("transcript_id_ens", "sample")) %>% 
+        rename(ensembl_transcript_id_version = "transcript_id_ens")
+}
+
+df <- import_data(snakemake@params[["illumina_tx_rlog"]],
+    snakemake@input[["ont_tx_rlog"]], snakemake@params[["illumina_tx_tpm"]])
+```
+
+```{r dataImport_gene}
+import_data_genes <- function(illumina, ont, tpm) {
+
+    sample_info <- read_csv(snakemake@input[["sample_info"]])
+
+    tpm <- read_csv(tpm) %>% 
+        select(-gene_name, -mgi_symbol) %>% 
+            tidyr::gather(key = "sample", value = "tpm", -gene_id_ens)
+    
+    illumina <- read_csv(illumina) %>% 
+        select(-gene_name, -mgi_symbol) %>% 
+        tidyr::gather(key = "sample", value = "counts_illumina", -gene_id_ens)
+
+    ont <- read_tsv(ont) %>% 
+        tidyr::separate(transcript, c("transcript_id_ens", "gene_id_ens"), sep = '\\|')
+    
+    lookup <- sample_info$illumina
+    names(lookup) <- sample_info$ont
+    
+    colnames(ont) <- lookup[colnames(ont)]
+    colnames(ont)[c(1, 2)] <- c("transcript_id_ens", "gene_id_ens")
+    
+    ont <- ont %>%
+        tidyr::gather(key = "sample", value = "counts_ont",
+            -transcript_id_ens, -gene_id_ens) %>% 
+        group_by(gene_id_ens, sample) %>% 
+        summarise(counts_ont = sum(counts_ont)) %>% 
+        tidyr::spread(key = sample, value = counts_ont) %>% 
+        filter(!is.na(gene_id_ens)) %>% 
+        magrittr::set_rownames(.$gene_id_ens) %>% 
+        as.matrix() %>% 
+        `[`( ,-1)
+    
+    class(ont) <- "numeric"
+    gene_ids <- rownames(ont)
+    
+    ont <- ont %>% 
+        DESeq2::rlog() 
+    
+    ont <- ont %>% 
+        as_tibble() %>% 
+        mutate(gene_id_ens = gene_ids) %>% 
+        tidyr::gather(key = "sample", value = "counts_ont",
+            -gene_id_ens)
+        
+    tpm %>% 
+        left_join(illumina, by = c("gene_id_ens", "sample")) %>% 
+        full_join(ont, by = c("gene_id_ens", "sample")) %>% 
+        mutate(tpm = log2(tpm + 1)) %>% 
+        rename(ensembl_gene_id_version = "gene_id_ens")
+}
+
+df_genes <- import_data_genes(snakemake@params[["illumina_gene_rlog"]],
+    snakemake@input[["ont_gene_raw"]], snakemake@params[["illumina_gene_tpm"]])
+```
+
+# Filtering
+
+## Transcripts
+
+### Before filtering
+
+```{r densityBeforeFilter, dependson="dataImport_tx"}
+pl_countsIllumina <- df %>% 
+    ggplot(aes(counts_illumina)) +
+    geom_density(aes(colour = sample)) +
+    scale_x_continuous(
+        breaks = c(log2(c(1, 10, 100, 1000, 10000)), max(df$counts_illumina, na.rm = TRUE)),
+        labels = function(x) signif(2^x)) +
+    scale_colour_viridis_d()
+
+pl_tpm <- df %>% 
+    ggplot(aes(log10(tpm + 1))) +
+    geom_density(aes(colour = sample)) +
+    scale_x_continuous(breaks = log10(c(.01, 1, 10, 100, 1000, 10000, max(df$tpm, na.rm = TRUE)) + 1),
+            labels = function(x) signif(10^x - 1),
+            name = "tpm") +
+    scale_colour_viridis_d()
+
+pl_countsOnt <- df %>% 
+    ggplot(aes(counts_ont)) +
+    geom_density(aes(colour = sample)) +
+    scale_x_continuous(
+        breaks = c(log2(c(1, 10, 100, 1000, 10000)), max(df$counts_ont, na.rm = TRUE)),
+        labels = function(x) signif(2^x)) +
+    scale_colour_viridis_d()
+
+ggdraw(plot_grid(plot_grid(pl_countsIllumina + theme(legend.position = "none"),
+        pl_tpm + theme(legend.position = "none"),
+        pl_countsOnt + theme(legend.position = "none"),
+        ncol = 1, align = 'v'),
+    plot_grid(NULL, get_legend(pl_countsIllumina), ncol = 1),
+        rel_widths = c(1, 0.2)))
+```
+
+Actually most transcripts are not expressed. 
+
+### Transcripts expressed in one of the datasets
+
+Cutoff is at least 1 count in Soneson et al., 2019.
+
+```{r cutOffs echo=TRUE}
+cutoff_illumina = 18
+cutoff_ont = 18
+```
+
+```{r filterNotExpressed}
+# filter not expressed transcripts
+expressedInONT <- df %>% 
+    group_by(ensembl_transcript_id_version) %>% 
+    summarise(counts_ont = sum(counts_ont)) %>% 
+    filter(counts_ont > log2(cutoff_ont)) %>% 
+    pull(ensembl_transcript_id_version)
+
+expressedInIllumina <- df %>% 
+    group_by(ensembl_transcript_id_version) %>% 
+    summarise(counts_illumina = sum(counts_illumina)) %>% 
+    filter(counts_illumina > log2(cutoff_illumina)) %>% 
+    pull(ensembl_transcript_id_version)
+
+expressedInBoth <- df %>% 
+    group_by(ensembl_transcript_id_version) %>% 
+    summarise(counts_illumina = sum(counts_illumina),
+        counts_ont = sum(counts_ont)) %>% 
+    filter(counts_illumina > log2(cutoff_illumina) & counts_ont > log2(cutoff_ont)) %>% 
+    pull(ensembl_transcript_id_version)
+    
+df_expressedInBoth <- df %>% 
+    filter(ensembl_transcript_id_version %in% expressedInONT &
+        ensembl_transcript_id_version %in% expressedInIllumina)
+```
+
+```{r vennTranscripts}
+library("eulerr")
+venn <- euler(c("A" = length(expressedInONT), "B" = length(expressedInIllumina),
+    "A&B" = length(expressedInBoth)))
+plot(venn,
+    labels = list(labels = c("Teloprime", "Illumina")),
+    quantities = list(type = "counts"))
+```
+
+```{r transcriptDetectionByLength}
+
+```
+

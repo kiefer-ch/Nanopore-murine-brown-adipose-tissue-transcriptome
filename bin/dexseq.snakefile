@@ -2,7 +2,7 @@ rule dexseq_prefilterIsoforms:
     input:
         annotation = "annotation/annotation.gtf",
         scaledTPM = "data/scaledTPM_all.rds",
-        txdb = "annotation/annotation.txdb.rds",
+        txdb = "annotation/annotation_txdb.sqlite",
         sampleInfo = "sample_info/sampleInfo.csv"
     params:
         threshold = 15
@@ -11,7 +11,6 @@ rule dexseq_prefilterIsoforms:
     script:
         "dexseq_prefilterIsoforms.R"
 
-# https://github.com/vivekbhr/Subread_to_DEXSeq
 rule dexseq_prepareAnnotation:
     input:
         "indices/dexseq/annotation_prefiltered.gtf"
@@ -48,11 +47,12 @@ rule dexseq_importCounts:
 
 rule dexseq_analyse:
     threads:
-        6
+        8
     input:
         expand("BW/{sample}_fw.bw", sample=SAMPLES),
         expand("BW/{sample}_rv.bw", sample=SAMPLES),
-        dxd = "data/dxd.rds"
+        dxd = "data/dxd.rds",
+        txdb = "annotation/annotation_txdb.sqlite"
     params:
         out_folder = "data/dexseq",
         bw_folder = "BW"
