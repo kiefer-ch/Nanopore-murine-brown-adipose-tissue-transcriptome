@@ -45,3 +45,19 @@ rule sort_annotation:
         "annotation/annotation_sort.gtf"
     shell:
         "bedtools sort -i {input} > {output}"
+
+rule get_biomart_tx:
+    input:
+        txdb = "annotation/annotation_txdb.sqlite",
+    output:
+        tx = "annotation/biomaRt_tx.rds"
+    script:
+        "biomaRt_tx.R"
+
+rule get_biomart_gene:
+    input:
+        txdb = "annotation/annotation_txdb.sqlite",
+    output:
+        gene = "annotation/biomaRt_gene.rds"
+    script:
+        "biomaRt_gene.R"

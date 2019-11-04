@@ -1,0 +1,241 @@
+---
+title: "Nanopore iBAT, expression levels by technology"
+author: "Christoph Kiefer"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+    html_document:
+        toc: true
+editor_options:
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = FALSE)
+```
+
+```{r}
+save.image("quantification_correlation.RData")
+```
+
+```{r loadPackages}
+source("packrat/init.R")
+library("dplyr")
+library("readr")
+library("purrr")
+library("ggplot2")
+library("ggthemes")
+library("ggpmisc")
+library("scales")
+    rename <- dplyr::rename
+    select <- dplyr::select
+```
+
+```{r importData}
+teloprime_tx_raw <- read_csv(snakemake@input[["teloprime_tx_raw"]])
+illumina_tx_raw <- read_csv(snakemake@input[["illumina_tx_raw"]])
+teloprime_tx_ntd <- read_csv(snakemake@input[["teloprime_tx_norm"]])
+tpm_tx <- read_csv(snakemake@input[["tpm_tx"]])
+
+teloprime_gene_raw <- read_csv(snakemake@input[["teloprime_gene_raw"]])
+illumina_gene_raw <- read_csv(snakemake@input[["illumina_gene_raw"]])
+teloprime_gene_ntd <- read_csv(snakemake@input[["teloprime_gene_norm"]])
+tpm_gene <- read_csv(snakemake@input[["tpm_gene"]])
+
+
+sample_info <- read_csv(snakemake@input[["sample_info"]]) %>% 
+    filter(!is.na(ont)) %>%
+    mutate_at(vars(matches("condition")), as.factor) %>%
+    rename(sample = "illumina")
+
+biomaRt_tx <- read_rds(snakemake@input[["biomaRt_tx"]])
+biomaRt_gene <- read_rds(snakemake@input[["biomaRt_gene"]])
+biotype_groups <- read_csv(snakemake@input[["biotype_groups"]])
+```
+
+```{r}
+get_detectedFeatures <- function(df, cutoff = 1) {
+    df %>% 
+        select(-mgi_symbol, -gene_name) %>%
+        as.data.frame() %>%
+        magrittr::set_rownames(.$gene_id_ens) %>%
+        `[`( ,-1) %>%
+        data.matrix() %>% 
+        rowSums() %>% 
+        (function(x) x >= cutoff) %>% 
+        tibble::enframe() %>% 
+        filter(value == TRUE) %>% 
+        pull(name)
+}
+```
+
+# Transcripts
+
+```{r}
+detected_by_teloprime <- get_detectedFeatures(teloprime_tx_raw)
+detected_by_illumina <- get_detectedFeatures(illumina_tx_raw)
+```
+
+```{r}
+get_averageExpression <- function(df) {
+    df %>% 
+        select(-mgi_symbol, -gene_name) %>%
+        as.data.frame() %>%
+        magrittr::set_rownames(.$transcript_id_ens) %>%
+        `[`( ,-1) %>%
+        data.matrix() %>% 
+        (function(x) exp(rowMeans(log(x), na.rm = TRUE))) %>% 
+        tibble::enframe("ensembl_transcript_id_version", "counts")
+}
+
+df <- list(teloprime_tx_ntd, tpm_tx) %>% 
+    map(get_averageExpression) %>% 
+    reduce(left_join, by = "ensembl_transcript_id_version",
+        suffix = c("_teloprime", "_tpm")) %>% 
+    filter(ensembl_transcript_id_version %in% detected_by_teloprime | 
+        ensembl_transcript_id_version %in% detected_by_illumina) %>% 
+    left_join(biomaRt_tx, by = "ensembl_transcript_id_version") %>% 
+    left_join(biotype_groups, by = "transcript_biotype")
+```
+
+```{r}
+mylog10_trans <- function (base = 10) {
+  trans <- function(x) log(x + 1, base)
+  inv <- function(x) base^x - 1
+  trans_new(paste0("log-", format(base)), trans, inv, log_breaks(base = base), 
+            domain = c(1e-100, Inf))
+}
+
+df %>% 
+    tidyr::drop_na() %>% 
+    mutate(counts_teloprime = 2^counts_teloprime - 1) %>% 
+    ggplot(aes(counts_tpm, counts_teloprime)) +
+    geom_point(aes(colour = grouped_biotype)) +
+    geom_abline(slope = 1) +
+    stat_poly_eq(formula = y ~ x,
+            aes(label = paste(..rr.label.., sep = "~~~")),
+            parse = TRUE, family = "serif", size = 3, colour = "grey30",
+            label.x.npc = "left", label.y.npc = "top") +
+    scale_x_continuous(
+        breaks = c(.1, 1, 10, 100, 1000, 10000),
+        labels = function(x) signif(x),
+        trans = "mylog10") +
+    scale_y_continuous(
+        breaks = c(.1, 1, 10, 100, 1000, 10000),
+        labels = function(x) signif(x),
+        trans = "mylog10") +
+    scale_colour_viridis_d() +
+    theme_tufte() +
+    geom_rangeframe(sides = 'bl', na.rm = FALSE) +
+    xlab("Average illumina tpm") +
+    ylab("Average teloprime counts")
+```
+
+```{r}
+df %>% 
+    tidyr::drop_na() %>% 
+    mutate(counts_teloprime = 2^counts_teloprime - 1) %>% 
+    ggplot(aes(counts_tpm, counts_teloprime)) +
+    geom_hex() +
+    geom_abline(slope = 1) +
+    stat_poly_eq(formula = y ~ x,
+            aes(label = paste(..rr.label.., sep = "~~~")),
+            parse = TRUE, family = "serif", size = 3, colour = "grey30",
+            label.x.npc = "left", label.y.npc = "top") +
+    facet_wrap(~ grouped_biotype) +
+    scale_x_continuous(
+        breaks = c(.1, 1, 10, 100, 1000, 10000),
+        labels = function(x) signif(x),
+        trans = "mylog10") +
+    scale_y_continuous(
+        breaks = c(.1, 1, 10, 100, 1000, 10000),
+        labels = function(x) signif(x),
+        trans = "mylog10") +
+    scale_fill_viridis_c(trans = "log") +
+    theme_tufte() +
+    geom_rangeframe(sides = "bl") +
+    xlab("Average illumina tpm") +
+    ylab("Average teloprime counts")
+```
+
+# Genes
+
+```{r}
+detected_by_teloprime <- get_detectedFeatures(teloprime_gene_raw)
+detected_by_illumina <- get_detectedFeatures(illumina_gene_raw)
+```
+
+```{r}
+get_averageExpression <- function(df) {
+    df %>% 
+        select(-mgi_symbol, -gene_name) %>%
+        as.data.frame() %>%
+        magrittr::set_rownames(.$gene_id_ens) %>%
+        `[`( ,-1) %>%
+        data.matrix() %>% 
+        (function(x) exp(rowMeans(log(x), na.rm = TRUE))) %>% 
+        tibble::enframe("ensembl_gene_id_version", "counts")
+}
+
+df <- list(teloprime_gene_ntd, tpm_gene) %>% 
+    map(get_averageExpression) %>% 
+    reduce(left_join, by = "ensembl_gene_id_version",
+        suffix = c("_teloprime", "_tpm")) %>% 
+    filter(ensembl_gene_id_version %in% detected_by_teloprime | 
+        ensembl_gene_id_version %in% detected_by_illumina) %>% 
+    left_join(biomaRt_gene, by = "ensembl_gene_id_version") %>% 
+    left_join(biotype_groups %>% rename(gene_biotype = "transcript_biotype"),
+        by = "gene_biotype")
+```
+
+```{r}
+df %>% 
+    tidyr::drop_na() %>% 
+    mutate(counts_teloprime = 2^counts_teloprime - 1) %>% 
+    ggplot(aes(counts_tpm, counts_teloprime)) +
+    geom_point(aes(colour = grouped_biotype)) +
+    geom_abline(slope = 1) +
+    stat_poly_eq(formula = y ~ x,
+            aes(label = paste(..rr.label.., sep = "~~~")),
+            parse = TRUE, family = "serif", size = 3, colour = "grey30",
+            label.x.npc = "left", label.y.npc = "top") +
+    scale_x_continuous(
+        breaks = c(.1, 1, 10, 100, 1000, 10000),
+        labels = function(x) signif(x),
+        trans = "mylog10") +
+    scale_y_continuous(
+        breaks = c(.1, 1, 10, 100, 1000, 10000),
+        labels = function(x) signif(x),
+        trans = "mylog10") +
+    scale_colour_viridis_d() +
+    theme_tufte() +
+    geom_rangeframe(sides = "bl") +
+    xlab("Average illumina tpm") +
+    ylab("Average teloprime counts")
+```
+
+```{r}
+df %>% 
+    tidyr::drop_na() %>% 
+    mutate(counts_teloprime = 2^counts_teloprime - 1) %>% 
+    ggplot(aes(counts_tpm, counts_teloprime)) +
+    geom_hex() +
+    geom_abline(slope = 1) +
+    stat_poly_eq(formula = y ~ x,
+            aes(label = paste(..rr.label.., sep = "~~~")),
+            parse = TRUE, family = "serif", size = 3, colour = "grey30",
+            label.x.npc = "left", label.y.npc = "top") +
+    facet_wrap(~ grouped_biotype) +
+    scale_x_continuous(
+        breaks = c(.1, 1, 10, 100, 1000, 10000),
+        labels = function(x) signif(x),
+        trans = "mylog10") +
+    scale_y_continuous(
+        breaks = c(.1, 1, 10, 100, 1000, 10000),
+        labels = function(x) signif(x),
+        trans = "mylog10") +
+    scale_fill_viridis_c(trans = "log") +
+    theme_tufte() +
+    geom_rangeframe(sides = "bl") +
+    xlab("Average illumina tpm") +
+    ylab("Average teloprime counts")
+```

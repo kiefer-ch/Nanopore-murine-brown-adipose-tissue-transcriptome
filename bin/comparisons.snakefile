@@ -1,20 +1,40 @@
 # comparisons
-rule correlations:
+rule quantification_correlation:
     input:
-        "res/txlevel_ont/deseq_txlevel_ont.html",
-        ont_tx_rlog = "res/wien/6samples/ChrKiefer_6samples_reg_log_transf_counts.tsv",
-        ont_gene_raw = "res/wien/6samples/ChrKiefer_6samples_raw_gene_counts.tsv",
-        sample_info = "sample_info/sampleInfo.csv"
-    params:
-        out_folder = "res/comparisons/correlations",
-        illumina_tx_tpm = "res/txlevel_ont/txlevel_ont_cm_tpm.csv.gz",
-        illumina_tx_rlog = "res/txlevel_ont/txlevel_ont_cm_rld.csv.gz",
-        illumina_gene_tpm = "res/genelevel_ont/genelevel_ont_cm_tpm.csv.gz",
-        illumina_gene_rlog = "res/genelevel_ont/genelevel_ont_cm_rld.csv.gz"
+        teloprime_tx_raw = "res/deseq/teloprime/txlevel/teloprime_txlevel_cm_cts.csv.gz",
+        teloprime_tx_norm = "res/deseq/teloprime/txlevel/teloprime_txlevel_cm_ntd.csv.gz",
+        illumina_tx_raw = "res/deseq/illumina/txlevel_ont/txlevel_ont_cm_cts.csv.gz",
+        tpm_tx = "res/deseq/illumina/txlevel_ont/txlevel_ont_cm_tpm.csv.gz",
+        teloprime_gene_raw = "res/deseq/teloprime/genelevel/teloprime_genelevel_cm_cts.csv.gz",
+        teloprime_gene_norm = "res/deseq/teloprime/genelevel/teloprime_genelevel_cm_ntd.csv.gz",
+        illumina_gene_raw = "res/deseq/illumina/genelevel_ont/genelevel_ont_cm_cts.csv.gz",
+        tpm_gene = "res/deseq/illumina/genelevel_ont/genelevel_ont_cm_tpm.csv.gz",
+        sample_info = "sample_info/sampleInfo.csv",
+        biomaRt_tx = "annotation/biomaRt_tx.rds",
+        biomaRt_gene = "annotation/biomaRt_gene.rds",
+        biotype_groups = "data/biotype_groups.csv"
     output:
-        "res/comparisons/correlations/correlations.html"
+        "res/comparisons/quantification_correlation.html"
     script:
-        "correlations.Rmd"
+        "quantification_correlation.Rmd"
+
+rule feature_detection:
+    input:
+        teloprime_tx = "res/deseq/teloprime/txlevel/teloprime_txlevel_cm_cts.csv.gz",
+        illumina_tx = "res/deseq/illumina/txlevel_ont/txlevel_ont_cm_cts.csv.gz",
+        tpm_tx = "res/deseq/illumina/txlevel_ont/txlevel_ont_cm_tpm.csv.gz",
+        teloprime_gene = "res/deseq/teloprime/genelevel/teloprime_genelevel_cm_cts.csv.gz",
+        illumina_gene = "res/deseq/illumina/genelevel_ont/genelevel_ont_cm_cts.csv.gz",
+        sample_info = "sample_info/sampleInfo.csv",
+        biomaRt_tx = "annotation/biomaRt_tx.rds",
+        biotype_groups = "data/biotype_groups.csv"
+    output:
+        "res/comparisons/feature_detection.html"
+    script:
+        "feature_detection.Rmd"
+
+rule readCharacteristics:
+
 
 rule render_GOcomp:
     input:

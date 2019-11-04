@@ -1,0 +1,393 @@
+---
+title: "Nanopore iBAT, Trascript detection"
+author: "Christoph Kiefer"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+    html_document:
+        toc: true
+editor_options:
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = FALSE)
+```
+
+```{r loadPackages}
+source("packrat/init.R")
+library("dplyr")
+library("readr")
+library("eulerr")
+library("ggplot2")
+library("ggthemes")
+library("AnnotationDbi")
+    rename <- dplyr::rename
+    select <- dplyr::select
+```
+
+```{r importData}
+teloprime_tx <- read_csv(snakemake@input[["teloprime_tx"]])
+illumina_tx <- read_csv(snakemake@input[["illumina_tx"]])
+teloprime_gene <- read_csv(snakemake@input[["teloprime_gene"]])
+illumina_gene <- read_csv(snakemake@input[["illumina_gene"]])
+tpm_tx <- read_csv(snakemake@input[["tpm_tx"]])
+
+sample_info <- read_csv(snakemake@input[["sample_info"]]) %>% 
+    filter(!is.na(ont)) %>%
+    mutate_at(vars(matches("condition")), as.factor) %>%
+    rename(sample = "illumina")
+
+biomaRt_tx <- read_rds(snakemake@input[["biomaRt_tx"]])
+biotype_groups <- read_csv(snakemake@input[["biotype_groups"]])
+```
+
+# Number of mapped reads
+
+```{r mappedReads}
+read_teloprime <- teloprime_gene %>% 
+    select_if(is.numeric) %>% 
+    data.matrix() %>% 
+    colSums() %>% 
+    tibble::enframe(value = "teloprime")
+
+read_illumina <- illumina_tx %>% 
+    select_if(is.numeric) %>% 
+    data.matrix() %>% 
+    colSums() %>% 
+    tibble::enframe(value = "illumina")
+
+reads_perLibrary <- read_teloprime %>% 
+    left_join(read_illumina, by = "name") %>% 
+    rename(sample = "name") %>% 
+    tidyr::gather(key = "method", value = "reads", -sample) %>% 
+    left_join(sample_info, by = "sample")
+
+reads_perLibrary %>% 
+    ggplot(aes(method, reads)) +
+    geom_jitter(aes(colour = condition_temp), size = 2, width = .1, height = 0) +
+    stat_summary(geom = "crossbar", width = .5, lwd = .25) +
+    scale_y_log10(breaks = c(10^6, 2.5*10^6, 5*10^6, 10^7, 2.5*10^7)) +
+    theme_tufte() +
+    geom_rangeframe(sides = 'l') +
+    xlab(NULL) +
+    ylab("Total counts") +
+    scale_color_viridis_d()
+```
+
+Sophia reported the difference in the library size between the two conditions in
+teloprime dataset before.
+
+Comparing to the read numbers from teloprime, it seems, there are more counts 
+then reads! There might be some problem with multimappers (primary, secondary hits)!
+
+```{r}
+
+```
+
+
+# Saturation curve
+
+```{r}
+get_numberDetectedFeatures <- function(cm, prop, cutoff = 1) {
+    cm %>% 
+        select_if(is.numeric) %>% 
+        data.matrix() %>% 
+        DropletUtils::downsampleMatrix(prop = prop, bycol = TRUE) %>% 
+        rowSums() %>% 
+        (function(x) x >= cutoff) %>% 
+        sum()
+}
+```
+
+Cutoff is 1 read in any of the librarys per method. (Maybe it should be redone
+taking replicates, condition etc. into account)
+
+```{r saturationCurve}
+fractions <- c(seq(0, .01, by = .001), 
+        seq(.015, .1, by = .01),
+        seq(.1, .25, by = .05),
+        seq(.3, 1, by = .1))
+
+average_readsPerMethod <- reads_perLibrary %>% 
+    select(method, reads, sample) %>% 
+    group_by(method) %>% 
+    summarise(reads = exp(mean(log(reads)))) %>% 
+    tibble::deframe()
+
+df <- tibble(fraction = fractions) %>% 
+    rowwise() %>% 
+    mutate(teloprime_tx = get_numberDetectedFeatures(teloprime_tx, prop = fraction),
+        illumina_tx = get_numberDetectedFeatures(illumina_tx, prop = fraction),
+        teloprime_gene = get_numberDetectedFeatures(teloprime_gene, prop = fraction),
+        illumina_gene = get_numberDetectedFeatures(illumina_gene, prop = fraction)) %>% 
+    tidyr::gather(key = "library", value = "features", -fraction) %>% 
+    mutate(reads = if_else(grepl("teloprime", library),
+            average_readsPerMethod["teloprime"],
+            average_readsPerMethod["illumina"])) %>% 
+    mutate(reads = reads * fraction * 6) %>% 
+    tidyr::separate(library, c("method", "feature_type"))
+
+df %>% 
+    ggplot(aes(reads, features)) +
+    geom_point(aes(colour = method)) +
+    geom_path(aes(colour = method)) +
+    theme_tufte() +
+    geom_rangeframe() +
+    facet_wrap(~feature_type, scale = "free_y") +
+    xlab("Aligned reads") +
+    ylab("Detected features") +
+    scale_color_viridis_d() +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+While the illumina dataset has reached saturation, the teloprime dataset has not
+yet. In addition, the teloprime curves seem to plateau out at smaller values.
+
+# Transcript detection rate by transcript length
+
+## Overview
+
+```{r}
+get_groupedTxLength <- function(df, cutoff = 1) {
+    df %>% 
+        select(-mgi_symbol, -gene_name) %>%
+        as.data.frame() %>%
+        magrittr::set_rownames(.$gene_id_ens) %>%
+        `[`( ,-1) %>%
+        data.matrix() %>% 
+        rowSums() %>% 
+        (function(x) x >= cutoff) %>% 
+        tibble::enframe("ensembl_transcript_id_version", "detected") %>% 
+        left_join(biomaRt_tx, by = "ensembl_transcript_id_version") %>% 
+        tidyr::drop_na(transcript_length) %>% 
+        mutate(grouped_transcript_length = cut(transcript_length, 
+            breaks = c(0, 500, 1000, 1500, 2000, 2500, 3000,
+                3500, 4000, 4500, 5000, 7500, 123179))) %>% 
+        group_by(grouped_transcript_length) %>% 
+        summarise(n = n(),
+            detected = sum(detected)) %>% 
+        mutate(rate = detected / n)
+}
+```
+
+```{r}
+df <- get_groupedTxLength(illumina_tx) %>% 
+    select(-n) %>% 
+    left_join(get_groupedTxLength(teloprime_tx), 
+        by = "grouped_transcript_length",
+        suffix = c("_illumina", "_teloprime")) %>% 
+    select(grouped_transcript_length, n, everything())
+
+df %>% 
+    knitr::kable(format = "html") %>%
+    kableExtra::kable_styling()
+
+df %>% 
+    select(grouped_transcript_length, rate_illumina, rate_teloprime) %>% 
+    tidyr::gather("method", "rate", -grouped_transcript_length) %>% 
+    ggplot(aes(grouped_transcript_length, rate)) +
+    geom_bar(stat = "identity") +
+    facet_wrap(~method) +
+    xlab("Transcript length") +
+    ylab("Detected transcripts") +
+    theme_tufte() +
+    geom_rangeframe(
+        data = tibble(rate = c(0, .8), grouped_transcript_length = c(0,1)),
+        sides = 'l') +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+In the illumina dataset, longer transcripts show a higher propensity to be detected.
+(The cutoff is on count level, and longer transcripts give more counts than smaller
+transcripts at the same expression level.)
+
+In the short range, there might be many non polyadenylated transcripts, that lower
+detection rate for both methods (small ncRNAs), as well lncRNAs, which might not
+be expressed because of tissue specificity.
+
+## By transcript biotpye
+
+```{r}
+get_groupedTxLength_byBiotype <- function(df, cutoff = 1) {
+    df %>% 
+        select(-mgi_symbol, -gene_name) %>%
+        as.data.frame() %>%
+        magrittr::set_rownames(.$gene_id_ens) %>%
+        `[`( ,-1) %>%
+        data.matrix() %>% 
+        rowSums() %>% 
+        (function(x) x >= cutoff) %>% 
+        tibble::enframe("ensembl_transcript_id_version", "detected") %>% 
+        left_join(biomaRt_tx, by = "ensembl_transcript_id_version") %>% 
+        left_join(biotype_groups, by = "transcript_biotype") %>% 
+        tidyr::drop_na(transcript_length) %>% 
+        mutate(grouped_transcript_length = cut(transcript_length, 
+            breaks = c(0, 500, 1000, 1500, 2000, 2500, 3000,
+                3500, 4000, 123179))) %>% 
+                group_by(grouped_biotype, grouped_transcript_length) %>% 
+        summarise(n = n(),
+            detected = sum(detected)) %>% 
+        mutate(rate = detected / n)
+}
+```
+
+#### Illumina 
+
+```{r}
+get_groupedTxLength_byBiotype(illumina_tx) %>% 
+    filter(!grouped_biotype == c("small ncRNA")) %>% 
+    tidyr::drop_na(grouped_biotype) %>% 
+    ggplot(aes(grouped_transcript_length, rate)) +
+    geom_bar(stat = "identity") +
+    facet_wrap(~grouped_biotype) +
+    xlab("Transcript length") +
+    ylab("Detected transcripts") +
+    theme_tufte() +
+    geom_rangeframe(
+        data = tibble(rate = c(0, .8), grouped_transcript_length = c(0,1)),
+        sides = 'l') +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+In the illumina protocol, coding transcripts, processed_others and lncRNA transcripts
+are detected at the same rate. Others shows a low detection rate for small
+transcripts, maybe caused by many non poly adenylated transcripts in that group.
+The detection rate for pseudo gene transcripts is generally low, maybe many are 
+not expressed, maybe it is also caused by the selective alignment algorithm in
+salmon [https://www.biorxiv.org/content/10.1101/657874v1].
+
+#### Teloprime
+
+```{r}
+get_groupedTxLength_byBiotype(teloprime_tx) %>% 
+    filter(!grouped_biotype == c("small ncRNA")) %>% 
+    tidyr::drop_na(grouped_biotype) %>% 
+    ggplot(aes(grouped_transcript_length, rate)) +
+    geom_bar(stat = "identity") +
+    facet_wrap(~grouped_biotype) +
+    xlab("Transcript length") +
+    ylab("Detected transcripts") +
+    theme_tufte() +
+    geom_rangeframe(
+        data = tibble(rate = c(0, .3), grouped_transcript_length = c(0,1)),
+        sides = 'l') +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+Even for coding transcripts, the teloprime protocol seems not good for detection
+of short transcripts. The teloprime protocol seems better in detecting coding
+transcripts than noncoding ones. This might be caused by generally higher expression 
+levels in the group of coding transcripts.
+
+# Features not detected by one but by the other method
+
+## Transcripts
+
+```{r}
+get_detectedTrancripts <- function(df, cutoff = 1) {
+    df %>% 
+        select(-mgi_symbol, -gene_name) %>%
+        as.data.frame() %>%
+        magrittr::set_rownames(.$gene_id_ens) %>%
+        `[`( ,-1) %>%
+        data.matrix() %>% 
+        rowSums() %>% 
+        (function(x) x >= cutoff) %>% 
+        tibble::enframe() %>% 
+        filter(value == TRUE) %>% 
+        pull(name)
+}
+```
+
+```{r}
+detected_by_teloprime <- get_detectedTrancripts(teloprime_tx)
+detected_by_illumina <- get_detectedTrancripts(illumina_tx)
+
+euler(c("Teloprime" = length(detected_by_teloprime) - sum(detected_by_teloprime %in% detected_by_illumina),
+    "Illumina" = length(detected_by_illumina) - sum(detected_by_teloprime %in% detected_by_illumina),
+    "Teloprime&Illumina" = sum(detected_by_teloprime %in% detected_by_illumina))) %>% 
+    plot(quantities = list(type = "counts", fontfamily = "serif"),
+        labels = list(fontfamily = "serif"))
+```
+
+Most transcripts detected by the teloprime protocol are also detected by illumina.
+
+### Detected by illumina but not by teloprime
+
+```{r}
+df <- tpm_tx %>% 
+    select(-mgi_symbol, -gene_name) %>%
+    as.data.frame() %>%
+    magrittr::set_rownames(.$transcript_id_ens) %>%
+    `[`( ,-1) %>%
+    data.matrix() %>% 
+    (function(x) exp(rowMeans(log(x), na.rm = TRUE))) %>% 
+    tibble::enframe("ensembl_transcript_id_version", "average_tpm") %>% 
+    mutate(
+        illumina = if_else(ensembl_transcript_id_version %in% detected_by_illumina, TRUE, FALSE),
+        teloprime = if_else(ensembl_transcript_id_version %in% detected_by_teloprime, TRUE, FALSE))
+
+df %>% 
+    filter(illumina) %>% 
+    left_join(biomaRt_tx, by = "ensembl_transcript_id_version") %>% 
+    left_join(biotype_groups, by = "transcript_biotype") %>% 
+    filter(!grouped_biotype == c("small ncRNA")) %>% 
+    tidyr::drop_na(grouped_biotype) %>% 
+    mutate(teloprime = factor(teloprime, levels = c(TRUE, FALSE))) %>% 
+    ggplot(aes(grouped_biotype, average_tpm)) +
+    geom_violin(aes(fill = teloprime)) +
+    scale_y_log10() +
+    xlab(NULL) +
+    ylab("Average TPM") +
+    theme_tufte() +
+    geom_rangeframe(sides = 'l') +
+    scale_fill_viridis_d()
+```
+
+In general, the transcripts not detected by teloprime show a lower expression in the
+illumina libraries compared to the transcripts detected by both mehtods.
+
+### Detected by teloprime but not by illumina
+
+```{r}
+df <- teloprime_tx %>% 
+    select(-mgi_symbol, -gene_name) %>%
+    as.data.frame() %>%
+    magrittr::set_rownames(.$gene_id_ens) %>%
+    `[`( ,-1) %>%
+    data.matrix() %>% 
+    (function(x) exp(rowMeans(log(x), na.rm = TRUE))) %>% 
+    tibble::enframe("ensembl_transcript_id_version", "average_counts") %>% 
+    mutate(
+        illumina = if_else(ensembl_transcript_id_version %in% detected_by_illumina, TRUE, FALSE),
+        teloprime = if_else(ensembl_transcript_id_version %in% detected_by_teloprime, TRUE, FALSE))
+
+df %>% 
+    filter(teloprime) %>%  
+    left_join(biomaRt_tx, by = "ensembl_transcript_id_version") %>% 
+    left_join(biotype_groups, by = "transcript_biotype") %>% 
+    filter(!grouped_biotype == c("small ncRNA")) %>% 
+    tidyr::drop_na(grouped_biotype) %>% 
+    mutate(illumina = factor(illumina, levels = c(TRUE, FALSE))) %>% 
+    ggplot(aes(grouped_biotype, average_counts)) +
+    geom_violin(aes(fill = illumina)) +
+    scale_y_log10() +
+    xlab(NULL) +
+    ylab("Average counts") +
+    theme_tufte() +
+    geom_rangeframe(sides = 'l') +
+    scale_fill_viridis_d()
+```
+
+## Genes
+
+```{r}
+detected_by_teloprime <- get_detectedTrancripts(teloprime_gene)
+detected_by_illumina <- get_detectedTrancripts(illumina_gene)
+
+euler(c("Teloprime" = length(detected_by_teloprime) - sum(detected_by_teloprime %in% detected_by_illumina),
+    "Illumina" = length(detected_by_illumina) - sum(detected_by_teloprime %in% detected_by_illumina),
+    "Teloprime&Illumina" = sum(detected_by_teloprime %in% detected_by_illumina))) %>% 
+    plot(quantities = list(type = "counts", fontfamily = "serif"),
+        labels = list(fontfamily = "serif"))
+```

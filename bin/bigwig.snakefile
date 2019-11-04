@@ -31,7 +31,7 @@ rule bamCoverage_stranded:
             --effectiveGenomeSize 2652783500 \
             --normalizeUsing BPM"
 
-rule merge_bam_ont:
+rule merge_bam_ont_genome:
     input:
         bam1 = "BAM/bam_ont/X1_flowcell/20190808_X1_genome_{barcode}_q7_sort.bam",
         bai1 = "BAM/bam_ont/X1_flowcell/20190808_X1_genome_{barcode}_q7_sort.bam.bai",
@@ -39,6 +39,17 @@ rule merge_bam_ont:
         bai2 = "BAM/bam_ont/X3_flowcell/20190808_X3_genome_{barcode}_q7_sort.bam.bai"
     output:
         "BAM/bam_ont/{barcode}.bam"
+    shell:
+        "samtools merge {output} {input.bam1} {input.bam2}"
+
+rule merge_bam_ont_transcriptome:
+    input:
+        bam1 = "BAM/bam_ont/X1_flowcell/20190808_X1_transcriptome_{barcode}_q7_sort.bam",
+        bai1 = "BAM/bam_ont/X1_flowcell/20190808_X1_transcriptome_{barcode}_q7_sort.bam.bai",
+        bam2 = "BAM/bam_ont/X3_flowcell/20190808_X3_transcriptome_{barcode}_q7_sort.bam",
+        bai2 = "BAM/bam_ont/X3_flowcell/20190808_X3_transcriptome_{barcode}_q7_sort.bam.bai"
+    output:
+        "BAM/bam_ont/{barcode}_transcriptome.bam"
     shell:
         "samtools merge {output} {input.bam1} {input.bam2}"
 

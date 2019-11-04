@@ -8,7 +8,7 @@ rule drimseq_ont_dtu:
         tpm = "data/scaledTPM_ont.rds",
         sample_info = "sample_info/sampleInfo.csv"
     output:
-        "res/dtu_ont/ont_dtu.html"
+        "res/dtu/dtu_ont/ont_dtu.html"
     script:
         "drimseq_ont.Rmd"
 
@@ -21,6 +21,6 @@ rule drimseq_all_dtu:
         tpm = "data/scaledTPM_all.rds",
         sample_info = "sample_info/sampleInfo.csv"
     output:
-        "res/dtu_all/all_dtu.html"
+        "res/dtu/dtu_all/all_dtu.html"
     script:
         "drimseq_all.Rmd"
