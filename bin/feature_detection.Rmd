@@ -41,7 +41,9 @@ biomaRt_tx <- read_rds(snakemake@input[["biomaRt_tx"]])
 biotype_groups <- read_csv(snakemake@input[["biotype_groups"]])
 ```
 
-# Number of mapped reads
+# Number of counts
+
+The counts are taken from the DESeq raw count files.
 
 ```{r mappedReads}
 read_teloprime <- teloprime_gene %>% 
@@ -72,6 +74,12 @@ reads_perLibrary %>%
     xlab(NULL) +
     ylab("Total counts") +
     scale_color_viridis_d()
+
+reads_perLibrary %>% 
+    select(sample, method, reads, condition_temp, teloprime_barcode = "ont") %>% 
+    tidyr::spread(method, reads) %>% 
+    knitr::kable(format = "html") %>%
+    kableExtra::kable_styling()
 ```
 
 Sophia reported the difference in the library size between the two conditions in

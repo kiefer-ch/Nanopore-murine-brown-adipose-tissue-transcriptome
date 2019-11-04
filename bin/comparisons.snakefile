@@ -33,8 +33,20 @@ rule feature_detection:
     script:
         "feature_detection.Rmd"
 
-rule readCharacteristics:
+rule countReads:
+    input:
+        "BAM/bam_ont/{barcode}_transcriptome.bam.bai",
+        "BAM/bam_ont/{barcode}.bam.bai",
+        bam_tx = "BAM/bam_ont/{barcode}_transcriptome.bam",
+        bam_genome = "BAM/bam_ont/{barcode}.bam"
+    output:
+        "data/countReads/{barcode}.rds"
+    script:
+        "count_reads.R"
 
+rule read_lengths:
+    input:
+        expand("data/countReads/{barcode}.rds", barcode=BARCODES)
 
 rule render_GOcomp:
     input:
