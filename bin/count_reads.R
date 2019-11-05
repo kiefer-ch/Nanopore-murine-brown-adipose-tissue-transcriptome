@@ -18,17 +18,18 @@ suppressPackageStartupMessages(library("GenomicAlignments"))
 ################################################################################
 
 # genome
-message("Preparing genome bam...")
-bam <- readGAlignments(snakemake@input[["bam_genome"]],
+message(sprintf("Loading %s...", snakemake@input[[1]]))
+bam <- readGAlignments(snakemake@input[[1]],
     use.names = TRUE,
     param = ScanBamParam(tag = c("NM"),
-        what = c("qname","flag", "rname", "pos", "mapq")))
+        what = c("qname","flag", "rname", "pos")))
 
 get_opts <- function(cigar, opts) {
     sum(as.numeric(gsub(paste0(opts, "$"), "", cigar)), na.rm = TRUE)
 }
 
-df_genome <- bam %>%
+message(sprintf("Processing %s...", snakemake@input[[1]]))
+bam %>%
     as_tibble() %>%
     select(qname, flag, qwidth, cigar, seqnames) %>%
     mutate(lengths = explodeCigarOpLengths(cigar),
@@ -38,45 +39,7 @@ df_genome <- bam %>%
     rowwise() %>%
     mutate(n_I = get_opts(cigar, "I"),
         n_M = get_opts(cigar, "M")) %>%
+    ungroup() %>%
     mutate(aligned = n_I + n_M) %>%
     select(-cigar, -n_I, -n_M) %>%
-    group_by(qname) %>%
-    summarise(n_primary_genome = sum(flag %in% c(0, 16)),
-        n_supplementary_genome = sum(flag %in% c(2048, 2064)),
-        qwidth_genome = max(qwidth),
-        qaligned_genome = max(aligned),
-        seqname_genome = dplyr::last(seqnames, order_by = qwidth))
-
-# transcriptome
-message("Preparing transcriptome bam...")
-bam <- readGAlignments(snakemake@input[["bam_tx"]],
-    use.names = TRUE,
-    param = ScanBamParam(tag = c("NM"),
-        what = c("qname","flag", "rname", "pos", "mapq")))
-
-df_transcriptome <- bam %>%
-    as_tibble() %>%
-    select(qname, flag, qwidth, cigar, seqnames) %>%
-    mutate(lengths = explodeCigarOpLengths(cigar),
-        values = explodeCigarOps(cigar)) %>%
-    mutate(cigar = relist(paste0(unlist(lengths), unlist(values)), values)) %>%
-    select(-lengths, -values) %>%
-    rowwise() %>%
-    mutate(n_I = get_opts(cigar, "I"),
-        n_M = get_opts(cigar, "M")) %>%
-    mutate(aligned = n_I + n_M) %>%
-    select(-cigar, -n_I, -n_M) %>%
-    group_by(qname) %>%
-    summarise(n_primary_tx = sum(flag %in% c(0, 16)),
-        n_secondary_tx = sum(flag %in% c(256, 272)),
-        n_supplementary_tx = sum(flag %in% c(2048, 2064)),
-        qwidth_tx = max(qwidth),
-        qaligned_tx = max(aligned),
-        seqname_tx = dplyr::last(seqnames, order_by = qwidth))
-
-# merge and export
-message("Exporting...")
-df_genome %>%
-    full_join(df_transcriptome, by = "qname") %>%
     saveRDS(snakemake@output[[1]])
-
