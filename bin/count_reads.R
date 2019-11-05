@@ -30,7 +30,7 @@ get_opts <- function(cigar, opts) {
 
 df_genome <- bam %>%
     as_tibble() %>%
-    select(qname, flag, qwidth, cigar) %>%
+    select(qname, flag, qwidth, cigar, seqnames) %>%
     mutate(lengths = explodeCigarOpLengths(cigar),
         values = explodeCigarOps(cigar)) %>%
     mutate(cigar = relist(paste0(unlist(lengths), unlist(values)), values)) %>%
@@ -44,7 +44,8 @@ df_genome <- bam %>%
     summarise(n_primary_genome = sum(flag %in% c(0, 16)),
         n_supplementary_genome = sum(flag %in% c(2048, 2064)),
         qwidth_genome = max(qwidth),
-        qaligned_genome = max(aligned))
+        qaligned_genome = max(aligned),
+        seqname_genome = dplyr::last(seqnames, order_by = qwidth))
 
 # transcriptome
 message("Preparing transcriptome bam...")
@@ -55,7 +56,7 @@ bam <- readGAlignments(snakemake@input[["bam_tx"]],
 
 df_transcriptome <- bam %>%
     as_tibble() %>%
-    select(qname, flag, qwidth, cigar) %>%
+    select(qname, flag, qwidth, cigar, seqnames) %>%
     mutate(lengths = explodeCigarOpLengths(cigar),
         values = explodeCigarOps(cigar)) %>%
     mutate(cigar = relist(paste0(unlist(lengths), unlist(values)), values)) %>%
@@ -70,7 +71,8 @@ df_transcriptome <- bam %>%
         n_secondary_tx = sum(flag %in% c(256, 272)),
         n_supplementary_tx = sum(flag %in% c(2048, 2064)),
         qwidth_tx = max(qwidth),
-        qaligned_tx = max(aligned))
+        qaligned_tx = max(aligned),
+        seqname_tx = dplyr::last(seqnames, order_by = qwidth))
 
 # merge and export
 message("Exporting...")

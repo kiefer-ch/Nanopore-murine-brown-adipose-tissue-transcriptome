@@ -33,7 +33,7 @@ rule feature_detection:
     script:
         "feature_detection.Rmd"
 
-rule countReads:
+rule count_reads:
     input:
         "BAM/bam_ont/{barcode}_transcriptome.bam.bai",
         "BAM/bam_ont/{barcode}.bam.bai",
