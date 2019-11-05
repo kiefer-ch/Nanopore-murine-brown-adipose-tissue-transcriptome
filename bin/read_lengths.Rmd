@@ -1,0 +1,116 @@
+---
+title: "Nanopore iBAT, Trascript detection"
+author: "Christoph Kiefer"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+    html_document:
+        toc: true
+editor_options:
+  chunk_output_type: console
+---
+
+```{r loadPackages}
+source("packrat/init.R")
+library("dplyr")
+library("readr")
+library("purrr")
+library("ggplot2")
+library("ggthemes")
+```
+
+```{r dataImport_tx}
+get_map_type <- function(flag) {
+    if_else(flag %in% c(0, 16), "primary",
+        if_else(flag %in% c(256, 275), "secondary", "supplementary"))
+}
+
+tx <- snakemake@input %>% 
+    unlist() %>% 
+    tibble::enframe() %>% 
+    filter(grepl("transcriptome", value)) %>% 
+    tibble::deframe()
+
+df_tx <- tx %>%
+    as.list() %>% 
+    set_names(tx) %>% 
+    map(read_rds) %>%     
+    map(mutate, type = get_map_type(flag)) %>% 
+    map(select, -seqnames) %>% 
+    bind_rows(.id = "sample") %>% 
+```
+
+# Transcriptome
+
+## Aligned length vs read length
+
+Primary hits only
+
+```{r}
+df_tx %>% 
+    filter(type == "primary") %>% 
+    ggplot(aes(qwidth, aligned)) +
+    geom_hex(aes(fill = ..density..), binwidth = .025) +
+    scale_x_log10() +
+    scale_y_log10() +
+    scale_fill_viridis_c(trans = "log") +
+    geom_abline(slope = 1) +
+    theme_tufte() +
+    geom_rangeframe(sides = "bl") +
+    xlab("Read Length") + 
+    ylab("Aligned Length") 
+```
+
+#```{r}
+#df_tx %>% 
+#    filter(type == "primary") %>%
+#    tidyr::drop_na() %>% 
+#    mutate(fraction = aligned / transcript_length) %>% 
+#    mutate(grouped_transcript_length = cut(transcript_length, 
+#            breaks = c(0, 500, 1000, 1500, 2000, 3000,
+#                4000, 5000, 7500, 123179))) %>% 
+#    ggplot(aes(grouped_transcript_length, fraction)) +
+#    geom_violin() +
+#    xlab("Transcript length") +
+#    ylab("Aligned lengt / transcript length") +
+#    theme_tufte() +
+#    geom_rangeframe(sides = 'l') +
+#    theme(axis.text.x = element_text(angle = 90, hjust = 1))
+#```
+
+# Genome
+
+```{r dataImport_genome}
+rm(df_tx)
+
+genome <- snakemake@input %>% 
+    unlist() %>% 
+    tibble::enframe() %>% 
+    filter(!grepl("transcriptome", value)) %>% 
+    tibble::deframe()
+
+df_genome <- genome %>%
+    as.list() %>% 
+    set_names(genome) %>% 
+    map(read_rds) %>%     
+    map(mutate, type = get_map_type(flag)) %>% 
+    bind_rows(.id = "sample")
+```
+
+## Aligned length vs read length
+
+Primary hits only
+
+```{r}
+df_genome %>% 
+    filter(type == "primary") %>% 
+    ggplot(aes(qwidth, aligned)) +
+    geom_hex(aes(fill = ..density..), binwidth = .025) +
+    scale_x_log10() +
+    scale_y_log10() +
+    scale_fill_viridis_c(trans = "log") +
+    geom_abline(slope = 1) +
+    theme_tufte() +
+    geom_rangeframe(sides = "bl") +
+    xlab("Read Length") + 
+    ylab("Aligned Length") 
+```

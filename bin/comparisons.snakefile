@@ -45,7 +45,12 @@ rule count_reads:
 rule read_lengths:
     input:
         expand("data/countReads/{barcode}.rds", barcode=BARCODES),
-        expand("data/countReads/{barcode}_transcriptome.rds", barcode=BARCODES)
+        expand("data/countReads/{barcode}_transcriptome.rds", barcode=BARCODES),
+        biomaRt_tx = "annotation/biomaRt_tx.rds"
+    output:
+        "res/comparisons/read_lengths.html"
+    script:
+        "read_lengths.Rmd"
 
 rule render_GOcomp:
     input:
