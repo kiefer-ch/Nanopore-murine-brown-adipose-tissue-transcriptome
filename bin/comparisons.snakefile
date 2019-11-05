@@ -33,7 +33,7 @@ rule feature_detection:
     script:
         "feature_detection.Rmd"
 
-rule count_reads:
+rule count_reads_bam:
     input:
         "BAM/bam_ont/{file}.bam",
         "BAM/bam_ont/{file}.bam.bai",
@@ -41,6 +41,15 @@ rule count_reads:
         "data/countReads/{file}.rds"
     script:
         "count_reads.R"
+
+rule count_reads_fastq_teloprime:
+    input:
+        expand("fastq/teloprime/X1_flowcell/{barcode}_q7.fastq.gz", barcode=BARCODES),
+        expand("fastq/teloprime/X3_flowcell/{barcode}_q7.fastq.gz", barcode=BARCODES)
+    output:
+        "data/countReads/teloprime_fastqReadLengths.csv"
+    script:
+        "fasta_counts.py"
 
 rule read_lengths:
     input:
