@@ -55,7 +55,7 @@ rule read_lengths:
     input:
         expand("data/countReads/{barcode}.rds", barcode=BARCODES),
         expand("data/countReads/{barcode}_transcriptome.rds", barcode=BARCODES),
-        biomaRt_tx = "annotation/biomaRt_tx.rds"
+        teloprime_readLengths = "data/countReads/teloprime_fastqReadLengths.csv"
     output:
         "res/comparisons/read_lengths.html"
     script:
