@@ -22,6 +22,7 @@ message(sprintf("Loading %s...", snakemake@input[[1]]))
 bam <- readGAlignments(snakemake@input[[1]],
     use.names = TRUE,
     param = ScanBamParam(tag = c("NM"),
+        scanBamFlag(isUnmappedQuery = NA),
         what = c("qname","flag", "rname", "pos")))
 
 get_opts <- function(cigar, opts) {

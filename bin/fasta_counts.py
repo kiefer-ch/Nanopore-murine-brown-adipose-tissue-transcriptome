@@ -12,8 +12,8 @@ import numpy as np
 
 df = pd.DataFrame({'read_length': []})
 
-for file in [snakemake.input]:
-
+for file in snakemake.input:
+    print(file)
     count = 0
     lengths = []
 
@@ -27,4 +27,4 @@ for file in [snakemake.input]:
     df_ = pd.DataFrame.from_records(data)
     df = pd.merge(df, df_, on='read_length', how='outer')
 
-df.to_csv(snakemake.output[0])
+df.to_csv(snakemake.output[0], index=False, na_rep='0')

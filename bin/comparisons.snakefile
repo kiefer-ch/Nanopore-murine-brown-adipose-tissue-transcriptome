@@ -44,8 +44,8 @@ rule count_reads_bam:
 
 rule count_reads_fastq_teloprime:
     input:
-        expand("fastq/teloprime/X1_flowcell/{barcode}_q7.fastq.gz", barcode=BARCODES),
-        expand("fastq/teloprime/X3_flowcell/{barcode}_q7.fastq.gz", barcode=BARCODES)
+        expand(
+            "fastq/teloprime/X{flowcell}_flowcell/{barcode}_q7.fastq.gz", barcode=BARCODES, flowcell=[1, 3])
     output:
         "data/countReads/teloprime_fastqReadLengths.csv"
     script:
