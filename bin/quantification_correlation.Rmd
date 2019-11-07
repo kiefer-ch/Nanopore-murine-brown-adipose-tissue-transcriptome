@@ -14,7 +14,7 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = FA
 ```
 
 ```{r}
-save.image("quantification_correlation.RData")
+#save.image("quantification_correlation.RData")
 ```
 
 ```{r loadPackages}
@@ -129,6 +129,37 @@ df %>%
     xlab("Average illumina tpm") +
     ylab("Average teloprime counts")
 ```
+
+#### Transcript length, only coding transcripts
+
+```{r transcripts_by_length}
+df %>% 
+    filter(transcript_biotype == "protein_coding") %>% 
+    filter(transcript_length < 10000) %>% 
+    tidyr::drop_na() %>% 
+    mutate(counts_teloprime = 2^counts_teloprime - 1) %>% 
+    ggplot(aes(counts_tpm, counts_teloprime)) +
+    geom_point(aes(colour = transcript_length)) +
+    geom_abline(slope = 1) +
+    stat_poly_eq(formula = y ~ x,
+            aes(label = paste(..rr.label.., sep = "~~~")),
+            parse = TRUE, family = "serif", size = 3, colour = "grey30",
+            label.x.npc = "left", label.y.npc = "top") +
+    scale_x_continuous(
+        breaks = c(.1, 1, 10, 100, 1000, 10000),
+        labels = function(x) signif(x),
+        trans = "mylog10") +
+    scale_y_continuous(
+        breaks = c(.1, 1, 10, 100, 1000, 10000),
+        labels = function(x) signif(x),
+        trans = "mylog10") +
+    scale_colour_viridis_c(trans = "log") +
+    theme_tufte() +
+    geom_rangeframe(sides = 'bl', na.rm = FALSE) +
+    xlab("Average illumina tpm") +
+    ylab("Average teloprime counts")
+```
+
 
 ```{r}
 df %>% 

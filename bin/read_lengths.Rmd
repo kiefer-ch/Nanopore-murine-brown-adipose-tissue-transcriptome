@@ -138,7 +138,6 @@ df_tx %>%
     ylab("Aligned read length")
 ```
 
-
 # Transcriptome
 
 ## Aligned length vs read length
