@@ -49,17 +49,26 @@ rule count_reads_fastq_teloprime:
     output:
         "data/countReads/teloprime_fastqReadLengths.csv"
     script:
-        "fasta_counts.py"
+        "fastq_counts.py"
 
 rule read_lengths:
     input:
         expand("data/countReads/{barcode}.rds", barcode=BARCODES),
         expand("data/countReads/{barcode}_transcriptome.rds", barcode=BARCODES),
-        teloprime_readLengths = "data/countReads/teloprime_fastqReadLengths.csv"
+        teloprime_readLengths = "data/countReads/teloprime_fastqReadLengths.csv",
+        annotation_txLengths = "data/annotation/transcripts_lengths.csv"
     output:
         "res/comparisons/read_lengths.html"
     script:
         "read_lengths.Rmd"
+
+rule count_txLength_reference:
+    input:
+        "annotation/transcripts.fa"
+    output:
+        "data/annotation/transcripts_lengths.csv"
+    script:
+        "fasta_tx_lengths.py"
 
 rule render_GOcomp:
     input:

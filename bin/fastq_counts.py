@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""fasta_counts.py: Count reads and readlengths of a fasta file."""
+"""fastq_counts.py: Count reads and readlengths of a fastq file."""
 
 __author__ = "Christoph Kiefer"
 __email__ = "christophak@bmb.sdu.dk"

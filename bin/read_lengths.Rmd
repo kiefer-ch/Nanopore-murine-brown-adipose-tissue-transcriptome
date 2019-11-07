@@ -48,12 +48,42 @@ df_tx <- tx %>%
     bind_rows(.id = "sample")
 ```
 
-```{r dataImport_fastq}
+```{r dataImport_fastqReadLengths}
 df <- read_csv(snakemake@input[["teloprime_readLengths"]]) %>%
     tidyr::gather("sample", "counts", -read_length) %>% 
     tidyr::separate(sample, c("waste1", "waste2", "flowcell", "waste3", "barcode"), 
         extra = "drop") %>% 
     select_at(vars(-matches("waste"))) 
+```
+
+```{r dataImport_referenceTxLengths}
+referenceTxLengths <- read_csv(snakemake@input[["annotation_txLengths"]]) %>% 
+    mutate(group = "gencode")
+```
+
+```{r dataImport_genome}
+genome <- snakemake@input %>% 
+    unlist() %>% 
+    tibble::enframe() %>% 
+    filter(!grepl("transcriptome", value)) %>% 
+    filter(!grepl("csv", value)) %>% 
+    tibble::deframe()
+
+df_genome <- genome %>%
+    as.list() %>% 
+    set_names(genome) %>% 
+    map(read_rds) %>%     
+    map(mutate, type = get_map_type(flag)) %>% 
+    map(select, -seqnames) %>% 
+    bind_rows(.id = "sample")
+
+mapping_df_genome <- df_genome %>% 
+    select(qname, type) %>% 
+    group_by(qname) %>% 
+    summarise(has_primary = any(type == "primary"),
+        has_supplementary = any(type == "supplementary"))
+
+rm(df_genome)
 ```
 
 # Length of reads per sample and flowcell
@@ -75,18 +105,42 @@ df %>%
     ylab("Read length")
 ```
 
+#### Compared with tx length from GENCODE annotation
+
+```{r}
+df %>% 
+    group_by(read_length) %>% 
+    summarise(n = sum(counts),
+        group = "teloprime") %>%
+    bind_rows(referenceTxLengths) %>%
+    group_by(group) %>% 
+    mutate(weight = n / sum(n)) %>% 
+    ungroup() %>% 
+    ggplot(aes(group, read_length, weight = weight)) +
+    geom_violin() +
+    scale_y_log10() +
+    scale_fill_viridis_d() +
+    theme_tufte() +
+    geom_rangeframe(sides = "l") +
+    xlab(NULL) + 
+    ylab("Read/transcript length")
+```
+
 # Reads and mapping
 
 ```{r}
-mapping_df <- df_tx %>% 
+mapping_df_tx <- df_tx %>% 
     select(qname, type) %>% 
     group_by(qname) %>% 
     summarise(has_primary = any(type == "primary"),
         has_supplementary = any(type == "supplementary"))
 
-mapping_df2 <- mapping_df %>% 
-    summarise(n_primary = sum(has_primary),
-        n_supplementary = sum(has_supplementary)) %>% 
+mapping_df2 <- mapping_df_tx %>% 
+    left_join(mapping_df_genome, by = "qname", suffix = c("_tx", "_genome")) %>% 
+    summarise(n_primary_genome = sum(has_primary_genome, na.rm = TRUE),
+        n_supplementary_genome = sum(has_supplementary_genome, na.rm = TRUE),
+        n_primary_transcriptome = sum(has_primary_tx, na.rm = TRUE),
+        n_supplementary_transcriptome = sum(has_supplementary_tx, na.rm = TRUE)) %>% 
     tidyr::gather("type", "count") %>% 
     add_row(type = "n_total", count = sum(df$counts)) %>% 
     mutate(method = "teloprime") %>% 
@@ -99,13 +153,18 @@ mapping_df2 %>%
     kableExtra::kable_styling()
 
 mapping_df2 %>% 
-    mutate(type = factor(type, levels = c("n_total", "n_primary", "n_supplementary"))) %>% 
+    mutate(type = factor(type, 
+        levels = c("n_total", "n_primary_genome", "n_supplementary_genome",
+            "n_primary_transcriptome", "n_supplementary_transcriptome"))) %>% 
     ggplot(aes(x = method, y = count,  fill = type)) +
     geom_bar(stat = "identity", position=position_dodge()) +
     theme_tufte() +
     geom_rangeframe(sides = "l") +
     xlab(NULL) + 
-    ylab("Reads")
+    ylab("Reads") +
+    scale_fill_viridis_d()
+
+rm(mapping_df_genome)
 ```
 
 ## Length of primary and supplementary reads
@@ -113,7 +172,7 @@ mapping_df2 %>%
 ```{r}
 df_tx %>% 
     select(-sample, -flag) %>% 
-    left_join(mapping_df, by = "qname") %>% 
+    left_join(mapping_df_tx, by = "qname") %>% 
     mutate(category = if_else(type == "supplementary", "supplementary",
         if_else(has_supplementary, "primary_with_supplementary", "primary_wo_supplementary"))) %>% 
     ggplot(aes(category, qwidth)) + 
@@ -126,7 +185,7 @@ df_tx %>%
 
 df_tx %>% 
     select(-sample, -flag) %>% 
-    left_join(mapping_df, by = "qname") %>% 
+    left_join(mapping_df_tx, by = "qname") %>% 
     mutate(category = if_else(type == "supplementary", "supplementary",
         if_else(has_supplementary, "primary_with_supplementary", "primary_wo_supplementary"))) %>% 
     ggplot(aes(category, aligned)) + 
@@ -160,24 +219,6 @@ df_tx %>%
 ```
 
 # Genome
-
-```{r dataImport_genome, eval=FALSE}
-rm(df_tx)
-
-genome <- snakemake@input %>% 
-    unlist() %>% 
-    tibble::enframe() %>% 
-    filter(!grepl("transcriptome", value)) %>% 
-    tibble::deframe()
-
-df_genome <- genome %>%
-    as.list() %>% 
-    set_names(genome) %>% 
-    map(read_rds) %>%     
-    map(mutate, type = get_map_type(flag)) %>% 
-    map(select, -seqnames) %>% 
-    bind_rows(.id = "sample")
-```
 
 ## Aligned length vs read length
 
