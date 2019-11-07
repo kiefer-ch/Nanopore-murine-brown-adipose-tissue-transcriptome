@@ -43,6 +43,11 @@ df[[6]] <- read_tsv(snakemake@input[["teloprime_dtu"]]) %>%
     rename(mgi_symbol = "GeneSymbol",
         ensembl_gene_id_version = "geneID",
         ensembl_transcript_id_version = "txID")
+
+teloprime_gene_counts <- read_csv(snakemake@input[["teloprime_counts"]])
+illumina_gene_counts <- read_csv(snakemake@input[["illumina_counts"]])
+
+biomart_gene <- read_rds(snakemake@input[["biomaRt_gene"]])
 ```
 
 ```{r mergeDatasets}
@@ -93,8 +98,11 @@ df %>%
     as.data.frame() %>% 
     magrittr::set_rownames(.$ensembl_gene_id_version) %>% 
     `[`(, -1) %>% 
-    upset(nsets = 8, nintersects = 20,
-        keep.order = TRUE, 
+    upset(sets = c("illumina_tx", "illumina_gene", "illumina_dtu_gene", "illumina_dtu_tx",
+        "teloprime_tx", "teloprime_gene", "teloprime_dtu_gene", "teloprime_dtu_tx"),
+        nsets = 8, keep.order = TRUE,
+        sets.bar.color = rep(c("red", "blue"), each = 4),
+        nintersects = 20,
         order.by = "freq")
 ```
 
@@ -102,3 +110,79 @@ The take home message is: There is not much overlap between the genes detected
 by ont and illumina.
 
 ## Only genes, that were detected by both datasets
+
+```{r}
+get_detectedTrancripts <- function(df, cutoff = 1) {
+    df %>% 
+        select(-mgi_symbol, -gene_name) %>%
+        as.data.frame() %>%
+        magrittr::set_rownames(.$gene_id_ens) %>%
+        `[`( ,-1) %>%
+        data.matrix() %>% 
+        rowSums() %>% 
+        (function(x) x >= cutoff) %>% 
+        tibble::enframe() %>% 
+        filter(value == TRUE) %>% 
+        pull(name)
+}
+```
+
+```{r}
+detected_by_teloprime <- get_detectedTrancripts(teloprime_gene_counts, cutoff = 10)
+detected_by_illumina <- get_detectedTrancripts(illumina_gene_counts, cutoff = 10)
+```
+
+```{r}
+df %>%
+    filter(ensembl_gene_id_version %in% detected_by_teloprime & 
+        ensembl_gene_id_version %in% detected_by_illumina) %>% 
+    mutate_if(is.numeric, function(x) tidyr::replace_na(x, 1)) %>% 
+    mutate_if(is.numeric, function(x) as.integer(x < .05)) %>%
+    tidyr::drop_na(ensembl_gene_id_version) %>%
+    as.data.frame() %>% 
+    magrittr::set_rownames(.$ensembl_gene_id_version) %>% 
+    `[`(, -1) %>% 
+    upset(sets = c("illumina_tx", "illumina_gene", "illumina_dtu_gene", "illumina_dtu_tx",
+        "teloprime_tx", "teloprime_gene", "teloprime_dtu_gene", "teloprime_dtu_tx"),
+        nsets = 8, keep.order = TRUE,
+        sets.bar.color = rep(c("red", "blue"), each = 4),
+        nintersects = 20,
+        order.by = "freq")
+```
+
+What is different between those genes significant in teloprime, illumina or both?
+
+```{r}
+df2 <- df %>%
+    filter(ensembl_gene_id_version %in% detected_by_teloprime & 
+        ensembl_gene_id_version %in% detected_by_illumina) %>% 
+    mutate_if(is.numeric, function(x) tidyr::replace_na(x, 1)) %>% 
+    mutate_if(is.numeric, function(x) x < .05) %>%
+    tidyr::drop_na(ensembl_gene_id_version) %>%
+    rowwise() %>% 
+    mutate(group = if_else(any(c(illumina_tx, illumina_gene) & any(teloprime_gene, teloprime_tx)), "both",
+        if_else(any(c(illumina_tx, illumina_gene)), "illumina", 
+            if_else(any(c(teloprime_tx, teloprime_gene)), "teloprime",
+                "not")))) %>% 
+    ungroup() %>% 
+    select(ensembl_gene_id_version, group) %>% 
+    mutate(group = as.factor(group))
+
+df2$group %>%
+    table()
+```
+
+```{r}
+df2 <- df2 %>% 
+    left_join(biomart_gene, by = "ensembl_gene_id_version")
+
+df2 %>% 
+    filter(group != "not") %>% 
+    ggplot(aes(group, fill = gene_biotype)) +
+    geom_bar(position = "fill")
+```
+
+Teloprime is picking up unprocessed pseudogenes (minimap2 likes to align without
+splicing. Error prone reads, ...)
+
+counts/tpm?

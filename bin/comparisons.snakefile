@@ -77,7 +77,10 @@ rule compare_differentialExpressionAnalysis:
         illumina_dtu = "res/drimseq/illumina/dtu_ont/stageR_drimseq_dtu.csv.gz",
         teloprime_tx = "res/deseq/teloprime/txlevel/teloprime_txlevel_de.csv.gz",
         teloprime_gene = "res/deseq/teloprime/genelevel/teloprime_genelevel_de.csv.gz",
-        teloprime_dtu = "res/wien/DRIMSeq_stageR/stageR/stageR_final_output_padj_GeneSymbols.tsv"
+        teloprime_dtu = "res/wien/DRIMSeq_stageR/stageR/stageR_final_output_padj_GeneSymbols.tsv",
+        teloprime_counts = "res/deseq/teloprime/genelevel/teloprime_genelevel_cm_cts.csv.gz",
+        illumina_counts = "res/deseq/illumina/genelevel_ont/genelevel_ont_cm_cts.csv.gz",
+        biomaRt_gene = "annotation/biomaRt_gene.rds"
     output:
         "res/comparisons/comparisons_dgeDteDtu.html"
     script:

@@ -88,11 +88,6 @@ teloprime dataset before.
 Comparing to the read numbers from teloprime, it seems, there are more counts 
 then reads! There might be some problem with multimappers (primary, secondary hits)!
 
-```{r}
-
-```
-
-
 # Saturation curve
 
 ```{r}
