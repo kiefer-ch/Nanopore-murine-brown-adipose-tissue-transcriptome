@@ -1,7 +1,7 @@
 ---
 title: "Comparison of DGE, DTE and DTU"
 author: "Christoph Kiefer"
-date: "07. 10. 2019"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: 
     html_document:
         toc: true
@@ -9,11 +9,12 @@ editor_options:
   chunk_output_type: console
 ---
 
-```{r setup, include=FALSE, cache=FALSE}
+```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = FALSE)
 ```
 
-```{r library, include=FALSE, cache=FALSE}
+```{r library, include=FALSE}
+source("packrat/init.R")
 library("dplyr")
 library("readr")
 library("purrr")
@@ -34,13 +35,15 @@ illumina_tx <- "../res/txlevel_ont/txlevel_ont_de.csv.gz"
 illumina_gene <- "../res/genelevel_ont/genelevel_ont_de.csv.gz"
 illumina_dtu <- "../res/dtu_ont/stageR_drimseq_dtu.csv.gz"
 
-data <- c(illumina_tx, illumina_gene, illumina_dtu) %>% 
+data <- c(snakemake@input[["illumina_tx"]], 
+        snakemake@input[["illumina_gene"]], 
+        snakemake@input[["illumina_dtu"]]) %>% 
     map(read_csv)
 ```
 
 ```{r dataImport_ont}
 # dtu
-ont_dtu <- read_tsv(("../res/wien/DRIMSeq_stageR/stageR/stageR_final_output_padj_GeneSymbols.tsv"))
+ont_dtu <- read_tsv((snakemake@input[["teloprime_dtu"]]))
 
 # read counts
 ont <- "../res/wien/6samples/ChrKiefer_6samples_raw_gene_counts.tsv"

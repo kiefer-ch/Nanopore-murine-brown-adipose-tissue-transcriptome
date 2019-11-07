@@ -9,6 +9,7 @@ suppressPackageStartupMessages(library("DESeq2"))
 suppressPackageStartupMessages(library("Mus.musculus"))
     select <- dplyr::select
     rename <- dplyr::rename
+BPPARAM = BiocParallel::MulticoreParam(snakemake@threads[[1]])
 
 ################################################################################
 #
@@ -16,8 +17,6 @@ suppressPackageStartupMessages(library("Mus.musculus"))
 # email: christophak@bmb.sdu.dk
 #
 ################################################################################
-
-save.image("deseq_teloprime.RData")
 
 # import data
 message("Import data...")
@@ -101,6 +100,33 @@ counts(dds, normalized = FALSE) %>%
     annotate_cm(keytype = "ENSEMBLTRANS") %>%
     write_csv(snakemake@output[["tx_cts"]])
 
+# dge analysis
+# run DESeq2
+colData(dds)$condition_temp <- relevel(colData(dds)$condition_temp, ref = "22")
+dds <- dds[rowSums(counts(dds)) > 10, ] %>%
+    DESeq(., parallel = TRUE, BPPARAM = BPPARAM)
+
+# get results
+resLFC <- lfcShrink(dds,
+    coef = "condition_temp_4_vs_22",
+    lfcThreshold = 1,
+    type = "apeglm",
+    parallel = TRUE,
+    BPPARAM = BPPARAM) %>%
+    as_tibble(rownames = "ensembl_gene_id_version")
+
+# annotate
+biomaRt_gene <- read_rds(snakemake@input[["biomaRt_gene"]])
+resLFC <- resLFC %>%
+    left_join(biomaRt_gene, by = "ensembl_gene_id_version") %>%
+    select(ensembl_gene_id_version, mgi_symbol, description, gene_biotype,
+        baseMean, log2FoldChange, lfcSE, svalue)
+
+# export
+resLFC %>%
+    arrange(-abs(log2FoldChange)) %>%
+    write_csv(gzfile(snakemake@output[["gene_de"]]))
+
 ################################################################################
 # genelevel
 ################################################################################
@@ -162,3 +188,29 @@ counts(dds, normalized = FALSE) %>%
     as_tibble(rownames = "gene_id_ens") %>%
     annotate_cm() %>%
     write_csv(snakemake@output[["gene_cts"]])
+
+# run DESeq2
+colData(dds)$condition_temp <- relevel(colData(dds)$condition_temp, ref = "22")
+dds <- dds[rowSums(counts(dds)) > 10, ] %>%
+    DESeq(., parallel = TRUE, BPPARAM = BPPARAM)
+
+# get results
+resLFC <- lfcShrink(dds,
+    coef = "condition_temp_4_vs_22",
+    lfcThreshold = 1,
+    type = "apeglm",
+    parallel = TRUE,
+    BPPARAM = BPPARAM) %>%
+    as_tibble(rownames = "ensembl_transcript_id_version")
+
+# annotate
+biomaRt_tx <- read_rds(snakemake@input[["biomaRt_tx"]])
+resLFC <- resLFC %>%
+    left_join(biomaRt_tx, by = "ensembl_transcript_id_version") %>%
+    select(ensembl_transcript_id_version, ensembl_gene_id_version, mgi_symbol, description, gene_biotype,
+        baseMean, transcript_length, log2FoldChange,  lfcSE, svalue)
+
+# export
+resLFC %>%
+    arrange(-abs(log2FoldChange)) %>%
+    write_csv(gzfile(snakemake@output[["tx_de"]]))

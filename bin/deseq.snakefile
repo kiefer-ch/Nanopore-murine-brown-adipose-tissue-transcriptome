@@ -52,13 +52,18 @@ rule deseq_txlevel_all:
 rule deseq_teloprime:
     input:
         ont_gene_raw = "res/wien/6samples/ChrKiefer_6samples_raw_gene_counts.tsv",
-        sample_info = "sample_info/sampleInfo.csv"
+        sample_info = "sample_info/sampleInfo.csv",
+        biomaRt_tx = "annotation/biomaRt_tx.rds",
+        biomaRt_gene = "annotation/biomaRt_gene.rds"
+    threads: 4
     output:
         gene_rld = "res/deseq/teloprime/genelevel/teloprime_genelevel_cm_rld.csv.gz",
         gene_cts = "res/deseq/teloprime/genelevel/teloprime_genelevel_cm_cts.csv.gz",
         gene_ntd = "res/deseq/teloprime/genelevel/teloprime_genelevel_cm_ntd.csv.gz",
+        gene_de = "res/deseq/teloprime/genelevel/teloprime_genelevel_de.csv.gz",
         tx_ntd = "res/deseq/teloprime/txlevel/teloprime_txlevel_cm_ntd.csv.gz",
         tx_rld = "res/deseq/teloprime/txlevel/teloprime_txlevel_cm_rld.csv.gz",
-        tx_cts = "res/deseq/teloprime/txlevel/teloprime_txlevel_cm_cts.csv.gz"
+        tx_cts = "res/deseq/teloprime/txlevel/teloprime_txlevel_cm_cts.csv.gz",
+        tx_de = "res/deseq/teloprime/txlevel/teloprime_txlevel_de.csv.gz",
     script:
         "deseq_teloprime.R"

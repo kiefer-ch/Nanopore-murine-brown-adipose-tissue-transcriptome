@@ -70,6 +70,19 @@ rule count_txLength_reference:
     script:
         "fasta_tx_lengths.py"
 
+rule compare_differentialExpressionAnalysis:
+    input:
+        illumina_tx = "res/deseq/illumina/txlevel_ont/txlevel_ont_de.csv.gz",
+        illumina_gene = "res/deseq/illumina/genelevel_ont/genelevel_ont_de.csv.gz",
+        illumina_dtu = "res/drimseq/illumina/dtu_ont/stageR_drimseq_dtu.csv.gz",
+        teloprime_tx = "res/deseq/teloprime/txlevel_ont/txlevel_de.csv.gz"
+#        teloprime_gene =
+#        teloprime_dtu = "res/wien/DRIMSeq_stageR/stageR/stageR_final_output_padj_GeneSymbols.tsv"
+
+
+
+
+
 rule render_GOcomp:
     input:
         "res/txlevel_ont/txlevel_ont_de.csv.gz",
