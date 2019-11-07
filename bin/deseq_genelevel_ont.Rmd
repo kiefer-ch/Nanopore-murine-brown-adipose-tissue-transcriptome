@@ -614,11 +614,6 @@ res <- res %>%
     select(ensembl_gene_id_version, mgi_symbol, description, gene_biotype,
         baseMean, baseTPM, log2FoldChange,  lfcSE, pvalue, padj)
 
-# export
-res %>% 
-    arrange(-abs(log2FoldChange)) %>% 
-    write_csv(gzfile(file.path(res_folder, "genelevel_ont_de.csv.gz")))
-
 # filter and kable
 res_signif <- res %>% 
     filter(padj < .05) %>% 

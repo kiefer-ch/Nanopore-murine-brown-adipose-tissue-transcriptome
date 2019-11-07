@@ -27,7 +27,8 @@ sample_info <- read_csv(snakemake@input[["sample_info"]]) %>%
 
 # tidy rownames
 raw <- raw%>%
-    tidyr::separate(transcript, c("transcript_id_ens", "gene_id_ens"), sep = '\\|') %>%
+    tidyr::separate(transcript, c("transcript_id_ens", "gene_id_ens"),
+        sep = '\\|', extra = "drop") %>%
     tidyr::drop_na()
 
 # tidy colnames
@@ -113,19 +114,19 @@ resLFC <- lfcShrink(dds,
     type = "apeglm",
     parallel = TRUE,
     BPPARAM = BPPARAM) %>%
-    as_tibble(rownames = "ensembl_gene_id_version")
+    as_tibble(rownames = "ensembl_transcript_id_version")
 
 # annotate
-biomaRt_gene <- read_rds(snakemake@input[["biomaRt_gene"]])
+biomaRt_tx <- read_rds(snakemake@input[["biomaRt_tx"]])
 resLFC <- resLFC %>%
-    left_join(biomaRt_gene, by = "ensembl_gene_id_version") %>%
-    select(ensembl_gene_id_version, mgi_symbol, description, gene_biotype,
-        baseMean, log2FoldChange, lfcSE, svalue)
+    left_join(biomaRt_tx, by = "ensembl_transcript_id_version") %>%
+    select(ensembl_transcript_id_version, ensembl_gene_id_version, mgi_symbol, description, gene_biotype,
+        baseMean, transcript_length, log2FoldChange,  lfcSE, svalue)
 
 # export
 resLFC %>%
     arrange(-abs(log2FoldChange)) %>%
-    write_csv(gzfile(snakemake@output[["gene_de"]]))
+    write_csv(gzfile(snakemake@output[["tx_de"]]))
 
 ################################################################################
 # genelevel
@@ -201,16 +202,16 @@ resLFC <- lfcShrink(dds,
     type = "apeglm",
     parallel = TRUE,
     BPPARAM = BPPARAM) %>%
-    as_tibble(rownames = "ensembl_transcript_id_version")
+    as_tibble(rownames = "ensembl_gene_id_version")
 
 # annotate
-biomaRt_tx <- read_rds(snakemake@input[["biomaRt_tx"]])
+biomaRt_gene <- read_rds(snakemake@input[["biomaRt_gene"]])
 resLFC <- resLFC %>%
-    left_join(biomaRt_tx, by = "ensembl_transcript_id_version") %>%
-    select(ensembl_transcript_id_version, ensembl_gene_id_version, mgi_symbol, description, gene_biotype,
-        baseMean, transcript_length, log2FoldChange,  lfcSE, svalue)
+    left_join(biomaRt_gene, by = "ensembl_gene_id_version") %>%
+    select(ensembl_gene_id_version, mgi_symbol, description, gene_biotype,
+        baseMean, log2FoldChange, lfcSE, svalue)
 
 # export
 resLFC %>%
     arrange(-abs(log2FoldChange)) %>%
-    write_csv(gzfile(snakemake@output[["tx_de"]]))
+    write_csv(gzfile(snakemake@output[["gene_de"]]))
