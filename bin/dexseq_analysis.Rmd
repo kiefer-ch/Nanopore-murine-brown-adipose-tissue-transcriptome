@@ -25,6 +25,10 @@ library("ggplot2")
 BPPARAM = BiocParallel::MulticoreParam(snakemake@threads[[1]])
 ```
 
+```{r}
+save.image()
+```
+
 ```{r importData}
 dxd <- readRDS(snakemake@input[["dxd"]])
 ```
@@ -106,10 +110,6 @@ res %>%
 dir.create(snakemake@params[["out_folder"]], showWarnings = FALSE)
 res %>% 
     write_csv(file.path(snakemake@params[["out_folder"]], "all_deu.csv.gz"))
-```
-
-```{r}
-save.image()
 ```
 
 ```{r plotGeneFunction}

@@ -1,0 +1,114 @@
+---
+title: "DESeq quality control"
+author: "Christoph Kiefer"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+    html_document:
+        toc: true
+editor_options:
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = FALSE)
+source("packrat/init.R")
+```
+
+```{r library, include=FALSE}
+library("dplyr")
+library("readr")
+library("ggplot2")
+library("ggthemes")
+library("RColorBrewer")
+library("pheatmap")
+library("DESeq2")
+```
+
+```{r importData}
+# import data
+dds <- readRDS(snakemake@input[[1]])
+rld <- rld <- rlog(dds, blind = FALSE)
+```
+
+# Quality control
+
+## Sampling depths
+
+Million counts.
+
+```{r samplingDepth1}
+# sampling depth, unnormalized
+sapply(split(colSums(counts(dds))/1e6, colData(dds)$condition_temp), summary)
+```
+
+```{r samplingDepth2}
+# normalized
+assay(rld) %>% 
+    as_tibble(rownames = "gene") %>% 
+    tidyr::gather("sample", "log2_norm_counts", -gene) %>% 
+    ggplot(aes(sample, log2_norm_counts)) +
+    geom_boxplot() +
+    ylab("log2_norm_counts (rlog transformation)") +
+    xlab(NULL)
+```
+
+## Sample distances
+
+```{r sampleDist}
+# calculate sample distances
+sampleDists <- dist(t(assay(rld)))
+sampleDistMatrix <- as.matrix(sampleDists)
+
+# colorscale for the heatmap
+colors <- colorRampPalette(rev(brewer.pal(9, "YlOrRd")))(255)
+
+# plot heatmap
+pl <- pheatmap(sampleDistMatrix,
+         annotation_col = colData(dds) %>%
+             as.data.frame() %>%
+             select(condition_temp, condition_cage, condition_room, condition_isolation, RIN),
+         clustering_distance_rows = sampleDists,
+         clustering_distance_cols = sampleDists,
+         col = colors,
+         border_color = NA,
+         fontfamily = "Palatino",
+         lwd = .2)
+
+pl
+```
+
+## Pca on rlog transformed counts
+
+```{r pca, echo=FALSE}
+# calculate pcs
+pca <- prcomp(t(assay(rld)), scale. = FALSE)
+
+# importance for labels of the plot
+importance <- summary(pca)[[6]]
+pca <- as_tibble(pca$x, rownames = "sample") %>%
+    left_join(as_tibble(colData(dds), rownames = "sample"), by = "sample")
+
+# plot against room/isolation
+# room and isolation are not independent
+ggplot(pca, aes(PC1, PC2, colour = condition_temp)) +
+    geom_point(aes(pch = condition_room), size = 2) +
+#    geom_text(aes(label = sample)) +
+    stat_ellipse(type = "norm", level = .68) +
+    theme_tufte() +
+    geom_rangeframe(colour = "black", sides = 'bl') +
+    scale_y_continuous(breaks = extended_range_breaks()(pca[, 3]),
+                       labels = function(x) round(x, 1),
+                       name = sprintf("PC2 (%s %% variance)",
+                                      round(importance[2,2] * 100, 1))) +
+    scale_x_continuous(breaks = extended_range_breaks()(pca[, 2]),
+                       labels = function(x) round(x, 1),
+                       name = sprintf("PC1 (%s %% variance)",
+                                      round(importance[2,1] * 100, 1))) +
+    scale_color_viridis_d()
+```
+
+# Session info
+
+```{r sessionInfo}
+sessionInfo()
+```

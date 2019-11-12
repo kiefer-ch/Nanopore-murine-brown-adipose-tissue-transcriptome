@@ -61,9 +61,19 @@ rule deseq_teloprime:
         gene_cts = "res/deseq/teloprime/genelevel/teloprime_genelevel_cm_cts.csv.gz",
         gene_ntd = "res/deseq/teloprime/genelevel/teloprime_genelevel_cm_ntd.csv.gz",
         gene_de = "res/deseq/teloprime/genelevel/teloprime_genelevel_de.csv.gz",
+        gene_dds = "res/deseq/teloprime/genelevel/teloprime_genelevel_dds.rds",
         tx_ntd = "res/deseq/teloprime/txlevel/teloprime_txlevel_cm_ntd.csv.gz",
         tx_rld = "res/deseq/teloprime/txlevel/teloprime_txlevel_cm_rld.csv.gz",
         tx_cts = "res/deseq/teloprime/txlevel/teloprime_txlevel_cm_cts.csv.gz",
         tx_de = "res/deseq/teloprime/txlevel/teloprime_txlevel_de.csv.gz",
+        tx_dds = "res/deseq/teloprime/txlevel/teloprime_txlevel_dds.rds"
     script:
         "deseq_teloprime.R"
+
+rule deseq_qc:
+    input:
+        dds = "{method}_dds.rds"
+    output:
+        "{method}_qc.html"
+    script:
+        "deseq_qc.Rmd"

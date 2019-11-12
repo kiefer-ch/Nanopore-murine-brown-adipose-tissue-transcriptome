@@ -80,11 +80,24 @@ rule compare_differentialExpressionAnalysis:
         teloprime_dtu = "res/wien/DRIMSeq_stageR/stageR/stageR_final_output_padj_GeneSymbols.tsv",
         teloprime_counts = "res/deseq/teloprime/genelevel/teloprime_genelevel_cm_cts.csv.gz",
         illumina_counts = "res/deseq/illumina/genelevel_ont/genelevel_ont_cm_cts.csv.gz",
-        biomaRt_gene = "annotation/biomaRt_gene.rds"
+        biomaRt_gene = "annotation/biomaRt_gene.rds",
+        grouped_biotypes = "data/biotype_groups.csv",
+        tpm_gene = "res/deseq/illumina/genelevel_ont/genelevel_ont_cm_tpm.csv.gz"
     output:
         "res/comparisons/comparisons_dgeDteDtu.html"
     script:
         "comparisons_dgeDteDtu.Rmd"
+
+rule browser_plots:
+    input:
+        txdb = "annotation/annotation_txdb.sqlite",
+        bw_folder = "BW",
+        biomaRt_tx = "annotation/biomaRt_tx.rds",
+        illumina_bam = "BAM/5035_S34_Aligned.sortedByCoord.out.bam",
+        teloprime_bam = "BAM/bam_ont/barcode02.bam"
+    script:
+        "browser_plots.R"
+
 
 rule render_GOcomp:
     input:

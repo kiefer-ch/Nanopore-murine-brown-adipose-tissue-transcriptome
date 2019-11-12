@@ -207,7 +207,7 @@ pca <- as_tibble(pca$x, rownames = "sample") %>%
 # plot against room/isolation
 # room and isolation are not independent
 ggplot(pca, aes(PC1, PC2, colour = condition_temp)) +
-    geom_point(aes(pch = condition_room), size = 1.5) +
+    geom_point(aes(pch = condition_room), size = 2) +
 #    geom_text(aes(label = sample)) +
     stat_ellipse(type = "norm", level = .68) +
     theme_tufte() +

@@ -50,6 +50,7 @@ raw_tx <- raw %>%
 dds <- DESeqDataSetFromMatrix(countData = raw_tx,
     colData = sample_info,
     design = ~ condition_temp)
+saveRDS(dds, snakemake@output[["tx_dds"]])
 
 ################################################################################
 # txlevel
@@ -146,6 +147,7 @@ raw_gene <- raw %>%
 dds <- DESeqDataSetFromMatrix(countData = raw_gene,
     colData = sample_info,
     design = ~ condition_temp)
+saveRDS(dds, snakemake@output[["gene_dds"]])
 
 # prepare countmatrices
 rld <- rlog(dds, blind = FALSE)

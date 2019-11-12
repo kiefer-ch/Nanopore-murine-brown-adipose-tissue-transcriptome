@@ -1,14 +1,16 @@
-rule tximport_gene_illumina:
+rule tximport_salmon_gene:
     input:
-        expand("salmon/{sample}/quant.sf", sample=SAMPLES),
-        annotation = "annotation/annotation.gtf",
+        salmon_out = expand("salmon/{sample}/quant.sf", sample=SAMPLES),
+        txdb = "annotation/annotation_txdb.sqlite",
         sample_info = "sample_info/sampleInfo.csv"
+    params:
+        level = "gene"
     output:
-        "data/dds_gencode.vM22_gene.rds"
+        "res/deseq/illumina/genelevel_all/illumina_genelevel_all_dds.rds"
     shell:
-        "bin/txImport.R {input.sample_info} {input.annotation} {output} --genelevel illumina"
+        "bin/txImport.R"
 
-rule tximport_transcript_illumina:
+rule tximport_salmon_transcript:
     input:
         expand("salmon/{sample}/quant.sf", sample=SAMPLES),
         annotation = "annotation/annotation.gtf",
@@ -17,26 +19,6 @@ rule tximport_transcript_illumina:
         "data/dds_gencode.vM22_transcript.rds"
     shell:
         "bin/txImport.R {input.sample_info} {input.annotation} {output} --txlevel illumina"
-
-rule tximport_gene_ont:
-    input:
-        expand("salmon/{sample}/quant.sf", sample=SAMPLES_ont),
-        annotation = "annotation/annotation.gtf",
-        sample_info = "sample_info/sampleInfo.csv"
-    output:
-        "data/dds_gencode.vM22_gene_ont.rds"
-    shell:
-        "bin/txImport.R {input.sample_info} {input.annotation} {output} --genelevel ont"
-
-rule tximport_transcript_ont:
-    input:
-        expand("salmon/{sample}/quant.sf", sample=SAMPLES_ont),
-        annotation = "annotation/annotation.gtf",
-        sample_info = "sample_info/sampleInfo.csv"
-    output:
-        "data/dds_gencode.vM22_transcript_ont.rds"
-    shell:
-        "bin/txImport.R {input.sample_info} {input.annotation} {output} --txlevel ont"
 
 rule tximport_dtu_ont:
     input:
