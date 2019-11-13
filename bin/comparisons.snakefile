@@ -88,6 +88,20 @@ rule compare_differentialExpressionAnalysis:
     script:
         "comparisons_dgeDteDtu.Rmd"
 
+rule compare_differentialExpressionAnalysis2:
+    input:
+        illumina_tx = "res/deseq/illumina/txlevel_ont/illumina_txlevel_ont_dds.rds",
+        illumina_gene = "res/deseq/illumina/genelevel_ont/illumina_genelevel_ont_dds.rds",
+        teloprime_tx = "res/deseq/teloprime/txlevel/teloprime_txlevel_dds.rds",
+        teloprime_gene = "res/deseq/teloprime/genelevel/teloprime_genelevel_dds.rds",
+        biomaRt_tx = "annotation/biomaRt_tx.rds",
+        biomaRt_gene = "annotation/biomaRt_gene.rds",
+        grouped_biotypes = "data/biotype_groups.csv"
+    output:
+        "res/comparisons/comparisons_dgeDteDtu_onlyDetectedByBoth.html"
+    script:
+        "comparisons_dgeDte_onlyDetectedByBoth.Rmd"
+
 rule browser_plots:
     input:
         txdb = "annotation/annotation_txdb.sqlite",

@@ -1,0 +1,137 @@
+---
+title: "Comparison of DGE, DTE and DTU"
+author: "Christoph Kiefer"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+    html_document:
+        toc: true
+editor_options:
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = FALSE)
+```
+
+```{r}
+save.image("dge.RData")
+```
+
+```{r library, include=FALSE}
+source("packrat/init.R")
+library("dplyr")
+library("readr")
+library("purrr")
+library("ggplot2")
+library("ggthemes")
+library("DESeq2")
+library("UpSetR")
+    select <- dplyr::select
+    rename <- dplyr::rename
+    BPPARAM = BiocParallel::MulticoreParam(snakemake@threads[[1]])
+```
+
+# Data Import
+
+```{r dataImport}
+data <- c(snakemake@input[["illumina_gene"]],
+        snakemake@input[["teloprime_gene"]],
+        snakemake@input[["illumina_tx"]],
+        snakemake@input[["teloprime_tx"]]) %>% 
+    set_names(., tools::file_path_sans_ext(basename(.))) %>% 
+    as.list() %>% 
+    map(read_rds) %>% 
+    map(estimateSizeFactors)
+
+biomart_tx <- read_rds(snakemake@input[["biomaRt_tx"]])
+biomart_gene <- read_rds(snakemake@input[["biomaRt_gene"]])
+```
+
+```{r subsetting}
+get_detectedFeatures <- function(dds, cutoff = 10) {
+    counts(dds) %>% 
+        rowSums() %>% 
+        (function(x) x >= cutoff) %>% 
+        tibble::enframe() %>% 
+        filter(value == TRUE) %>% 
+        pull(name)
+}
+
+# vector with all gene and trascript identifiers, that are identified in all 
+# respective data sets
+detected <- data %>%
+    map(get_detectedFeatures) %>% 
+    unlist() %>% 
+    tibble::enframe() %>% 
+    group_by(value) %>% 
+    summarise (n = n()) %>% 
+    filter(n == 2) %>% 
+    pull(value)
+
+filter_notDetected <- function(dds) {
+    keep <- rownames(counts(dds)) %in% detected
+    dds[keep,]
+}
+
+data <- data %>% 
+    map(filter_notDetected)
+```
+
+```{r runDeseq}
+set_reference <- function(dds) {
+    colData(dds)$condition_temp <- relevel(colData(dds)$condition_temp, ref = "22")
+    dds
+}
+
+data <- data %>% 
+    map(set_reference) %>% 
+    map(DESeq, parallel = TRUE, BPPARAM = BPPARAM) %>% 
+    map(lfcShrink,
+        coef = "condition_temp_4_vs_22",
+        lfcThreshold = 1,
+        type = "apeglm",
+        parallel = TRUE,
+        BPPARAM = BPPARAM) %>% 
+    map(as_tibble, rownames = "feature_id")
+```
+
+```{r collapseTanscripts}
+collapse_transcripts <- function(df) {
+    data[[3]] %>% 
+        left_join(biomart_tx, by = c("feature_id" = "ensembl_transcript_id_version")) %>% 
+        group_by(ensembl_gene_id_version) %>% 
+        summarise(baseMean = max(baseMean), log2FoldChange = max(log2FoldChange), lfcSE = min(lfcSE), svalue = min(svalue))
+}
+
+data <- data %>% 
+    map_at(vars(matches("txlevel")), collapse_transcripts) %>% 
+    map_at(vars(matches("genelevel")), rename, ensembl_gene_id_version = "feature_id")
+```
+
+```{r collapseForUpset}
+df <- data %>% 
+    map(select, ensembl_gene_id_version, svalue) %>% 
+    purrr::reduce(full_join, by = "ensembl_gene_id_version")
+
+colnames(df) <- c("ensembl_gene_id_version", "illumina_gene", "teloprime_gene", "illumina_tx", "teloprime_tx")
+
+df <- df %>% 
+    mutate_if(is.numeric, function(x) tidyr::replace_na(x, 1)) %>% 
+    mutate_if(is.numeric, function(x) as.integer(x < .05)) %>%
+    tidyr::drop_na(ensembl_gene_id_version) %>% 
+    as.data.frame() %>% 
+    magrittr::set_rownames(.$ensembl_gene_id_version) %>% 
+    `[`(, -1)
+```
+
+```{r}
+df %>% 
+    upset(sets = c("illumina_tx", "illumina_gene", 
+        "teloprime_tx", "teloprime_gene"),
+        nsets = 4, keep.order = TRUE,
+        sets.bar.color = rep(c("red", "blue"), each = 2),
+        nintersects = 20,
+        order.by = "freq")
+```
+
+

@@ -181,3 +181,11 @@ dev.off()
 pdf("ctcflos_bam.pdf", width = 12, height = 12 / 1.618)
     plot.bam(gene = "ENSMUSG00000087382.7", extend_right = 6000)
 dev.off()
+
+pdf("Gm15551.pdf", width = 12, height = 12 / 1.618)
+    plot.gene(gene = "ENSMUSG00000086679.2")
+dev.off()
+
+pdf("Gm15551.pdf", width = 12, height = 12 / 1.618)
+    plot.bam(gene = "ENSMUSG00000086679.2")
+dev.off()
