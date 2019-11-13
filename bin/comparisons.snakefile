@@ -105,10 +105,21 @@ rule compare_differentialExpressionAnalysis2:
 rule browser_plots:
     input:
         txdb = "annotation/annotation_txdb.sqlite",
-        bw_folder = "BW",
         biomaRt_tx = "annotation/biomaRt_tx.rds",
         illumina_bam = "BAM/5035_S34_Aligned.sortedByCoord.out.bam",
-        teloprime_bam = "BAM/bam_ont/barcode02.bam"
+        illumina_bam_warm = "BAM/5034_S33_Aligned.sortedByCoord.out.bam",
+        teloprime_bam = "BAM/bam_ont/barcode02.bam",
+        teloprime_bam_warm = "BAM/bam_ont/barcode01.bam"
+    params:
+        bw_folder = "BW"
+    output:
+        adcy3 = "res/browser_plots/adcy3.pdf",
+        adcy3_bam = "res/browser_plots/adcy3_bam.pdf",
+        adcy3_bam_ausschnitt = "res/browser_plots/adcy3_bam_ausschnitt.pdf",
+        ctcflos = "res/browser_plots/ctcflos.pdf",
+        ctcflos_bam = "res/browser_plots/ctcflos_bam.pdf",
+        gm15551 = "res/browser_plots/Gm15551.pdf",
+        gm15551_bam = "res/browser_plots/Gm15551_bam.pdf"
     script:
         "browser_plots.R"
 

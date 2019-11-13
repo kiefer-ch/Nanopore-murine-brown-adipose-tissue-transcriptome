@@ -101,7 +101,7 @@ plot.gene <- function(gene = "ENSMUSG00000020654.15", extend_right = 50) {
 }
 
 plot.bam <- function(gene = "ENSMUSG00000020654.15", extend_right = 50,
-        type = "both") {
+        type = "both", condition = "cold") {
     df <- AnnotationDbi::select(txdb, keys = gene,
             keytype = "GENEID",
             columns = c("TXCHROM", "TXSTART", "TXEND", "TXSTRAND")) %>%
@@ -126,8 +126,16 @@ plot.bam <- function(gene = "ENSMUSG00000020654.15", extend_right = 50,
         left_join(biomart, by = "ensembl_transcript_id_version") %>%
         pull(mgi_symbol)
 
+    if(condition == "cold") {
+        illumina_bam <- snakemake@input[["illumina_bam"]]
+        teloprime_bam <- snakemake@input[["teloprime_bam"]]
+    } else if (condition == "warm") {
+        illumina_bam <- snakemake@input[["illumina_bam_warm"]]
+        teloprime_bam <- snakemake@input[["teloprime_bam_warm"]]
+    }
+
     if (type %in% c("illumina", "both")) {
-        illumina <- AlignmentsTrack(snakemake@input[["illumina_bam"]],
+        illumina <- AlignmentsTrack(illumina_bam,
             isPaired = TRUE,
             genome = "mm10",
             name = "illumina",
@@ -138,10 +146,10 @@ plot.bam <- function(gene = "ENSMUSG00000020654.15", extend_right = 50,
     }
 
     if (type %in% c("teloprime", "both")) {
-        teloprime <- AlignmentsTrack(snakemake@input[["teloprime_bam"]],
+        teloprime <- AlignmentsTrack(teloprime_bam,
             isPaired = FALSE,
             genome = "mm10",
-            name = "telorprime",
+            name = "teloprime",
             chromosome = df$TXCHROM,
             start = df$TXSTART,
             end = df$TXEND,
@@ -150,11 +158,15 @@ plot.bam <- function(gene = "ENSMUSG00000020654.15", extend_right = 50,
 
     options(ucscChromosomeNames=FALSE)
 
-    plotTracks(list(
-            gtrack,
-    #        illumina,
-            teloprime,
-            atrack),
+    if (type == "both") {
+        tracklist <- list(gtrack, illumina, teloprime, atrack)
+    } else if (type == "illumina") {
+        tracklist <- list(gtrack, illumina, atrack)
+    } else if (type == "teloprime") {
+        tracklist <- list(gtrack, teloprime, atrack)
+    }
+
+    plotTracks(tracklist,
         transcriptAnnotation = "symbol",
         from = df$TXSTART,
         to = df$TXEND,
@@ -165,27 +177,97 @@ plot.bam <- function(gene = "ENSMUSG00000020654.15", extend_right = 50,
         min.height = 0, coverageHeight = 0.08, minCoverageHeight = 0)
 }
 
+plot.bam2 <- function(start, end, chr,
+        type = "both", condition = "cold") {
 
-pdf("adcy3.pdf", width = 12, height = 12 / 1.618)
+    sTrack <- SequenceTrack("annotation/genome.fa",
+        genome = "mm10", chromosome = chr)
+
+    gtrack <- GenomeAxisTrack(genome = "mm10", chromosome = chr)
+    atrack <- GeneRegionTrack(txdb, chromosome = chr,
+        from = start, to = end,
+        name = "GENCODE M23")
+    symbol(atrack) <- symbol(atrack) %>%
+        tibble::enframe() %>%
+        dplyr::select(ensembl_transcript_id_version = "value") %>%
+        left_join(biomart, by = "ensembl_transcript_id_version") %>%
+        pull(mgi_symbol)
+
+    if(condition == "cold") {
+        illumina_bam <- snakemake@input[["illumina_bam"]]
+        teloprime_bam <- snakemake@input[["teloprime_bam"]]
+    } else if (condition == "warm") {
+        illumina_bam <- snakemake@input[["illumina_bam_warm"]]
+        teloprime_bam <- snakemake@input[["teloprime_bam_warm"]]
+    }
+
+    if (type %in% c("illumina", "both")) {
+        illumina <- AlignmentsTrack(illumina_bam,
+            isPaired = TRUE,
+            genome = "mm10",
+            name = "illumina",
+            chromosome = chr,
+            start = start,
+            end = end,
+            referenceSequence = sTrack)
+    }
+
+    if (type %in% c("teloprime", "both")) {
+        teloprime <- AlignmentsTrack(teloprime_bam,
+            isPaired = FALSE,
+            genome = "mm10",
+            name = "teloprime",
+            chromosome = chr,
+            start = start,
+            end = end,
+            referenceSequence = sTrack)
+    }
+
+    options(ucscChromosomeNames=FALSE)
+
+    if (type == "both") {
+        tracklist <- list(gtrack, illumina, teloprime, atrack)
+    } else if (type == "illumina") {
+        tracklist <- list(gtrack, illumina, atrack)
+    } else if (type == "teloprime") {
+        tracklist <- list(gtrack, teloprime, atrack)
+    }
+
+    plotTracks(tracklist,
+        transcriptAnnotation = "symbol",
+        from = start,
+        to = end,
+        extend.left = 50,
+        extend.right = 50,
+        background.title = "darkblue",
+        fontsize = 15, cex.axis = .4,
+        min.height = 0, coverageHeight = 0.08, minCoverageHeight = 0)
+}
+
+pdf(snakemake@output[["adcy3"]], width = 12, height = 12 / 1.618)
     plot.gene()
 dev.off()
 
-pdf("adcy3_bam.pdf", width = 12, height = 12 / 1.618)
+pdf(snakemake@output[["adcy3_bam"]], width = 12, height = 12 / 1.618)
     plot.bam(type = "teloprime")
 dev.off()
 
-pdf("ctcflos.pdf", width = 12, height = 12 / 1.618)
+pdf(snakemake@output[["ctcflos"]], width = 12, height = 12 / 1.618)
     plot.gene(gene = "ENSMUSG00000087382.7",  extend_right = 6000)
 dev.off()
 
-pdf("ctcflos_bam.pdf", width = 12, height = 12 / 1.618)
+pdf(snakemake@output[["ctcflos_bam"]], width = 12, height = 12 / 1.618)
     plot.bam(gene = "ENSMUSG00000087382.7", extend_right = 6000)
 dev.off()
 
-pdf("Gm15551.pdf", width = 12, height = 12 / 1.618)
+pdf(snakemake@output[["gm15551"]], width = 12, height = 12 / 1.618)
     plot.gene(gene = "ENSMUSG00000086679.2")
 dev.off()
 
-pdf("Gm15551.pdf", width = 12, height = 12 / 1.618)
-    plot.bam(gene = "ENSMUSG00000086679.2")
+pdf(snakemake@output[["gm15551_bam"]], width = 12, height = 12 / 1.618)
+    plot.bam(gene = "ENSMUSG00000086679.2", condition = "warm")
+dev.off()
+
+pdf(snakemake@output[["adcy3_bam_ausschnitt"]], width = 12, height = 12 / 1.618)
+    plot.bam2(chr = "chr2", start = 173129106, end = 173130440)
 dev.off()
