@@ -1,5 +1,5 @@
 ---
-title: "Comparison of DGE, DTE and DTU"
+title: "Comparison of DGE, DTE and DTU, only genes/transcripts detected by all methods"
 author: "Christoph Kiefer"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: 
@@ -25,13 +25,13 @@ library("purrr")
 library("ggplot2")
 library("ggthemes")
 library("DESeq2")
+library("cowplot")
 library("UpSetR")
+library("topGO")
     select <- dplyr::select
     rename <- dplyr::rename
     BPPARAM = BiocParallel::MulticoreParam(snakemake@threads[[1]])
 ```
-
-# Data Import
 
 ```{r dataImport}
 data <- c(snakemake@input[["illumina_gene"]],
@@ -45,6 +45,8 @@ data <- c(snakemake@input[["illumina_gene"]],
 
 biomart_tx <- read_rds(snakemake@input[["biomaRt_tx"]])
 biomart_gene <- read_rds(snakemake@input[["biomaRt_gene"]])
+biotype_groups <- read_csv(snakemake@input[["grouped_biotypes"]]) %>% 
+    rename(gene_biotype = transcript_biotype)
 ```
 
 ```{r subsetting}
@@ -97,7 +99,7 @@ data <- data %>%
 
 ```{r collapseTanscripts}
 collapse_transcripts <- function(df) {
-    data[[3]] %>% 
+    df %>% 
         left_join(biomart_tx, by = c("feature_id" = "ensembl_transcript_id_version")) %>% 
         group_by(ensembl_gene_id_version) %>% 
         summarise(baseMean = max(baseMean), log2FoldChange = max(log2FoldChange), lfcSE = min(lfcSE), svalue = min(svalue))
@@ -108,9 +110,11 @@ data <- data %>%
     map_at(vars(matches("genelevel")), rename, ensembl_gene_id_version = "feature_id")
 ```
 
+# Upset
+
 ```{r collapseForUpset}
 df <- data %>% 
-    map(select, ensembl_gene_id_version, svalue) %>% 
+    map(dplyr::select, ensembl_gene_id_version, svalue) %>% 
     purrr::reduce(full_join, by = "ensembl_gene_id_version")
 
 colnames(df) <- c("ensembl_gene_id_version", "illumina_gene", "teloprime_gene", "illumina_tx", "teloprime_tx")
@@ -134,4 +138,144 @@ df %>%
         order.by = "freq")
 ```
 
+# Differences
+
+## Biotypes
+
+```{r}
+df %>% 
+    as_tibble(rownames = "ensembl_gene_id_version") %>% 
+    rowwise() %>% 
+    mutate(group = if_else(any(c(illumina_tx, illumina_gene) & any(teloprime_gene, teloprime_tx)), "both",
+        if_else(any(c(illumina_tx, illumina_gene)), "illumina", 
+            if_else(any(c(teloprime_tx, teloprime_gene)), "teloprime",
+                "not")))) %>% 
+    ungroup() %>% 
+    dplyr::select(ensembl_gene_id_version, group) %>% 
+    mutate(group = as.factor(group)) %>% 
+    left_join(biomart_gene, by = "ensembl_gene_id_version") %>% 
+    left_join(biotype_groups, by = "gene_biotype") %>% 
+    filter(group != "not") %>% 
+    ggplot(aes(group, fill = grouped_biotype)) +
+    geom_bar(position = "fill") +
+    theme_tufte() +
+    geom_rangeframe(sides = 'l') +
+    scale_fill_viridis_d() +
+    xlab(NULL) +
+    ylab("Fraction of significant genes")
+```
+
+## p-values
+
+```{r}
+# Scatter plot pvalues teloprime against illumina for features only significant
+# in teloprime. One plot for genes, on for transcripts.
+df <- data %>% 
+    map(dplyr::select, ensembl_gene_id_version, svalue) %>% 
+    purrr::reduce(full_join, by = "ensembl_gene_id_version")
+
+colnames(df) <- c("ensembl_gene_id_version", "illumina_gene", "teloprime_gene", "illumina_tx", "teloprime_tx")
+
+pl_genes <- df %>%
+    mutate_if(is.numeric, function(x) tidyr::replace_na(x, 1)) %>% 
+#    filter(teloprime_gene < .05 & illumina_gene > .05) %>% 
+    ggplot(aes(-log10(teloprime_gene), -log10(illumina_gene))) +
+    geom_point() +
+    geom_vline(xintercept = -log10(.05), lty = 2) +
+    geom_hline(yintercept = -log10(.05), lty = 2) +
+    theme_tufte() +
+    geom_rangeframe() +
+    xlim(0,10) +
+    ylim(0,10)
+
+pl_tx <- df %>%
+    mutate_if(is.numeric, function(x) tidyr::replace_na(x, 1)) %>% 
+#    filter(teloprime_gene < .05 & illumina_gene > .05) %>% 
+    ggplot(aes(-log10(teloprime_tx), -log10(illumina_tx))) +
+    geom_point() +
+    geom_vline(xintercept = -log10(.05), lty = 2) +
+    geom_hline(yintercept = -log10(.05), lty = 2) +
+    theme_tufte() +
+    geom_rangeframe() +
+    xlim(0,10) +
+    ylim(0,10)
+
+plot_grid(pl_genes, pl_tx)
+```
+
+# List of genes only significant in teloprime
+
+```{r}
+df <- df %>% 
+    filter(teloprime_gene < .05 | teloprime_tx < .05) %>% 
+    filter(illumina_gene > .05) %>% 
+    filter(illumina_tx > .05) %>% 
+    left_join(biomart_gene, by = "ensembl_gene_id_version") %>% 
+    left_join(biotype_groups, by = "gene_biotype") %>% 
+    left_join(data$teloprime_genelevel_dds %>% dplyr::select(ensembl_gene_id_version, log2FoldChange, baseMean),
+        by = "ensembl_gene_id_version") %>% 
+    dplyr::select(ensembl_gene_id_version, mgi_symbol, description, gene_biotype, grouped_biotype,
+        baseMean, log2FoldChange, everything()) %>% 
+    arrange(desc(abs(log2FoldChange)))
+
+df %>% 
+    knitr::kable(format = "html") %>%
+    kableExtra::kable_styling() %>%
+    kableExtra::scroll_box(width = "100%", height = "600px")
+```
+
+## GO
+
+```{r goAnalysisFunctions}
+# reference for the GO analysis are all expressed genes
+get.geneList <- function(df) {
+    all_genes <- detected[grepl("ENSMUSG", detected)]
+    signif <- df %>% 
+        filter(teloprime_gene < .05 | teloprime_tx < .05) %>% 
+        filter(illumina_gene > .05) %>%
+        filter(illumina_tx > .05) %>% 
+        pull("ensembl_gene_id_version")
+    
+    gl <- as.factor(as.integer(all_genes %in% signif))
+    names(gl) <- all_genes
+    # remove version
+    names(gl) <- unlist(lapply(stringr::str_split(names(gl), "[.]"), "[[",1))
+    gl
+}
+
+# function to actually create topGO object
+make.topGO <- function(geneList, description = "Description") {
+    new("topGOdata",
+        description = description,
+        ontology = "BP",
+        allGenes = geneList,
+        nodeSize = 10,
+        annot = annFUN.org,
+        ID = "ensembl",
+        mapping = "org.Mm.eg")
+}
+
+# conveniance function to get results from topGO
+get.results <- function(topGO) {
+    topGOres <- runTest(topGO, algorithm = "parentchild", statistic = "fisher")
+    GenTable(topGO, p = topGOres, orderBy = "p", ranksOf = "p", topNodes = 500) %>%
+        as_tibble() %>%
+        mutate(p = as.double(p))
+}
+```
+
+```{r runGOanalysis}
+# run the analysis
+go <- df %>% 
+    get.geneList() %>% 
+    make.topGO() 
+
+go <- go %>% 
+    get.results()
+
+go %>% 
+    filter(p < .01) %>% 
+    knitr::kable(format = "html") %>%
+    kableExtra::kable_styling()
+```
 
