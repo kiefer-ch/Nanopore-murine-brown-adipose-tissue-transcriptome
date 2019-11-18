@@ -116,8 +116,10 @@ rule browser_plots:
         adcy3 = "res/browser_plots/adcy3.pdf",
         adcy3_bam = "res/browser_plots/adcy3_bam.pdf",
         adcy3_bam_ausschnitt = "res/browser_plots/adcy3_bam_ausschnitt.pdf",
+        cars2_bam = "res/browser_plots/cars2_bam.pdf",
         ctcflos = "res/browser_plots/ctcflos.pdf",
         ctcflos_bam = "res/browser_plots/ctcflos_bam.pdf",
+        dbi_bam = "res/browser_plots/dbi_bam.pdf",
         gm15551 = "res/browser_plots/Gm15551.pdf",
         gm15551_bam = "res/browser_plots/Gm15551_bam.pdf"
     script:

@@ -244,6 +244,71 @@ plot.bam2 <- function(start, end, chr,
         min.height = 0, coverageHeight = 0.08, minCoverageHeight = 0)
 }
 
+plot.bam3 <- function(gene = "ENSMUSG00000020654.15", extend_right = 50) {
+    df <- AnnotationDbi::select(txdb, keys = gene,
+            keytype = "GENEID",
+            columns = c("TXCHROM", "TXSTART", "TXEND", "TXSTRAND")) %>%
+        as_tibble() %>%
+        group_by(GENEID) %>%
+        summarise(TXCHROM = unique(TXCHROM),
+            TXSTART = min(TXSTART),
+            TXEND = max(TXEND),
+            TXSTRAND = unique(TXSTRAND))
+    strand <- ifelse(df$TXSTRAND == '+', "fw", "rv")
+
+    sTrack <- SequenceTrack("annotation/genome.fa",
+        genome = "mm10", chromosome = df$TXCHROM)
+
+    gtrack <- GenomeAxisTrack(genome = "mm10", chromosome = df$TXCHROM)
+    atrack <- GeneRegionTrack(txdb, chromosome = df$TXCHROM,
+        from = df$TXSTART, to = df$TXEND, strand = df$TXSTRAND,
+        name = "GENCODE M23")
+    symbol(atrack) <- symbol(atrack) %>%
+        tibble::enframe() %>%
+        dplyr::select(ensembl_transcript_id_version = "value") %>%
+        left_join(biomart, by = "ensembl_transcript_id_version") %>%
+        pull(mgi_symbol)
+
+    cold_bam <- snakemake@input[["teloprime_bam"]]
+    warm_bam <- snakemake@input[["teloprime_bam_warm"]]
+
+    teloprime_warm <- AlignmentsTrack(warm_bam,
+        isPaired = FALSE,
+        genome = "mm10",
+        name = "22°C",
+        chromosome = df$TXCHROM,
+        start = df$TXSTART,
+        end = df$TXEND,
+        referenceSequence = sTrack)
+
+    teloprime_cold <- AlignmentsTrack(cold_bam,
+        isPaired = FALSE,
+        genome = "mm10",
+        name = "4°C",
+        chromosome = df$TXCHROM,
+        start = df$TXSTART,
+        end = df$TXEND,
+        referenceSequence = sTrack)
+
+    options(ucscChromosomeNames = FALSE)
+
+    tracklist <- list(gtrack, teloprime_warm, teloprime_cold, atrack)
+
+    plotTracks(tracklist,
+        transcriptAnnotation = "symbol",
+        from = df$TXSTART,
+        to = df$TXEND,
+        extend.left = 50,
+        extend.right = extend_right,
+        background.title = "darkblue",
+        fontsize = 15, cex.axis = .4,
+        min.height = 0, coverageHeight = 0.08, minCoverageHeight = 0)
+}
+
+pdf(snakemake@output[["cars2_bam"]])
+    plot.bam3("ENSMUSG00000056228.10")
+dev.off()
+
 pdf(snakemake@output[["adcy3"]], width = 12, height = 12 / 1.618)
     plot.gene()
 dev.off()
@@ -271,3 +336,8 @@ dev.off()
 pdf(snakemake@output[["adcy3_bam_ausschnitt"]], width = 12, height = 12 / 1.618)
     plot.bam2(chr = "chr2", start = 173129106, end = 173130440)
 dev.off()
+
+pdf(snakemake@output[["dbi_bam"]])
+    plot.bam3("ENSMUSG00000026385.16")
+dev.off()
+
