@@ -17,12 +17,12 @@ rule star_index:
 rule star_align:
     input:
         genome = "indices/STAR/Genome",
-        fastq_fw = "fastq/trimmed/{sample}_R1_001_trimmed.fastq.gz",
-        fastq_rv = "fastq/trimmed/{sample}_R2_001_trimmed.fastq.gz"
+        fastq_fw = "fastq/illumina/trimmed/{sample}_R1_001_trimmed.fastq.gz",
+        fastq_rv = "fastq/illumina/trimmed/{sample}_R2_001_trimmed.fastq.gz"
     output:
-        "BAM/{sample}_Aligned.sortedByCoord.out.bam"
+        "bam/illumina/{sample}_Aligned.sortedByCoord.out.bam"
     params:
-        prefix = "BAM/{sample}_",
+        prefix = "bam/illumina/{sample}_",
         inputDir = "indices/STAR"
     threads: 20
     shell:

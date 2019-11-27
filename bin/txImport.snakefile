@@ -1,39 +1,36 @@
-rule tximport_salmon_gene:
+# deseq
+rule tximport_deseq_gene:
     input:
         salmon_out = expand("salmon/{sample}/quant.sf", sample=SAMPLES),
         txdb = "annotation/annotation_txdb.sqlite",
         sample_info = "sample_info/sampleInfo.csv"
     params:
-        level = "gene"
+        txOut = 0,
+        design = "~condition_temp"
     output:
         "res/deseq/illumina/genelevel_all/illumina_genelevel_all_dds.rds"
-    shell:
-        "bin/txImport.R"
+    script:
+        "txImport_deseq.R"
 
-rule tximport_salmon_transcript:
+rule tximport_deseq_transcript:
     input:
-        expand("salmon/{sample}/quant.sf", sample=SAMPLES),
-        annotation = "annotation/annotation.gtf",
+        salmon_out = expand("salmon/{sample}/quant.sf", sample=SAMPLES),
+        txdb = "annotation/annotation_txdb.sqlite",
+        sample_info = "sample_info/sampleInfo.csv"
+    params:
+        txOut = 1,
+        design = "~condition_temp"
+    output:
+        "res/deseq/illumina/txlevel_all/illumina_txlevel_all_dds.rds"
+    script:
+        "txImport_deseq.R"
+
+# dexseq
+rule tximport_dexseq_illumina:
+    input:
+        salmone_out = expand("salmon/{sample}/quant.sf", sample=SAMPLES_ont),
         sample_info = "sample_info/sampleInfo.csv"
     output:
-        "data/dds_gencode.vM22_transcript.rds"
-    shell:
-        "bin/txImport.R {input.sample_info} {input.annotation} {output} --txlevel illumina"
-
-rule tximport_dtu_ont:
-    input:
-        expand("salmon/{sample}/quant.sf", sample=SAMPLES_ont),
-        "sample_info/sampleInfo.csv"
-    output:
-        "data/scaledTPM_ont.rds"
-    shell:
-        "bin/txImport_DTU.R {output} ont"
-
-rule tximport_dtu_all:
-    input:
-        expand("salmon/{sample}/quant.sf", sample=SAMPLES_ont),
-        "sample_info/sampleInfo.csv"
-    output:
-        "data/scaledTPM_all.rds"
-    shell:
-        "bin/txImport_DTU.R {output} illumina"
+        "res/dexseq/illumina/dexseq_scaledTPM.rds"
+    script:
+        "txImport_dexseq.R"

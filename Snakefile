@@ -41,7 +41,7 @@ rule all:
         "res/comparisons/feature_detection.html",
         "res/comparisons/quantification_correlation.html"
 
-rule all_align:
+rule illumina_align:
     input:
         expand("qc/RSeQC/bam_stat/{sample}", sample=SAMPLES),
         expand("qc/RSeQC/geneBody_coverage/{sample}.geneBodyCoverage.curves.pdf", sample=SAMPLES),
@@ -66,23 +66,25 @@ rule all_align:
     shell:
         "multiqc -f -z \
             -c bin/.multiqc.conf \
-            qc/fastqc/ BAM/ salmon/ qc/RSeQC \
+            qc/fastqc/ qc/cutadapt bam/illumina/ salmon/ qc/RSeQC \
             -o qc \
             -n multiqc_aligned"
 
-rule all_trimm:
+rule illumina_trimm:
     input:
+        expand("fastq/illumina/trimmed/{sample}_R1_001_trimmed.fastq.gz", sample=SAMPLES),
+        expand("fastq/illumina/trimmed/{sample}_R2_001_trimmed.fastq.gz", sample=SAMPLES),
         expand("qc/fastqc/raw/{sample}_R1_001_fastqc.zip", sample=SAMPLES),
         expand("qc/fastqc/raw/{sample}_R2_001_fastqc.zip", sample=SAMPLES),
         expand("qc/fastqc/trimmed/{sample}_R1_001_trimmed_fastqc.zip", sample=SAMPLES),
-        expand("qc/fastqc/trimmed/{sample}_R2_001_trimmed_fastqc.zip", sample=SAMPLES)
+        expand("qc/fastqc/trimmed/{sample}_R2_001_trimmed_fastqc.zip", sample=SAMPLES),
     output:
-        "qc/multiqc_trimmed.html"
+        "qc/multiqc_trimmed.html",
         "qc/multiqc_trimmed_data.zip"
     shell:
         "multiqc -f -z \
-            -c bin/.multiqc.conf \
-            qc/fastqc \
+            -c bin/multiqc.conf \
+            qc/fastqc qc/cutadapt \
             -o qc \
             -n multiqc_trimmed.html"
 

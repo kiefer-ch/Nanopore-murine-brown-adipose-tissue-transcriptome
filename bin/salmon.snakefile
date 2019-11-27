@@ -49,8 +49,8 @@ rule salmon_align:
         "indices/salmon/rsd.bin",
         "indices/salmon/sa.bin",
         "indices/salmon/txpInfo.bin",
-        fastq_fw = "fastq/trimmed/{sample}_R1_001_trimmed.fastq.gz",
-        fastq_rv = "fastq/trimmed/{sample}_R2_001_trimmed.fastq.gz"
+        fastq_fw = "fastq/illumina/trimmed/{sample}_R1_001_trimmed.fastq.gz",
+        fastq_rv = "fastq/illumina/trimmed/{sample}_R2_001_trimmed.fastq.gz"
     output:
         "salmon/{sample}/quant.sf"
     params:

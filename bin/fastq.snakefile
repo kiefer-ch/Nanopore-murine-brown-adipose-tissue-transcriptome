@@ -1,21 +1,14 @@
 # fastqc rules
-rule fastqc_raw:
+rule fastqc:
     input:
-        fastq_fw = "fastq/raw/{sample}_R1_001.fastq.gz",
-        fastq_rv = "fastq/raw/{sample}_R2_001.fastq.gz"
+        fastq = "fastq/illumina/{type}/{sample}_R1_001.fastq.gz"
     output:
-        "qc/fastqc/raw/{sample}_R1_001_fastqc.html",
-        "qc/fastqc/raw/{sample}_R1_001_fastqc.zip",
-        "qc/fastqc/raw/{sample}_R2_001_fastqc.html",
-        "qc/fastqc/raw/{sample}_R2_001_fastqc.zip"
+        "qc/fastqc/{type}/{sample}_fastqc.html",
+        "qc/fastqc/{type}/{sample}_fastqc.zip"
     params:
-        outputDir = "qc/fastqc/raw"
+        outputDir = "qc/fastqc/{type}"
     shell:
-        "fastqc {input.fastq_fw} \
-            --noextract \
-            --quiet \
-            -o {params.outputDir} && \
-        fastqc {input.fastq_rv} \
+        "fastqc {input.fastq} \
             --noextract \
             --quiet \
             -o {params.outputDir}"
@@ -23,11 +16,12 @@ rule fastqc_raw:
 # cutadapt rules
 rule cutadapt_trim:
     input:
-        fastq_fw = "fastq/raw/{sample}_R1_001.fastq.gz",
-        fastq_rv = "fastq/raw/{sample}_R2_001.fastq.gz"
+        fastq_fw = "fastq/illumina/raw/{sample}_R1_001.fastq.gz",
+        fastq_rv = "fastq/illumina/raw/{sample}_R2_001.fastq.gz"
     output:
-        fastq_fw = "fastq/trimmed/{sample}_R1_001_trimmed.fastq.gz",
-        fastq_rv = "fastq/trimmed/{sample}_R2_001_trimmed.fastq.gz"
+        fastq_fw = "fastq/illumina/trimmed/{sample}_R1_001_trimmed.fastq.gz",
+        fastq_rv = "fastq/illumina/trimmed/{sample}_R2_001_trimmed.fastq.gz",
+        report = "qc/cutadapt/{sample}.txt"
     threads: 5
     shell:
         "cutadapt \
@@ -38,25 +32,5 @@ rule cutadapt_trim:
             -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT \
             -o {output.fastq_fw} \
             -p {output.fastq_rv} \
-            {input.fastq_fw} {input.fastq_rv}"
-
-rule fastqc_trimmed:
-    input:
-        fastq_fw = "fastq/trimmed/{sample}_R1_001_trimmed.fastq.gz",
-        fastq_rv = "fastq/trimmed/{sample}_R2_001_trimmed.fastq.gz"
-    output:
-        "qc/fastqc/trimmed/{sample}_R1_001_trimmed_fastqc.html",
-        "qc/fastqc/trimmed/{sample}_R1_001_trimmed_fastqc.zip",
-        "qc/fastqc/trimmed/{sample}_R2_001_trimmed_fastqc.html",
-        "qc/fastqc/trimmed/{sample}_R2_001_trimmed_fastqc.zip"
-    params:
-        outputDir = "qc/fastqc/trimmed"
-    shell:
-        "fastqc {input.fastq_fw} \
-            --noextract \
-            --quiet \
-            -o {params.outputDir} && \
-        fastqc {input.fastq_rv} \
-            --noextract \
-            --quiet \
-            -o {params.outputDir}"
+            {input.fastq_fw} {input.fastq_rv} \
+            > {output.report}"

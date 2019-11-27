@@ -1,7 +1,7 @@
 # RSeQC rules
 rule rseqc_bamstat:
     input:
-        bam = "BAM/{sample}_Aligned.sortedByCoord.out.bam",
+        bam = "bam/illumina/{sample}_Aligned.sortedByCoord.out.bam",
     output:
         "qc/RSeQC/bam_stat/{sample}"
     params:
@@ -21,7 +21,7 @@ rule rseqc_junctionBED:
 
 rule rseqc_genebodyCoverage:
     input:
-        bam = "BAM/{sample}_Aligned.sortedByCoord.out.bam",
+        bam = "bam/illumina/{sample}_Aligned.sortedByCoord.out.bam",
         bed = "data/mm10_Gencode_vM20_gencode.bed"
     output:
         "qc/RSeQC/geneBody_coverage/{sample}.geneBodyCoverage.curves.pdf",
@@ -37,7 +37,7 @@ rule rseqc_genebodyCoverage:
 
 rule rseqc_readDuplication:
     input:
-        bam = "BAM/{sample}_Aligned.sortedByCoord.out.bam",
+        bam = "bam/illumina/{sample}_Aligned.sortedByCoord.out.bam",
         bed = "data/mm10_Gencode_vM20_gencode.bed"
     output:
         "qc/RSeQC/read_duplication/{sample}.DupRate_plot.pdf",
@@ -53,7 +53,7 @@ rule rseqc_readDuplication:
 
 rule rseqc_junctionAnnotation:
     input:
-        bam = "BAM/{sample}_Aligned.sortedByCoord.out.bam",
+        bam = "bam/illumina/{sample}_Aligned.sortedByCoord.out.bam",
         bed = "data/mm10_Gencode_vM20_gencode.bed"
     output:
         "qc/RSeQC/junction_annotation/{sample}",
@@ -73,7 +73,7 @@ rule rseqc_junctionAnnotation:
 
 rule rseqc_junctionSaturation:
     input:
-        bam = "BAM/{sample}_Aligned.sortedByCoord.out.bam",
+        bam = "bam/illumina/{sample}_Aligned.sortedByCoord.out.bam",
         bed = "data/mm10_Gencode_vM20_gencode.bed"
     output:
         "qc/RSeQC/junction_saturation/{sample}.junctionSaturation_plot.pdf",

@@ -1,19 +1,19 @@
 # Make bigwigs
-rule samtools_index_illumina:
+rule samtools_index:
     input:
-        "BAM/{sample}_Aligned.sortedByCoord.out.bam"
+        "{file}.bam"
     output:
-        "BAM/{sample}_Aligned.sortedByCoord.out.bam.bai"
+        "{file}.bam.bai"
     shell:
         "samtools index {input}"
 
 rule bamCoverage_stranded:
     input:
-        bam = "BAM/{sample}_Aligned.sortedByCoord.out.bam",
-        bai = "BAM/{sample}_Aligned.sortedByCoord.out.bam.bai"
+        bam = "bam/illumina/{sample}_Aligned.sortedByCoord.out.bam",
+        bai = "bam/illumina/{sample}_Aligned.sortedByCoord.out.bam.bai"
     output:
-        fw = "BW/{sample}_fw.bw",
-        rv = "BW/{sample}_rv.bw"
+        fw = "bw/illumina/{sample}_fw.bw",
+        rv = "bw_illumina/{sample}_rv.bw"
     threads: 10
     shell:
         "bamCoverage \
@@ -31,42 +31,25 @@ rule bamCoverage_stranded:
             --effectiveGenomeSize 2652783500 \
             --normalizeUsing BPM"
 
-rule merge_bam_ont_genome:
+rule merge_bam_teloprime:
     input:
-        bam1 = "BAM/bam_ont/X1_flowcell/20190808_X1_genome_{barcode}_q7_sort.bam",
-        bai1 = "BAM/bam_ont/X1_flowcell/20190808_X1_genome_{barcode}_q7_sort.bam.bai",
-        bam2 = "BAM/bam_ont/X3_flowcell/20190808_X3_genome_{barcode}_q7_sort.bam",
-        bai2 = "BAM/bam_ont/X3_flowcell/20190808_X3_genome_{barcode}_q7_sort.bam.bai"
+        bam1 = "bam/teloprime/X1_flowcell/20191107_X1_{type}_{barcode}_q7_sort.bam",
+        bai1 = "bam/teloprime/X1_flowcell/20191107_X1_{type}_{barcode}_q7_sort.bam.bai",
+        bam2 = "bam/teloprime/X3_flowcell/20191107_X3_{type}_{barcode}_q7_sort.bam",
+        bai2 = "bam/teloprime/X3_flowcell/20191107_X3_{type}_{barcode}_q7_sort.bam.bai"
+    wildcard_constraints:
+        type = "genome|transcriptome"
     output:
-        "BAM/bam_ont/{barcode}.bam"
+        "bam/teloprime/{barcode}_{type}.bam"
     shell:
         "samtools merge {output} {input.bam1} {input.bam2}"
-
-rule merge_bam_ont_transcriptome:
-    input:
-        bam1 = "BAM/bam_ont/X1_flowcell/20190808_X1_transcriptome_{barcode}_q7_sort.bam",
-        bai1 = "BAM/bam_ont/X1_flowcell/20190808_X1_transcriptome_{barcode}_q7_sort.bam.bai",
-        bam2 = "BAM/bam_ont/X3_flowcell/20190808_X3_transcriptome_{barcode}_q7_sort.bam",
-        bai2 = "BAM/bam_ont/X3_flowcell/20190808_X3_transcriptome_{barcode}_q7_sort.bam.bai"
-    output:
-        "BAM/bam_ont/{barcode}_transcriptome.bam"
-    shell:
-        "samtools merge {output} {input.bam1} {input.bam2}"
-
-rule samtools_index_ont:
-    input:
-        "BAM/bam_ont/{barcode}.bam"
-    output:
-        "BAM/bam_ont/{barcode}.bam.bai"
-    shell:
-        "samtools index {input}"
 
 rule bamCoverage_nonstranded:
     input:
-        bam = "BAM/bam_ont/{barcode}.bam",
-        bai = "BAM/bam_ont/{barcode}.bam.bai"
+        bam = "bam/teloprime/{barcode}_genome.bam",
+        bai = "bam/teloprime/{barcode}_genome.bam.bai"
     output:
-        "BW/bw_ont/{barcode}.bw"
+        "bw/teloprime/{barcode}.bw"
     threads: 10
     shell:
         "bamCoverage \
@@ -76,10 +59,11 @@ rule bamCoverage_nonstranded:
             --effectiveGenomeSize 2652783500  \
             --normalizeUsing BPM"
 
-rule makeHub_illumina:
+rule makeHub:
     input:
-        expand("BW/{sample}_fw.bw", sample=SAMPLES),
-        expand("BW/{sample}_rv.bw", sample=SAMPLES),
+        expand("bw/illumina/{sample}_fw.bw", sample=SAMPLES),
+        expand("bw/illumina/{sample}_rv.bw", sample=SAMPLES),
+        expand("bw/teloprime/{sample}.bw", sample=SAMPLES),
         sample_info = "sample_info/sampleInfo.csv"
     output:
         "nanoporeibat_hub/hub/hub.txt",

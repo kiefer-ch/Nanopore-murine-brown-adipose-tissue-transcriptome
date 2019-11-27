@@ -14,7 +14,7 @@ suppressPackageStartupMessages(library("dplyr"))
 ################################################################################
 
 message("Preparing tx2g...")
-tx2g <- AnnotationDbi::loadDb(path = snakemake@input[["txdb"]]) %>%
+tx2g <- AnnotationDbi::loadDb(snakemake@input[["txdb"]]) %>%
     AnnotationDbi::select(.,
         keys =  AnnotationDbi::keys(., keytype = "GENEID"),
         keytype = "GENEID",
@@ -27,7 +27,6 @@ message("Collecting sample info")
 sample_info <- suppressMessages(read_csv(snakemake@input[["sampleInfo"]])) %>%
     mutate_at(vars(matches("condition")), as.factor) %>%
     dplyr::select(sample = "sample_id", condition_temp)
-
 
 message("Calculating which transcripts should be kept...")
 # keep only those transcripts, that in at least one condition have more then
@@ -93,6 +92,3 @@ withr::with_options(c(scipen = 10),
         na = '.', quote = FALSE, sep = '\t'))
 
 message("Done")
-
-
-

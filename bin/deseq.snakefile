@@ -51,7 +51,7 @@ rule deseq_txlevel_all:
 # teloprime
 rule deseq_teloprime:
     input:
-        ont_gene_raw = "res/wien/6samples/ChrKiefer_6samples_raw_gene_counts.tsv",
+        ont_gene_raw = "res/wien/teloprime/DE/ONT_newbasecalling/ChrKiefer_6samples_raw_gene_counts.tsv",
         sample_info = "sample_info/sampleInfo.csv",
         biomaRt_tx = "annotation/biomaRt_tx.rds",
         biomaRt_gene = "annotation/biomaRt_gene.rds"
