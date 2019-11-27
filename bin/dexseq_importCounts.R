@@ -2,10 +2,11 @@
 
 # set libpaths to packrat local library
 source("packrat/init.R")
-
 suppressPackageStartupMessages(library("readr"))
 suppressPackageStartupMessages(library("dplyr"))
 suppressPackageStartupMessages(library("DEXSeq"))
+
+save.image("dexseq_import_illumina.RData")
 
 ################################################################################
 #
@@ -15,9 +16,15 @@ suppressPackageStartupMessages(library("DEXSeq"))
 ################################################################################
 message("Collecting sample info...")
 sample_info <- read_csv(snakemake@input[["sample_info"]]) %>%
-    filter(!is.na(illumina)) %>%
-    mutate_at(vars(matches("condition")), as.factor) %>%
-    mutate(path = file.path("dexseq", paste0(illumina, ".txt")))
+    filter(!is.na(ont)) %>%
+    mutate_at(vars(matches("condition")), as.factor)
+
+files <- snakemake@input[["files"]]
+files <- files[grep(paste(pull(sample_info, snakemake@params[["dataset"]]),
+    collapse = "|"), files)]
+
+sample_info <- sample_info %>%
+    mutate(path = files)
 
 message("Creating DEXSeqDataSet...")
 DEXSeqDataSetFromHTSeq(
@@ -28,3 +35,4 @@ DEXSeqDataSetFromHTSeq(
     saveRDS(snakemake@output[[1]])
 
 message("Done")
+

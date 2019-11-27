@@ -54,9 +54,11 @@ rule dexseq_count_nanopore:
 
 rule dexseq_importCounts_illumina:
     input:
-        expand("dexseq/illumina/{sample}.txt", sample=SAMPLES),
+        files = expand("dexseq/illumina/{sample}.txt", sample=SAMPLES),
         annotation = "indices/dexseq/annotation_flat.gff",
         sample_info = "sample_info/sampleInfo.csv"
+    params:
+        dataset = "illumina"
     output:
         "res/dexseq/illumina/illumina_dxd.rds",
     script:
@@ -64,9 +66,11 @@ rule dexseq_importCounts_illumina:
 
 rule dexseq_importCounts_teloprime:
     input:
-        expand("dexseq/teloprime/{barcode}.txt", barcode=BARCODES),
+        files = expand("dexseq/teloprime/{barcode}.txt", barcode=BARCODES),
         annotation = "indices/dexseq/annotation_flat.gff",
         sample_info = "sample_info/sampleInfo.csv"
+    params:
+        dataset = "ont"
     output:
         "res/dexseq/teloprime/teloprime_dxd.rds",
     script:
