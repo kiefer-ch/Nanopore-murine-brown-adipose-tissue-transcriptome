@@ -32,7 +32,7 @@ rule dexseq_count_illumina:
         dataSet = "illumina|teloprime"
     shell:
         "python3 bin/dexseq_count.py \
-            -p yes -s yes -f bam -r pos \
+            -p yes -s yes -f bam -r pos -a 2 \
             {input.annotation} \
             {input.bam} \
             {output}"
@@ -47,7 +47,7 @@ rule dexseq_count_nanopore:
         dataSet = "direct_cDNA|teloprime"
     shell:
         "python3 bin/dexseq_count.py \
-            -p no -s no -f bam -r pos \
+            -p no -s no -f bam -r pos -a 1 \
             {input.annotation} \
             {input.bam} \
             {output}"
@@ -76,18 +76,19 @@ rule dexseq_importCounts_teloprime:
     script:
         "dexseq_importCounts.R"
 
-rule dexseq_analyse:
+rule dexseq_analyse_illumina:
     threads:
         8
     input:
-        expand("BW/{sample}_fw.bw", sample=SAMPLES),
-        expand("BW/{sample}_rv.bw", sample=SAMPLES),
-        dxd = "data/dxd.rds",
-        txdb = "annotation/annotation_txdb.sqlite"
+        expand("bw/illumina/{sample}_fw.bw", sample=SAMPLES),
+        expand("bw/illumina/{sample}_rv.bw", sample=SAMPLES),
+        dxd = "res/dexseq/illumina/illumina_dxd.rds",
+        txdb = "annotation/annotation_txdb.sqlite",
+        biomaRt_gene = "annotation/biomaRt_gene.rds"
     params:
-        out_folder = "data/dexseq",
-        bw_folder = "BW"
+        out_folder = "res/dexseq/illumina",
+        bw_folder = "bw"
     output:
-        "res/dexseq/desxseq.html"
+        "res/dexseq/illumina/illumina_dexseq.html"
     script:
-        "dexseq_analysis.Rmd"
+        "dexseq_analysis_illumina.Rmd"

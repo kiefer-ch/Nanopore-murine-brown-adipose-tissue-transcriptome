@@ -6,8 +6,6 @@ suppressPackageStartupMessages(library("readr"))
 suppressPackageStartupMessages(library("dplyr"))
 suppressPackageStartupMessages(library("DEXSeq"))
 
-save.image("dexseq_import_illumina.RData")
-
 ################################################################################
 #
 # author: Christoph Kiefer
