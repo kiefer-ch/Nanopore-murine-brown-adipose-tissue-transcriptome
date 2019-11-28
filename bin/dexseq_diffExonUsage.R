@@ -12,7 +12,6 @@ BPPARAM = BiocParallel::MulticoreParam(snakemake@threads[[1]])
 # email: christophak@bmb.sdu.dk
 #
 ################################################################################
-save.image("dexseq.RData")
 
 message("Importing data...")
 dxd <- readRDS(snakemake@input[[1]])
@@ -29,10 +28,21 @@ dxd <- estimateExonFoldChanges(dxd, fitExpToVar = "condition_temp",
     BPPARAM = BPPARAM)
 
 message("Saving results to disc...")
-saveRDS(snakemake@output[["dxd"]])
+saveRDS(dxd, snakemake@output[["dxd"]])
 
 message("Generating report...")
 dxr <- DEXSeqResults(dxd)
-DEXSeqHTML(dxr, snakemake@output[["report"]])
+
+ensembl <- biomaRt::useMart("ensembl", dataset = "mmusculus_gene_ensembl")
+
+DEXSeqHTML(dxr,
+    path = dirname(snakemake@output[["report"]]),
+    file = basename(snakemake@output[["report"]]),
+    fitExpToVar = "condition_temp",
+    FDR = .05,
+    mart = ensembl,
+    filter = "ensembl_gene_id_version",
+    attributes = c("mgi_symbol","description"),
+    BPPARAM = BPPARAM)
 
 message("Done")

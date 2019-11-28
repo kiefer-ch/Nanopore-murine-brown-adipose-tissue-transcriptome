@@ -22,7 +22,20 @@ rule dexseq_prepareAnnotation:
             {input} \
             {output}"
 
-rule dexseq_count_illumina:
+rule dexseq_prepareAnnotation_featureCount:
+    input:
+        "indices/dexseq/annotation_prefiltered.gtf"
+    output:
+        gff = "indices/dexseq/annotation_flat_featureCounts.gff",
+        gtf = "indices/dexseq/annotation_flat_featureCounts.gtf"
+    shell:
+        "python3 bin/dexseq_prepare_annotation2.py \
+            --aggregate no \
+            -f {output.gtf}\
+            {input} \
+            {output.gff}"
+
+rule htseq_count_illumina:
     input:
         annotation = "indices/dexseq/annotation_flat.gff",
         bam = "bam/illumina/{sample}_Aligned.sortedByCoord.out.bam"
@@ -37,7 +50,7 @@ rule dexseq_count_illumina:
             {input.bam} \
             {output}"
 
-rule dexseq_count_nanopore:
+rule htseq_count_nanopore:
     input:
         annotation = "indices/dexseq/annotation_flat.gff",
         bam = "bam/{dataSet}/{sample}_genome.bam"
@@ -51,6 +64,26 @@ rule dexseq_count_nanopore:
             {input.annotation} \
             {input.bam} \
             {output}"
+
+rule featureCounts_count_teloprime:
+    input:
+        files = expand("bam/teloprime/{barcode}_genome.bam", barcode=BARCODES),
+        annotation = "indices/dexseq/annotation_flat_featureCounts.gtf",
+    threads:
+        40
+    output:
+        "res/dexseq/teloprime/teloprime_featureCounts.out"
+    shell:
+        "featureCounts --donotsort \
+            -L \
+            -f \
+            -O \
+            -s 0 \
+            -T {threads} \
+            -F GTF \
+            -a {input.annotation} \
+            -o {output} \
+            {input.files}"
 
 rule dexseq_importCounts_illumina:
     input:
@@ -75,6 +108,16 @@ rule dexseq_importCounts_teloprime:
         "res/dexseq/teloprime/teloprime_dxd.rds",
     script:
         "dexseq_importCounts.R"
+
+rule dexseq_importCounts_from_featureCounts:
+    input:
+        counts = "{file}_featureCounts.out",
+        annotation = "indices/dexseq/annotation_flat.gff",
+        sample_info = "sample_info/sampleInfo.csv"
+    output:
+        "{file}_dxd_featureCounts.rds",
+    script:
+        "dexseq_importCounts_from_featureCounts.R"
 
 rule dexseq_diffExonUsage:
     threads:
