@@ -76,30 +76,13 @@ rule dexseq_importCounts_teloprime:
     script:
         "dexseq_importCounts.R"
 
-rule dexseq_analyse_illumina:
+rule dexseq_diffExonUsage:
     threads:
         10
     input:
-        dxd = "res/dexseq/illumina/illumina_dxd.rds",
-        txdb = "annotation/annotation_txdb.sqlite",
-        biomaRt_gene = "annotation/biomaRt_gene.rds"
-    params:
-        out_folder = "res/dexseq/illumina"
+        "{file}_dxd.rds",
     output:
-        "res/dexseq/illumina/illumina_dexseq.html"
+        dxd = "{file}_dxd_diff.rds",
+        report = "{file}_dexseq.html"
     script:
-        "dexseq_analysis.Rmd"
-
-rule dexseq_analyse_teloprime:
-    threads:
-        10
-    input:
-        dxd = "res/dexseq/teloprime/teloprime_dxd.rds",
-        txdb = "annotation/annotation_txdb.sqlite",
-        biomaRt_gene = "annotation/biomaRt_gene.rds"
-    params:
-        out_folder = "res/dexseq/teloprime"
-    output:
-        "res/dexseq/teloprime/teloprime_dexseq.html"
-    script:
-        "dexseq_analysis.Rmd"
+        "dexseq_diffExonUsage.R"
