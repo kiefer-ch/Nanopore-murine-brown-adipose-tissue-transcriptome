@@ -112,10 +112,10 @@ rule dexseq_importCounts_teloprime:
 rule dexseq_importCounts_from_featureCounts:
     input:
         counts = "{file}_featureCounts.out",
-        annotation = "indices/dexseq/annotation_flat.gff",
+        annotation = "indices/dexseq/annotation_flat_featureCounts.gtf",
         sample_info = "sample_info/sampleInfo.csv"
     output:
-        "{file}_dxd_featureCounts.rds",
+        "{file}_featureCounts_dxd.rds",
     script:
         "dexseq_importCounts_from_featureCounts.R"
 
