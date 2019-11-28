@@ -32,7 +32,7 @@ rule dexseq_count_illumina:
         dataSet = "illumina|teloprime"
     shell:
         "python3 bin/dexseq_count.py \
-            -p yes -s yes -f bam -r pos -a 2 \
+            -p yes -s reverse -f bam -r pos -a 2 \
             {input.annotation} \
             {input.bam} \
             {output}"
@@ -78,17 +78,28 @@ rule dexseq_importCounts_teloprime:
 
 rule dexseq_analyse_illumina:
     threads:
-        8
+        10
     input:
-        expand("bw/illumina/{sample}_fw.bw", sample=SAMPLES),
-        expand("bw/illumina/{sample}_rv.bw", sample=SAMPLES),
         dxd = "res/dexseq/illumina/illumina_dxd.rds",
         txdb = "annotation/annotation_txdb.sqlite",
         biomaRt_gene = "annotation/biomaRt_gene.rds"
     params:
-        out_folder = "res/dexseq/illumina",
-        bw_folder = "bw"
+        out_folder = "res/dexseq/illumina"
     output:
         "res/dexseq/illumina/illumina_dexseq.html"
     script:
-        "dexseq_analysis_illumina.Rmd"
+        "dexseq_analysis.Rmd"
+
+rule dexseq_analyse_teloprime:
+    threads:
+        10
+    input:
+        dxd = "res/dexseq/teloprime/teloprime_dxd.rds",
+        txdb = "annotation/annotation_txdb.sqlite",
+        biomaRt_gene = "annotation/biomaRt_gene.rds"
+    params:
+        out_folder = "res/dexseq/teloprime"
+    output:
+        "res/dexseq/teloprime/teloprime_dexseq.html"
+    script:
+        "dexseq_analysis.Rmd"
