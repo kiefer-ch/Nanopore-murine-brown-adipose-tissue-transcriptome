@@ -119,5 +119,3 @@ dxr1 %>%
         theme_tufte() +
         theme(axis.text.x = element_text(angle = 90, hjust = 1))
 ```
-
-

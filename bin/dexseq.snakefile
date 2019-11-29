@@ -129,3 +129,14 @@ rule dexseq_diffExonUsage:
         report = "{file}_dexseq.html"
     script:
         "dexseq_diffExonUsage.R"
+
+rule dexseq_heatmap:
+    input:
+        dxd = "{file}_dxd_diff.rds",
+        biomaRt_gene = "annotation/biomaRt_gene.rds"
+    params:
+        pvalue_cutoff = .05
+    output:
+        "{file}_heatmap.html"
+    script:
+        "dexseq_heatmap.Rmd"
