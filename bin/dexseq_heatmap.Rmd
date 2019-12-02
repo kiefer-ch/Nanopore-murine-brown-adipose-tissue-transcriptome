@@ -80,6 +80,27 @@ df <- df %>%
     mutate(click = sprintf("window.open(\"%s%s\")",
         "http://www.ensembl.org/Mus_musculus/Gene/Summary?db=core;g=",
         ensembl_gene_id_version)) 
+
+# get strand information
+ensembl <- biomaRt::useMart("ensembl", dataset = "mmusculus_gene_ensembl")
+annotation <- biomaRt::getBM(
+        attributes = c("ensembl_gene_id_version", "strand"),
+        filters = "ensembl_gene_id_version",
+        values = unique(df$ensembl_gene_id_version),
+        mart = ensembl)
+
+df_list <- df %>% 
+    left_join(annotation, by = "ensembl_gene_id_version") %>%
+    split(., .$strand)
+
+df_list$`-1` <- df_list$`-1` %>% 
+    group_by(ensembl_gene_id_version) %>% 
+    arrange(exon_number, .by_group = TRUE) %>% 
+    mutate(exon_number = rev(exon_number)) %>% 
+    ungroup()
+
+df <- df_list %>% 
+    bind_rows()
 ```
 
 The fill colour represents the difference in exon usage between the two groups 
@@ -88,6 +109,10 @@ The fill colour represents the difference in exon usage between the two groups
 $$exonDifference = (exonExpression_{cold} - mean(exonExpression_{cold})) - (exonExpression_{warm} - mean(exonExpression_{warm}))$$
 
 Click on the rectangles to go to ENSEMBL.
+
+Contrary to the DEXSeq output, E001 is allways the first 5' exon, not the first 
+exon according to genomic coordinates.
+
 
 ```{r heatmap}
 p_order <- df %>% 
