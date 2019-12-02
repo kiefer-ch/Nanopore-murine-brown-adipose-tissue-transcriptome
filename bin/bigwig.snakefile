@@ -63,7 +63,7 @@ rule makeHub:
     input:
         expand("bw/illumina/{sample}_fw.bw", sample=SAMPLES),
         expand("bw/illumina/{sample}_rv.bw", sample=SAMPLES),
-        expand("bw/teloprime/{sample}.bw", sample=SAMPLES),
+        expand("bw/teloprime/{barcode}.bw", barcode=BARCODES),
         sample_info = "sample_info/sampleInfo.csv"
     output:
         "nanoporeibat_hub/hub/hub.txt",
