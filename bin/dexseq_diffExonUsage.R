@@ -2,6 +2,7 @@
 
 # set libpaths to packrat local library
 source("packrat/init.R")
+suppressPackageStartupMessages(library("dplyr"))
 suppressPackageStartupMessages(library("DEXSeq"))
     select <- dplyr::select
 BPPARAM = BiocParallel::MulticoreParam(snakemake@threads[[1]])
@@ -12,9 +13,35 @@ BPPARAM = BiocParallel::MulticoreParam(snakemake@threads[[1]])
 # email: christophak@bmb.sdu.dk
 #
 ################################################################################
+save.image("dexseq.RData")
 
 message("Importing data...")
 dxd <- readRDS(snakemake@input[[1]])
+
+message("Filtering lowly expressed genes...")
+df <- featureCounts(dxd) %>%
+    data.matrix() %>%
+    rowMeans() %>%
+    tibble::enframe() %>%
+    tidyr::separate(name, c("gene", "exon"), sep = ':', remove = FALSE) %>%
+    group_by(gene) %>%
+    mutate(is_expressed = value > 5) %>%
+    summarise(expressed_exons = sum(is_expressed))
+n_tot <- nrow(df)
+keep <- df %>%
+    filter(expressed_exons >= 2) %>%
+    pull(gene)
+message(sprintf("Removed %s out of %s genes because of low expression.",
+    n_tot - length(keep), n_tot))
+
+keep <- rownames(dxd) %>%
+    tibble::enframe() %>%
+    tidyr::separate(value, c("gene", "exon"),
+        sep = ':', remove = FALSE) %>%
+    mutate(expressed = if_else(gene %in% keep, TRUE, FALSE)) %>%
+    pull(expressed)
+
+dxd <- dxd[keep, ]
 
 message("Normalising...")
 dxd <- estimateSizeFactors(dxd)

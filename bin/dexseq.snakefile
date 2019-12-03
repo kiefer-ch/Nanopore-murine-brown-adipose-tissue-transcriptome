@@ -1,4 +1,4 @@
-rule dexseq_prefilterIsoforms:
+rule dexseq_prefilterIsoforms_illumina:
     input:
         annotation = "annotation/annotation.gtf",
         scaledTPM = "res/dexseq/illumina/dexseq_scaledTPM.rds",
@@ -11,23 +11,27 @@ rule dexseq_prefilterIsoforms:
     script:
         "dexseq_prefilterIsoforms.R"
 
+rule dexseq_prefilterIsoforms_teloprime:
+    input:
+        annotation = "annotation/annotation.gtf",
+        counts = "res/deseq/teloprime/txlevel/teloprime_txlevel_cm_ntd.csv.gz",
+        txdb = "annotation/annotation_txdb.sqlite",
+        sampleInfo = "sample_info/sampleInfo.csv"
+    params:
+        threshold = 15
+    output:
+        "indices/dexseq/annotation_teloprime_prefiltered.gtf"
+    script:
+        "dexseq_prefilterIsoforms_ont.R"
+
 rule dexseq_prepareAnnotation:
     input:
-        "indices/dexseq/annotation_prefiltered.gtf"
+        "indices/dexseq/annotation_{dataset}_prefiltered.gtf"
     output:
-        "indices/dexseq/annotation_flat.gff"
-    shell:
-        "python3 bin/dexseq_prepare_annotation.py \
-            --aggregate no \
-            {input} \
-            {output}"
-
-rule dexseq_prepareAnnotation_featureCount:
-    input:
-        "indices/dexseq/annotation_prefiltered.gtf"
-    output:
-        gff = "indices/dexseq/annotation_flat_featureCounts.gff",
-        gtf = "indices/dexseq/annotation_flat_featureCounts.gtf"
+        gff = "indices/dexseq/annotation_{dataset}_flat.gff",
+        gtf = "indices/dexseq/annotation_{dataset}_flat.gtf"
+    wildcard_constraints:
+        dataset = "illumina|teloprime"
     shell:
         "python3 bin/dexseq_prepare_annotation2.py \
             --aggregate no \
@@ -35,42 +39,12 @@ rule dexseq_prepareAnnotation_featureCount:
             {input} \
             {output.gff}"
 
-rule htseq_count_illumina:
-    input:
-        annotation = "indices/dexseq/annotation_flat.gff",
-        bam = "bam/illumina/{sample}_Aligned.sortedByCoord.out.bam"
-    output:
-        "dexseq/illumina/{sample}.txt"
-    wildcard_constraints:
-        dataSet = "illumina|teloprime"
-    shell:
-        "python3 bin/dexseq_count.py \
-            -p yes -s reverse -f bam -r pos -a 2 \
-            {input.annotation} \
-            {input.bam} \
-            {output}"
-
-rule htseq_count_nanopore:
-    input:
-        annotation = "indices/dexseq/annotation_flat.gff",
-        bam = "bam/{dataSet}/{sample}_genome.bam"
-    output:
-        "dexseq/{dataSet}/{sample}.txt"
-    wildcard_constraints:
-        dataSet = "direct_cDNA|teloprime"
-    shell:
-        "python3 bin/dexseq_count.py \
-            -p no -s no -f bam -r pos -a 1 \
-            {input.annotation} \
-            {input.bam} \
-            {output}"
-
 rule featureCounts_count_teloprime:
     input:
         files = expand("bam/teloprime/{barcode}_genome.bam", barcode=BARCODES),
-        annotation = "indices/dexseq/annotation_flat_featureCounts.gtf",
+        annotation = "indices/dexseq/annotation_teloprime_flat.gtf",
     threads:
-        40
+        20
     output:
         "res/dexseq/teloprime/teloprime_featureCounts.out"
     shell:
@@ -85,37 +59,34 @@ rule featureCounts_count_teloprime:
             -o {output} \
             {input.files}"
 
-rule dexseq_importCounts_illumina:
+rule featureCounts_count_illumina:
     input:
-        files = expand("dexseq/illumina/{sample}.txt", sample=SAMPLES),
-        annotation = "indices/dexseq/annotation_flat.gff",
-        sample_info = "sample_info/sampleInfo.csv"
-    params:
-        dataset = "illumina"
+        files = expand("bam/illumina/{sample}_Aligned.sortedByCoord.out.bam", sample=SAMPLES),
+        annotation = "indices/dexseq/annotation_illumina_flat.gtf",
+    threads:
+        20
     output:
-        "res/dexseq/illumina/illumina_dxd.rds",
-    script:
-        "dexseq_importCounts.R"
-
-rule dexseq_importCounts_teloprime:
-    input:
-        files = expand("dexseq/teloprime/{barcode}.txt", barcode=BARCODES),
-        annotation = "indices/dexseq/annotation_flat.gff",
-        sample_info = "sample_info/sampleInfo.csv"
-    params:
-        dataset = "ont"
-    output:
-        "res/dexseq/teloprime/teloprime_dxd.rds",
-    script:
-        "dexseq_importCounts.R"
+        "res/dexseq/illumina/illlumina_featureCounts.out"
+    shell:
+        "featureCounts --donotsort \
+            -s 2 -p \
+            -f \
+            -O \
+            -T {threads} \
+            -F GTF \
+            -a {input.annotation} \
+            -o {output} \
+            {input.files}"
 
 rule dexseq_importCounts_from_featureCounts:
     input:
-        counts = "{file}_featureCounts.out",
-        annotation = "indices/dexseq/annotation_flat_featureCounts.gtf",
+        counts = "res/dexseq/{dataset}/{dataset}_featureCounts.out",
+        annotation = "indices/dexseq/annotation_{dataset}_flat.gtf",
         sample_info = "sample_info/sampleInfo.csv"
+    wildcard_constraints:
+        dataset = "illumina|teloprime"
     output:
-        "{file}_featureCounts_dxd.rds",
+        "res/dexseq/{dataset}/{dataset}_dxd.rds",
     script:
         "dexseq_importCounts_from_featureCounts.R"
 
