@@ -20,7 +20,8 @@ rule star_align:
         fastq_fw = "fastq/illumina/trimmed/{sample}_R1_001_trimmed.fastq.gz",
         fastq_rv = "fastq/illumina/trimmed/{sample}_R2_001_trimmed.fastq.gz"
     output:
-        "bam/illumina/{sample}_Aligned.sortedByCoord.out.bam"
+        "bam/illumina/{sample}_Aligned.sortedByCoord.out.bam",
+        "bam/illumina/{sample}_SJ.out.tab"
     params:
         prefix = "bam/illumina/{sample}_",
         inputDir = "indices/STAR"

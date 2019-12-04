@@ -11,18 +11,20 @@ rule dexseq_prefilterIsoforms_illumina:
     script:
         "dexseq_prefilterIsoforms.R"
 
+
 rule dexseq_prefilterIsoforms_teloprime:
     input:
         annotation = "annotation/annotation.gtf",
-        counts = "res/deseq/teloprime/txlevel/teloprime_txlevel_cm_ntd.csv.gz",
         txdb = "annotation/annotation_txdb.sqlite",
-        sampleInfo = "sample_info/sampleInfo.csv"
+        counts = "res/deseq/teloprime/txlevel/teloprime_txlevel_cm_ntd.csv.gz",
+                sampleInfo = "sample_info/sampleInfo.csv"
     params:
         threshold = 15
     output:
         "indices/dexseq/annotation_teloprime_prefiltered.gtf"
     script:
         "dexseq_prefilterIsoforms_ont.R"
+
 
 rule dexseq_prepareAnnotation:
     input:
@@ -38,6 +40,7 @@ rule dexseq_prepareAnnotation:
             -f {output.gtf}\
             {input} \
             {output.gff}"
+
 
 rule featureCounts_count_teloprime:
     input:
@@ -59,9 +62,31 @@ rule featureCounts_count_teloprime:
             -o {output} \
             {input.files}"
 
+rule featureCounts_count_teloprime_flair:
+    input:
+        files = expand("bam/teloprime/{barcode}_genome.bam", barcode=BARCODES),
+        annotation = "flair/teloprime/flair.collapse.isoforms.gtf",
+    threads:
+        20
+    output:
+        "res/dexseq/teloprime_flair/teloprime_flair_featureCounts.out"
+    shell:
+        "featureCounts --donotsort \
+            -L \
+            -f \
+            -O \
+            -s 0 \
+            -T {threads} \
+            -F GTF \
+            -a {input.annotation} \
+            -o {output} \
+            {input.files}"
+
+
 rule featureCounts_count_illumina:
     input:
-        files = expand("bam/illumina/{sample}_Aligned.sortedByCoord.out.bam", sample=SAMPLES),
+        files = expand("bam/illumina/{sample}_Aligned.sortedByCoord.out.bam",
+                       sample=SAMPLES),
         annotation = "indices/dexseq/annotation_illumina_flat.gtf",
     threads:
         20
@@ -78,15 +103,28 @@ rule featureCounts_count_illumina:
             -o {output} \
             {input.files}"
 
+
 rule dexseq_importCounts_from_featureCounts:
     input:
-        counts = "res/dexseq/{dataset}/{dataset}_featureCounts.out",
+        counts = "res/dexseq/{dataset}/{dataset}_flair_featureCounts.out",
         annotation = "indices/dexseq/annotation_{dataset}_flat.gtf",
         sample_info = "sample_info/sampleInfo.csv"
     wildcard_constraints:
         dataset = "illumina|teloprime"
     output:
         "res/dexseq/{dataset}/{dataset}_dxd.rds",
+    script:
+        "dexseq_importCounts_from_featureCounts.R"
+
+rule dexseq_importCounts_from_featureCounts_flair:
+    input:
+        counts = "res/dexseq/{dataset}_flair/{dataset}_featureCounts.out",
+        annotation = "flair/{dataset}/flair.collapse.isoforms.gtf",
+        sample_info = "sample_info/sampleInfo.csv"
+    wildcard_constraints:
+        dataset = "illumina|teloprime"
+    output:
+        "res/dexseq/{dataset}_flair/{dataset}_flair_dxd.rds",
     script:
         "dexseq_importCounts_from_featureCounts.R"
 

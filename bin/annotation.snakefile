@@ -14,11 +14,11 @@ rule get_genome:
             - {GENOME_URL} \
             | gunzip > {output}"
 
-rule index_genome:
+rule index_fasta:
     input:
-        "annotation/genome.fa"
+        "{genome}.fa"
     output:
-        "annotation/genome.fa.fai"
+        "{genome}.fa.fai"
     shell:
         "samtools faidx {input}"
 
@@ -30,19 +30,19 @@ rule get_annotation:
             - {ANNOTATION_URL} \
             | gunzip > {output}"
 
-rule make_txdb:
+rule make_txdb_from_gtf:
     input:
-        "annotation/annotation.gtf"
+        "{annotation}.gtf"
     output:
-        "annotation/annotation_txdb.sqlite"
+        "{annotation}_txdb.sqlite"
     script:
         "txdb.R"
 
-rule sort_annotation:
+rule sort_gtf:
     input:
-        "annotation/annotation.gtf"
+        "{annotation}.gtf"
     output:
-        "annotation/annotation_sort.gtf"
+        "{annotation}_sort.gtf"
     shell:
         "bedtools sort -i {input} > {output}"
 
