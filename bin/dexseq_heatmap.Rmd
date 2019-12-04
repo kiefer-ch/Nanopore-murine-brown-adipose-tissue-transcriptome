@@ -134,7 +134,7 @@ pl <- df %>%
         size = .25) +
     scale_fill_viridis_c() +
     scale_colour_viridis_d() +
-    theme_tufte(base_size = 8) +
+    theme_tufte(base_size = 7) +
     theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
     xlab(NULL) +
     ylab(NULL)
