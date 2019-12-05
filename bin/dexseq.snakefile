@@ -62,26 +62,6 @@ rule featureCounts_count_teloprime:
             -o {output} \
             {input.files}"
 
-rule featureCounts_count_teloprime_flair:
-    input:
-        files = expand("bam/teloprime/{barcode}_genome.bam", barcode=BARCODES),
-        annotation = "flair/teloprime/flair.collapse.isoforms.gtf",
-    threads:
-        20
-    output:
-        "res/dexseq/teloprime_flair/teloprime_flair_featureCounts.out"
-    shell:
-        "featureCounts --donotsort \
-            -L \
-            -f \
-            -O \
-            -s 0 \
-            -T {threads} \
-            -F GTF \
-            -a {input.annotation} \
-            -o {output} \
-            {input.files}"
-
 
 rule featureCounts_count_illumina:
     input:
@@ -116,17 +96,6 @@ rule dexseq_importCounts_from_featureCounts:
     script:
         "dexseq_importCounts_from_featureCounts.R"
 
-rule dexseq_importCounts_from_featureCounts_flair:
-    input:
-        counts = "res/dexseq/{dataset}_flair/{dataset}_featureCounts.out",
-        annotation = "flair/{dataset}/flair.collapse.isoforms.gtf",
-        sample_info = "sample_info/sampleInfo.csv"
-    wildcard_constraints:
-        dataset = "illumina|teloprime"
-    output:
-        "res/dexseq/{dataset}_flair/{dataset}_flair_dxd.rds",
-    script:
-        "dexseq_importCounts_from_featureCounts.R"
 
 rule dexseq_diffExonUsage:
     threads:
@@ -139,6 +108,7 @@ rule dexseq_diffExonUsage:
     script:
         "dexseq_diffExonUsage.R"
 
+
 rule dexseq_heatmap:
     input:
         dxd = "{file}_dxd_diff.rds",
@@ -149,3 +119,4 @@ rule dexseq_heatmap:
         "{file}_heatmap.html"
     script:
         "dexseq_heatmap.Rmd"
+
