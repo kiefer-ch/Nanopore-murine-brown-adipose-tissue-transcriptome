@@ -1,4 +1,3 @@
-# DTU
 rule drimseq_ont_dtu:
     threads: 4
     params:
@@ -11,6 +10,7 @@ rule drimseq_ont_dtu:
         "res/drimseq/dtu_ont/ont_dtu.html"
     script:
         "drimseq_ont.Rmd"
+
 
 rule drimseq_all_dtu:
     threads: 4
@@ -25,6 +25,7 @@ rule drimseq_all_dtu:
     script:
         "drimseq_all.Rmd"
 
+
 rule drimseq_dmdsFromCountMatrix:
     input:
         txdb = "flair/{dataset}/flair.collapse.isoforms_txdb.sqlite",
@@ -36,6 +37,21 @@ rule drimseq_dmdsFromCountMatrix:
         dataset = "teloprime"
     script:
         "drimseq_dmdsFromCountMatrix.R"
+
+
+rule drimseq_stageR:
+    input:
+        dmds = "{file}_dmds.rds",
+        biomaRt_gene = "annotation/biomaRt_gene.rds",
+        biomaRt_tx = "annotation/biomaRt_tx.rds"
+    params:
+        out_folder = "{file}"
+    output:
+        "{file}_drimSeqStageR.html"
+    threads:
+        4
+    script:
+        "drimseq_stagerAnalysis.Rmd"
 
 rule drimseq_browserPlots:
     params:
@@ -49,3 +65,15 @@ rule drimseq_browserPlots:
         stageR_results = "res/wien/teloprime_old/DRIMSeq_stageR/stageR/stageR_final_output_padj_GeneSymbols.tsv"
     script:
         "drimseq_browserPlots.R"
+
+rule drimseq_browserPlots_flair:
+    params:
+        out_folder = "res/drimseq/teloprime_flair/browser_plots"
+    input:
+        genome = "annotation/genome.fa",
+        bw_warm = "bw/teloprime/barcode01.bw",
+        bw_cold = "bw/teloprime/barcode02.bw",
+        txdb = "flair/teloprime/flair.collapse.isoforms_txdb.sqlite",
+        stageR_results = "res/drimseq/teloprime_flair/teloprime_flair_drimSeqStageR.csv"
+    script:
+        "drimseq_browserPlots_flair.R"
