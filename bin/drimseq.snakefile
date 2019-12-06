@@ -25,6 +25,18 @@ rule drimseq_all_dtu:
     script:
         "drimseq_all.Rmd"
 
+rule drimseq_dmdsFromCountMatrix:
+    input:
+        txdb = "flair/{dataset}/flair.collapse.isoforms_txdb.sqlite",
+        counts = "flair/{dataset}/flair_teloprime_counts_matrix.tsv",
+        sample_info = "sample_info/sampleInfo.csv"
+    output:
+        "res/drimseq/{dataset}_flair/{dataset}_flair_dmds.rds"
+    wildcard_constraints:
+        dataset = "teloprime"
+    script:
+        "drimseq_dmdsFromCountMatrix.R"
+
 rule drimseq_browserPlots:
     params:
         out_folder = "res/drimseq/teloprime/browser_plots"

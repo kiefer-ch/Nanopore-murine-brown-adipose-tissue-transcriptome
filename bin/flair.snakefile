@@ -52,7 +52,8 @@ rule flair_correct:
 def get_flair_filenames_teloprime():
     files = list()
     for i in range(0, len(SAMPLES_ont)):
-        filename = "flair/teloprime/bed/corrected/{}_{}_all_corrected.psl".format(SAMPLES_ont[i], BARCODES[i])
+        filename = "flair/teloprime/bed/corrected/{}_{}_all_corrected.psl".format(
+            SAMPLES_ont[i], BARCODES[i])
         files.append(filename)
     return files
 
@@ -91,5 +92,37 @@ rule flair_collapse:
             -q {input.psl} \
             -t {threads} \
             -o {params.out_prefix} \
-            -s 10 \
+            -s 18 --stringent \
             --temp_dir ./"
+
+
+rule merge_teloprime_fastq:
+    input:
+        X1 = "fastq/teloprime/X1_flowcell/{barcode}_q7.fastq.gz",
+        X3 = "fastq/teloprime/X3_flowcell/{barcode}_q7.fastq.gz"
+    output:
+        temp("fastq/teloprime/merged/{barcode}_merged.fastq.gz")
+    shell:
+        "cat {input.X1} {input.X3} > {output}"
+
+
+rule flair_quantify:
+    input:
+        expand("fastq/teloprime/merged/{barcode}_merged.fastq.gz",
+               barcode=BARCODES),
+        reads_manifest = "sample_info/flair_{dataset}_readsManifest.tsv",
+        isoforms_fasta = "flair/{dataset}/flair.collapse.isoforms.fa"
+    output:
+        "flair/{dataset}/flair_teloprime_counts_matrix.tsv"
+    wildcard_constraints:
+        dataset = "teloprime"
+    threads:
+        40
+    shell:
+        "python2 ~/src/flair/flair.py quantify \
+            -r {input.reads_manifest} \
+            -i {input.isoforms_fasta} \
+            -o {output} \
+            -t {threads} \
+            --temp_dir ./ \
+            --trust_ends"
