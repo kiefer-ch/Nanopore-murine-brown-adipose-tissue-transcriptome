@@ -113,7 +113,7 @@ rule flair_quantify:
         reads_manifest = "sample_info/flair_{dataset}_readsManifest.tsv",
         isoforms_fasta = "flair/{dataset}/flair.collapse.isoforms.fa"
     output:
-        "flair/{dataset}/flair_teloprime_counts_matrix.tsv"
+        "flair/{dataset}/flair_{dataset}_counts_matrix.tsv"
     wildcard_constraints:
         dataset = "teloprime"
     threads:
