@@ -102,3 +102,5 @@ include: "bin/dexseq.snakefile"
 include: "bin/deseq.snakefile"
 include: "bin/drimseq.snakefile"
 include: "bin/flair.snakefile"
+include: "bin/chip.snakefile"
+
