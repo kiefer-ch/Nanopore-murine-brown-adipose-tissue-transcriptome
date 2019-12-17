@@ -2,12 +2,8 @@
 
 # set libpaths to packrat local library
 
-save.image("coverage.RData")
-
-message("Load packages...")
 source("packrat/init.R")
 suppressPackageStartupMessages(library("dplyr"))
-suppressPackageStartupMessages(library("purrr"))
 suppressPackageStartupMessages(library("GenomicAlignments"))
 
 ################################################################################
@@ -20,19 +16,15 @@ suppressPackageStartupMessages(library("GenomicAlignments"))
 ################################################################################
 
 # genome
-message(sprintf("Loading %s...", snakemake@input[[1]]))
-bam <- readGAlignments(snakemake@input[[1]],
-    use.names = TRUE,
-    param = ScanBamParam(tag = c("NM"),
-        scanBamFlag(isUnmappedQuery = NA),
-        what = c("qname","flag", "rname", "pos")))
-
 get_opts <- function(cigar, opts) {
     sum(as.numeric(gsub(paste0(opts, "$"), "", cigar)), na.rm = TRUE)
 }
 
-message(sprintf("Processing %s...", snakemake@input[[1]]))
-bam %>%
+readGAlignments(snakemake@input[[1]],
+    use.names = TRUE,
+    param = ScanBamParam(tag = c("NM"),
+        scanBamFlag(isUnmappedQuery = NA),
+        what = c("qname","flag", "rname", "pos"))) %>%
     as_tibble() %>%
     select(qname, flag, qwidth, cigar, seqnames) %>%
     mutate(lengths = explodeCigarOpLengths(cigar),
@@ -40,9 +32,9 @@ bam %>%
     mutate(cigar = relist(paste0(unlist(lengths), unlist(values)), values)) %>%
     select(-lengths, -values) %>%
     rowwise() %>%
-    mutate(n_I = get_opts(cigar, "I"),
+    mutate(n_D = get_opts(cigar, "D"),
         n_M = get_opts(cigar, "M")) %>%
     ungroup() %>%
-    mutate(aligned = n_I + n_M) %>%
-    select(-cigar, -n_I, -n_M) %>%
+    mutate(coverage = n_D + n_M) %>%
+    select(-cigar, -n_D, -n_M) %>%
     saveRDS(snakemake@output[[1]])

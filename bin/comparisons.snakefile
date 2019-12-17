@@ -129,7 +129,10 @@ rule compare_differentialExpressionAnalysis2:
 
 rule coverage:
     input:
-        expand("res/comparisons/geneBody_coverage/teloprime/{barcode}.geneBodyCoverage.txt", barcode = BARCODES)
+        geneBodyCoverage = expand("res/comparisons/geneBody_coverage/teloprime/{barcode}.geneBodyCoverage.txt", barcode = BARCODES),
+        coverage = expand("res/comparisons/coverage/teloprime/{barcode}.rds", barcode = BARCODES)
+    script:
+        "comparisons_coverage.Rmd"
 
 
 rule browser_plots:
