@@ -13,11 +13,6 @@ editor_options:
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = FALSE)
 ```
 
-```{r}
-save.image("read_lengths.RData")
-```
-
-
 ```{r loadPackages}
 source("packrat/init.R")
 library("dplyr")
@@ -25,9 +20,10 @@ library("readr")
 library("purrr")
 library("ggplot2")
 library("ggthemes")
+library("AnnotationDbi")
 ```
 
-```{r dataImport_tx}
+```{r dataImport_tx_bam}
 get_map_type <- function(flag) {
     if_else(flag %in% c(0, 16), "primary",
         if_else(flag %in% c(256, 275), "secondary", "supplementary"))
@@ -41,14 +37,19 @@ tx <- snakemake@input %>%
 
 df_tx <- tx %>%
     as.list() %>% 
-    set_names(tx) %>% 
+    set_names(basename(tx)) %>% 
     map(read_rds) %>%     
-    map(mutate, type = get_map_type(flag)) %>% 
-    map(select, -seqnames) %>% 
+    map(mutate, type = get_map_type(flag))
+
+df_tx <- df_tx %>% 
+    map(tidyr::separate, col = seqnames,
+        into = c("ensembl_transcript_id_version", "ensembl_gene_id_version"),
+        sep = '\\|', extra = "drop") %>% 
     bind_rows(.id = "sample")
 ```
 
 ```{r dataImport_fastqReadLengths}
+# histogram of read lengths from fasta file
 df <- read_csv(snakemake@input[["teloprime_readLengths"]]) %>%
     tidyr::gather("sample", "counts", -read_length) %>% 
     tidyr::separate(sample, c("waste1", "waste2", "flowcell", "waste3", "barcode"), 
@@ -74,11 +75,11 @@ df_genome <- genome %>%
     set_names(genome) %>% 
     map(read_rds) %>%     
     map(mutate, type = get_map_type(flag)) %>% 
-    map(select, -seqnames) %>% 
+    map(dplyr::select, -seqnames) %>% 
     bind_rows(.id = "sample")
 
 mapping_df_genome <- df_genome %>% 
-    select(qname, type) %>% 
+    dplyr::select(qname, type) %>% 
     group_by(qname) %>% 
     summarise(has_primary = any(type == "primary"),
         has_supplementary = any(type == "supplementary"))
@@ -130,7 +131,7 @@ df %>%
 
 ```{r}
 mapping_df_tx <- df_tx %>% 
-    select(qname, type) %>% 
+    dplyr::select(qname, type) %>% 
     group_by(qname) %>% 
     summarise(has_primary = any(type == "primary"),
         has_supplementary = any(type == "supplementary"))
@@ -169,9 +170,11 @@ rm(mapping_df_genome)
 
 ## Length of primary and supplementary reads
 
+From bam file.
+
 ```{r}
 df_tx %>% 
-    select(-sample, -flag) %>% 
+    dplyr::select(-sample, -flag) %>% 
     left_join(mapping_df_tx, by = "qname") %>% 
     mutate(category = if_else(type == "supplementary", "supplementary",
         if_else(has_supplementary, "primary_with_supplementary", "primary_wo_supplementary"))) %>% 
@@ -184,7 +187,7 @@ df_tx %>%
     ylab("Read length")
 
 df_tx %>% 
-    select(-sample, -flag) %>% 
+    dplyr::select(-sample, -flag) %>% 
     left_join(mapping_df_tx, by = "qname") %>% 
     mutate(category = if_else(type == "supplementary", "supplementary",
         if_else(has_supplementary, "primary_with_supplementary", "primary_wo_supplementary"))) %>% 
@@ -203,6 +206,8 @@ df_tx %>%
 
 Primary hits only
 
+From bam file
+
 ```{r plotTranscriptome}
 df_tx %>% 
     filter(type == "primary") %>% 
@@ -218,16 +223,20 @@ df_tx %>%
     ylab("Aligned Length") 
 ```
 
-# Genome
+## Aligned length vs expected length ()
 
-## Aligned length vs read length
+```{r import_txdb}
+biomart <- snakemake@input[["biomaRt_tx"]] %>% 
+    read_rds()
+```
 
-Primary hits only
-
-```{r plotGenome, eval=FALSE}
-df_genome %>% 
+```{r}
+df_tx %>% 
     filter(type == "primary") %>% 
-    ggplot(aes(qwidth, aligned)) +
+    dplyr::select(ensembl_transcript_id_version, aligned) %>% 
+    left_join(biomart, by = "ensembl_transcript_id_version") %>% 
+    filter(!is.na(transcript_length)) %>% 
+    ggplot(aes(transcript_length, aligned)) +
     geom_hex(aes(fill = ..density..), binwidth = .025) +
     scale_x_log10() +
     scale_y_log10() +
@@ -235,6 +244,26 @@ df_genome %>%
     geom_abline(slope = 1) +
     theme_tufte() +
     geom_rangeframe(sides = "bl") +
-    xlab("Read Length") + 
-    ylab("Aligned Length") 
+    xlab("Transcript length") + 
+    ylab("Aligned length")
+```
+
+## Read length vs expected length ()
+
+```{r}
+df_tx %>% 
+    filter(type == "primary") %>% 
+    dplyr::select(ensembl_transcript_id_version, qwidth) %>% 
+    left_join(biomart, by = "ensembl_transcript_id_version") %>% 
+    filter(!is.na(transcript_length)) %>% 
+    ggplot(aes(transcript_length, qwidth)) +
+    geom_hex(aes(fill = ..density..), binwidth = .025) +
+    scale_x_log10() +
+    scale_y_log10() +
+    scale_fill_viridis_c(trans = "log") +
+    geom_abline(slope = 1) +
+    theme_tufte() +
+    geom_rangeframe(sides = "bl") +
+    xlab("Transcript length") + 
+    ylab("Read length")
 ```

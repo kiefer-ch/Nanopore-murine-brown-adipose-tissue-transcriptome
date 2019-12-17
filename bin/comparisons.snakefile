@@ -57,12 +57,13 @@ rule read_lengths:
     input:
         expand("res/comparisons/countReads/teloprime_{barcode}_bam_genome.rds", barcode=BARCODES),
         expand("res/comparisons/countReads/teloprime_{barcode}_bam_transcriptome.rds", barcode=BARCODES),
+        biomaRt_tx = "annotation/biomaRt_tx.rds",
         teloprime_readLengths = "res/comparisons/countReads/teloprime_fastqReadLengths.csv",
         annotation_txLengths = "annotation/annotation_transcript_lengths.csv"
     output:
         "res/comparisons/read_lengths.html"
     script:
-        "read_lengths.Rmd"
+        "comparisons_read_lengths.Rmd"
 
 rule count_txLength_reference:
     input:
