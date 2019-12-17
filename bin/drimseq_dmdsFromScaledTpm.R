@@ -24,13 +24,13 @@ txdf <- AnnotationDbi::loadDb(snakemake@input[["txdb"]])  %>%
     mutate(ntx = row_number()) %>%
     ungroup()
 
-message("Import counts...")
-cts <- read_tsv(snakemake@input[["counts"]]) %>%
-    tidyr::separate(ids, c("TXNAME", "GENEID"), sep = '_')
-txdf <- txdf[match(cts$TXNAME, txdf$TXNAME),]
+message("Import scaled TPM...")
+cts <- readRDS(snakemake@input[["tpm"]])
+txdf <- txdf[match(rownames(cts), txdf$TXNAME),]
 
 counts <- cts %>%
-    left_join(txdf, by = c("TXNAME", "GENEID")) %>%
+    as_tibble(rownames = "TXNAME") %>%
+    left_join(txdf, by = "TXNAME") %>%
     dplyr::rename(gene_id = "GENEID",
         feature_id = "TXNAME") %>%
     as.data.frame()
@@ -41,10 +41,6 @@ sample_info <- read_csv(snakemake@input[["sample_info"]]) %>%
     mutate_at(vars(matches("condition")), as.factor) %>%
     as.data.frame()
 
-# This line is not good style!
-colnames(counts)[3:8] <- sample_info$sample_id
-
 message("Create dnds")
 dmds <- dmDSdata(counts = counts, samples = sample_info)
 saveRDS(dmds, snakemake@output[[1]])
-

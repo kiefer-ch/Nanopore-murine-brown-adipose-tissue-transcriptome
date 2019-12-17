@@ -1,31 +1,16 @@
-rule drimseq_ont_dtu:
-    threads: 4
-    params:
-        out_folder = "res/drimseq/dtu_ont"
+# illumina reads
+rule drimseq_dmdsFromScaledTpm:
     input:
-        annotation = "annotation/annotation.gtf",
-        tpm = "data/scaledTPM_ont.rds",
+        txdb = "annotation/annotation_txdb.sqlite",
+        tpm = "res/dexseq/illumina/dexseq_scaledTPM.rds",
         sample_info = "sample_info/sampleInfo.csv"
     output:
-        "res/drimseq/dtu_ont/ont_dtu.html"
+        "res/drimseq/illumina/illumina_dmds.rds"
     script:
-        "drimseq_ont.Rmd"
+        "drimseq_dmdsFromScaledTpm.R"
 
 
-rule drimseq_all_dtu:
-    threads: 4
-    params:
-        out_folder = "res/drimseq/dtu_all"
-    input:
-        annotation = "annotation/annotation.gtf",
-        tpm = "data/scaledTPM_all.rds",
-        sample_info = "sample_info/sampleInfo.csv"
-    output:
-        "res/drimseq/dtu_all/all_dtu.html"
-    script:
-        "drimseq_all.Rmd"
-
-
+# teloprime
 rule drimseq_dmdsFromCountMatrix:
     input:
         txdb = "flair/{dataset}/flair.collapse.isoforms_txdb.sqlite",

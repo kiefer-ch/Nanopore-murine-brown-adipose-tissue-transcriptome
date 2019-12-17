@@ -135,30 +135,6 @@ rule coverage:
         "comparisons_coverage.Rmd"
 
 
-rule browser_plots:
-    input:
-        txdb = "annotation/annotation_txdb.sqlite",
-        biomaRt_tx = "annotation/biomaRt_tx.rds",
-        illumina_bam = "bam/illumina/5035_S34_Aligned.sortedByCoord.out.bam",
-        illumina_bam_warm = "bam/illumina/5034_S33_Aligned.sortedByCoord.out.bam",
-        teloprime_bam = "bam/teloprime/barcode02_genome.bam",
-        teloprime_bam_warm = "bam/teloprime/barcode01_genome.bam"
-    params:
-        bw_folder = "bw"
-    output:
-        adcy3 = "res/browser_plots/adcy3.pdf",
-        adcy3_bam = "res/browser_plots/adcy3_bam.pdf",
-        adcy3_bam_ausschnitt = "res/browser_plots/adcy3_bam_ausschnitt.pdf",
-        cars2_bam = "res/browser_plots/cars2_bam.pdf",
-        ctcflos = "res/browser_plots/ctcflos.pdf",
-        ctcflos_bam = "res/browser_plots/ctcflos_bam.pdf",
-        dbi_bam = "res/browser_plots/dbi_bam.pdf",
-        gm15551 = "res/browser_plots/Gm15551.pdf",
-        gm15551_bam = "res/browser_plots/Gm15551_bam.pdf"
-    script:
-        "browser_plots.R"
-
-
 rule render_GOcomp:
     input:
         "res/txlevel_ont/txlevel_ont_de.csv.gz",
