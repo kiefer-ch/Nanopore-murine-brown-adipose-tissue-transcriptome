@@ -53,6 +53,7 @@ rule drimseq_stageR:
     script:
         "drimseq_stagerAnalysis.Rmd"
 
+
 rule drimseq_browserPlots:
     params:
         out_folder = "res/drimseq/teloprime/browser_plots"
@@ -65,6 +66,7 @@ rule drimseq_browserPlots:
         stageR_results = "res/wien/teloprime_old/DRIMSeq_stageR/stageR/stageR_final_output_padj_GeneSymbols.tsv"
     script:
         "drimseq_browserPlots.R"
+
 
 rule drimseq_browserPlots_flair:
     params:

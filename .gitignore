@@ -11,7 +11,7 @@
 !bin/*.R
 !bin/*.Rmd
 !bin/*.sh
-!bin/.multiqc.conf
+!bin/multiqc.conf
 !bin/*.snakefile
 !bin/*.py
 
@@ -34,5 +34,3 @@ packrat/*lib
 # Don't ignore sample info
 !sample_info/illumina_sample_id.txt
 !sample_info/sampleInfo.csv
-
-# Don't ignore raw fastq md5sum

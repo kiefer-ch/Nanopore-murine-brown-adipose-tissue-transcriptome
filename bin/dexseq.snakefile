@@ -1,3 +1,13 @@
+rule tximport_dexseq_illumina:
+    input:
+        salmone_out = expand("salmon/{sample}/quant.sf", sample=SAMPLES_ont),
+        sample_info = "sample_info/sampleInfo.csv"
+    output:
+        "res/dexseq/illumina/dexseq_scaledTPM.rds"
+    script:
+        "txImport_dexseq.R"
+
+
 rule dexseq_prefilterIsoforms_illumina:
     input:
         annotation = "annotation/annotation.gtf",
@@ -17,7 +27,7 @@ rule dexseq_prefilterIsoforms_teloprime:
         annotation = "annotation/annotation.gtf",
         txdb = "annotation/annotation_txdb.sqlite",
         counts = "res/deseq/teloprime/txlevel/teloprime_txlevel_cm_ntd.csv.gz",
-                sampleInfo = "sample_info/sampleInfo.csv"
+        sampleInfo = "sample_info/sampleInfo.csv"
     params:
         threshold = 15
     output:
@@ -119,4 +129,3 @@ rule dexseq_heatmap:
         "{file}_heatmap.html"
     script:
         "dexseq_heatmap.Rmd"
-
