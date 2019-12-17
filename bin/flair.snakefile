@@ -18,7 +18,7 @@ rule filter_SJout:
     params:
         threshold = 10
     script:
-        "filter_SJout.R"
+        "flair_filterSJout.R"
 
 
 rule flair_correct:

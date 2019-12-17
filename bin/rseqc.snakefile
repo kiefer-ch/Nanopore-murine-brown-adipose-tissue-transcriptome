@@ -35,6 +35,24 @@ rule rseqc_genebodyCoverage:
             -i {input.bam} \
             -o {params.outputDir}"
 
+rule rseqc_genebodyCoverage_ont:
+    input:
+        bam = "bam/{dataset}/{barcode}_genome.bam",
+        bed = "data/mm10_Gencode_vM20_gencode.bed"
+    output:
+        "res/comparisons/geneBody_coverage/{dataset}/{barcode}.geneBodyCoverage.curves.pdf",
+        "res/comparisons/geneBody_coverage/{dataset}/{barcode}.geneBodyCoverage.r",
+        "res/comparisons/geneBody_coverage/{dataset}/{barcode}.geneBodyCoverage.txt"
+    params:
+        outputDir = "res/comparisons/geneBody_coverage/{dataset}/{barcode}"
+    wildcard_constraints:
+        dataset = "teloprime"
+    shell:
+        "geneBody_coverage.py \
+            -r {input.bed} \
+            -i {input.bam} \
+            -o {params.outputDir}"
+
 rule rseqc_readDuplication:
     input:
         bam = "bam/illumina/{sample}_Aligned.sortedByCoord.out.bam",

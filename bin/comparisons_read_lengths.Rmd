@@ -29,19 +29,11 @@ get_map_type <- function(flag) {
         if_else(flag %in% c(256, 275), "secondary", "supplementary"))
 }
 
-tx <- snakemake@input %>% 
-    unlist() %>% 
-    tibble::enframe() %>% 
-    filter(grepl("transcriptome", value)) %>% 
-    tibble::deframe()
-
-df_tx <- tx %>%
+df_tx <- snakemake@input[["teloprime_bam_tx"]] %>%
     as.list() %>% 
-    set_names(basename(tx)) %>% 
+    set_names(basename(snakemake@input[["teloprime_bam_tx"]])) %>% 
     map(read_rds) %>%     
-    map(mutate, type = get_map_type(flag))
-
-df_tx <- df_tx %>% 
+    map(mutate, type = get_map_type(flag)) %>% 
     map(tidyr::separate, col = seqnames,
         into = c("ensembl_transcript_id_version", "ensembl_gene_id_version"),
         sep = '\\|', extra = "drop") %>% 
@@ -63,16 +55,9 @@ referenceTxLengths <- read_csv(snakemake@input[["annotation_txLengths"]]) %>%
 ```
 
 ```{r dataImport_genome}
-genome <- snakemake@input %>% 
-    unlist() %>% 
-    tibble::enframe() %>% 
-    filter(!grepl("transcriptome", value)) %>% 
-    filter(!grepl("csv", value)) %>% 
-    tibble::deframe()
-
-df_genome <- genome %>%
+df_genome <- snakemake@input[["teloprime_bam_genome"]] %>%
     as.list() %>% 
-    set_names(genome) %>% 
+    set_names(snakemake@input[["teloprime_bam_genome"]]) %>% 
     map(read_rds) %>%     
     map(mutate, type = get_map_type(flag)) %>% 
     map(dplyr::select, -seqnames) %>% 

@@ -18,6 +18,7 @@ rule quantification_correlation:
     script:
         "quantification_correlation.Rmd"
 
+
 rule feature_detection:
     input:
         teloprime_tx = "res/deseq/teloprime/txlevel/teloprime_txlevel_cm_cts.csv.gz",
@@ -31,32 +32,57 @@ rule feature_detection:
     output:
         "res/comparisons/feature_detection.html"
     script:
-        "feature_detection.Rmd"
+        "comparisons_featureDetection.Rmd"
 
-rule count_reads_bam_teloprime:
+
+rule bam_getAlignedLength:
     input:
-        "bam/teloprime/{file}_{type}.bam",
-        "bam/teloprime/{file}_{type}.bam.bai",
+        "bam/{dataset}/{file}_{type}.bam",
+        "bam/{dataset}/{file}_{type}.bam.bai"
     wildcard_constraints:
-        type = "genome|transcriptome"
+        type = "genome|transcriptome",
+        datatset = "teloprime"
     output:
-        "res/comparisons/countReads/teloprime_{file}_bam_{type}.rds"
+        "res/comparisons/countReads/{dataset}_{file}_bam_{type}.rds"
     script:
-        "count_reads.R"
+        "comparison_bam_getAlignedLength.R"
 
-rule count_reads_fastq_teloprime:
+
+rule bam_getCoverage:
+    input:
+        "bam/{dataset}/{file}_genome.bam",
+        "bam/{dataset}/{file}_genome.bam.bai"
+    wildcard_constraints:
+        datatset = "teloprime"
+    output:
+        "res/comparisons/coverage/{dataset}/{file}.rds"
+    script:
+        "comparison_bam_getCoverage.R"
+
+
+rule fastq_readLengthHistogram:
     input:
         expand(
             "fastq/teloprime/X{flowcell}_flowcell/{barcode}_q7.fastq.gz", barcode=BARCODES, flowcell=[1, 3])
     output:
         "res/comparisons/countReads/teloprime_fastqReadLengths.csv"
     script:
-        "fastq_counts.py"
+        "comparisons_fastq_readLengthHistogram.py"
+
+
+rule fasta_readLengthHistogram:
+    input:
+        "annotation/transcripts.fa"
+    output:
+        "annotation/annotation_transcript_lengths.csv"
+    script:
+        "comparisons_fasta_readLengthHistogram.py"
+
 
 rule read_lengths:
     input:
-        expand("res/comparisons/countReads/teloprime_{barcode}_bam_genome.rds", barcode=BARCODES),
-        expand("res/comparisons/countReads/teloprime_{barcode}_bam_transcriptome.rds", barcode=BARCODES),
+        teloprime_bam_genome = expand("res/comparisons/countReads/teloprime_{barcode}_bam_genome.rds", barcode=BARCODES),
+        teloprime_bam_tx = expand("res/comparisons/countReads/teloprime_{barcode}_bam_transcriptome.rds", barcode=BARCODES),
         biomaRt_tx = "annotation/biomaRt_tx.rds",
         teloprime_readLengths = "res/comparisons/countReads/teloprime_fastqReadLengths.csv",
         annotation_txLengths = "annotation/annotation_transcript_lengths.csv"
@@ -65,13 +91,6 @@ rule read_lengths:
     script:
         "comparisons_read_lengths.Rmd"
 
-rule count_txLength_reference:
-    input:
-        "annotation/transcripts.fa"
-    output:
-        "annotation/annotation_transcript_lengths.csv"
-    script:
-        "fasta_tx_lengths.py"
 
 rule compare_differentialExpressionAnalysis:
     input:
@@ -91,6 +110,7 @@ rule compare_differentialExpressionAnalysis:
     script:
         "comparisons_dgeDteDtu.Rmd"
 
+
 rule compare_differentialExpressionAnalysis2:
     input:
         illumina_tx = "res/deseq/illumina/txlevel_ont/illumina_txlevel_ont_dds.rds",
@@ -105,6 +125,12 @@ rule compare_differentialExpressionAnalysis2:
         "res/comparisons/comparisons_dgeDteDtu_onlyDetectedByBoth.html"
     script:
         "comparisons_dgeDte_onlyDetectedByBoth.Rmd"
+
+
+rule coverage:
+    input:
+        expand("res/comparisons/geneBody_coverage/teloprime/{barcode}.geneBodyCoverage.txt", barcode = BARCODES)
+
 
 rule browser_plots:
     input:
@@ -128,6 +154,7 @@ rule browser_plots:
         gm15551_bam = "res/browser_plots/Gm15551_bam.pdf"
     script:
         "browser_plots.R"
+
 
 rule render_GOcomp:
     input:

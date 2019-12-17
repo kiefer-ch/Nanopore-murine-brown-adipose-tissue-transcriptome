@@ -36,7 +36,7 @@ rule make_txdb_from_gtf:
     output:
         "{annotation}_txdb.sqlite"
     script:
-        "txdb.R"
+        "annotation_txdb.R"
 
 rule sort_gtf:
     input:
@@ -52,7 +52,7 @@ rule get_biomart_tx:
     output:
         tx = "annotation/biomaRt_tx.rds"
     script:
-        "biomaRt_tx.R"
+        "annotation_biomaRt_tx.R"
 
 rule get_biomart_gene:
     input:
@@ -60,4 +60,4 @@ rule get_biomart_gene:
     output:
         gene = "annotation/biomaRt_gene.rds"
     script:
-        "biomaRt_gene.R"
+        "annotation_biomaRt_gene.R"
