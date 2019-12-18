@@ -129,3 +129,12 @@ rule dexseq_heatmap:
         "{file}_heatmap.html"
     script:
         "dexseq_heatmap.Rmd"
+
+rule dexseq_resultsTable:
+    input:
+        dxd = "{file}_dxd_diff.rds",
+        biomaRt_gene = "annotation/biomaRt_gene.rds"
+    output:
+        "{file}_dexseq_results.csv.gz"
+    script:
+        "dexseq_resultsTable.R"

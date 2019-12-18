@@ -13,7 +13,6 @@ BPPARAM = BiocParallel::MulticoreParam(snakemake@threads[[1]])
 # email: christophak@bmb.sdu.dk
 #
 ################################################################################
-save.image("dexseq.RData")
 
 message("Importing data...")
 dxd <- readRDS(snakemake@input[[1]])
@@ -69,7 +68,7 @@ DEXSeqHTML(dxr,
     FDR = .05,
     mart = ensembl,
     filter = "ensembl_gene_id_version",
-    attributes = c("mgi_symbol","description"),
+    attributes = c("mgi_symbol", "description"),
     BPPARAM = BPPARAM)
 
 message("Done")

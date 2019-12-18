@@ -24,8 +24,6 @@ library("ggthemes")
     select <- dplyr::select
 ```
 
-
-
 ```{r import Data}
 dxd <- read_rds(snakemake@input[["dxd"]])
 dxr <- DEXSeqResults(dxd)
