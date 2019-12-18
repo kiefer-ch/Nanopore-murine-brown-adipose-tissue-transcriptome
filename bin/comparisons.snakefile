@@ -45,19 +45,19 @@ rule bam_getAlignedLength:
     output:
         "res/comparisons/countReads/{dataset}_{file}_bam_{type}.rds"
     script:
-        "comparison_bam_getAlignedLength.R"
+        "comparisons_bam_getAlignedLength.R"
 
 
 rule bam_getCoverage:
     input:
-        "bam/{dataset}/{file}_genome.bam",
-        "bam/{dataset}/{file}_genome.bam.bai"
+        "bam/{dataset}/{file}_transcriptome.bam",
+        "bam/{dataset}/{file}_transcriptome.bam.bai"
     wildcard_constraints:
         datatset = "teloprime"
     output:
         "res/comparisons/coverage/{dataset}/{file}.rds"
     script:
-        "comparison_bam_getCoverage.R"
+        "comparisons_bam_getCoverage.R"
 
 
 rule fastq_readLengthHistogram:
@@ -129,8 +129,12 @@ rule compare_differentialExpressionAnalysis2:
 
 rule coverage:
     input:
-        geneBodyCoverage = expand("res/comparisons/geneBody_coverage/teloprime/{barcode}.geneBodyCoverage.txt", barcode = BARCODES),
-        coverage = expand("res/comparisons/coverage/teloprime/{barcode}.rds", barcode = BARCODES)
+        geneBodyCoverage_teloprime = expand("res/comparisons/geneBody_coverage/teloprime/{barcode}.geneBodyCoverage.txt", barcode = BARCODES),
+        geneBodyCoverage_illumina = expand("qc/RSeQC/geneBody_coverage/{sample}.geneBodyCoverage.txt", sample = SAMPLES_ont),
+        coverage_teloprime = expand("res/comparisons/coverage/teloprime/{barcode}.rds", barcode = BARCODES),
+        sample_info = "sample_info/sampleInfo.csv"
+    output:
+        "res/comparisons/comparisons_coverage.html"
     script:
         "comparisons_coverage.Rmd"
 
