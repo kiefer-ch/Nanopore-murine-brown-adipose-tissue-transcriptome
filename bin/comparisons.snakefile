@@ -16,7 +16,7 @@ rule quantification_correlation:
     output:
         "res/comparisons/quantification_correlation.html"
     script:
-        "quantification_correlation.Rmd"
+        "comparisons_quantification_correlation.Rmd"
 
 
 rule feature_detection:
@@ -122,7 +122,7 @@ rule compare_differentialExpressionAnalysis2:
         grouped_biotypes = "data/biotype_groups.csv"
     threads: 4
     output:
-        "res/comparisons/comparisons_dgeDteDtu_onlyDetectedByBoth.html"
+        "res/comparisons/comparisons_dgeDte_onlyDetectedByBoth.html"
     script:
         "comparisons_dgeDte_onlyDetectedByBoth.Rmd"
 
@@ -132,7 +132,8 @@ rule coverage:
         geneBodyCoverage_teloprime = expand("res/comparisons/geneBody_coverage/teloprime/{barcode}.geneBodyCoverage.txt", barcode = BARCODES),
         geneBodyCoverage_illumina = expand("qc/RSeQC/geneBody_coverage/{sample}.geneBodyCoverage.txt", sample = SAMPLES_ont),
         coverage_teloprime = expand("res/comparisons/coverage/teloprime/{barcode}.rds", barcode = BARCODES),
-        sample_info = "sample_info/sampleInfo.csv"
+        sample_info = "sample_info/sampleInfo.csv",
+        biomaRt_tx = "annotation/biomaRt_tx.rds"
     output:
         "res/comparisons/comparisons_coverage.html"
     script:
