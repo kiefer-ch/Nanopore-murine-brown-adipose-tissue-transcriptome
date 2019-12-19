@@ -10,7 +10,7 @@ rule drimseq_dmdsFromScaledTpm:
         "drimseq_dmdsFromScaledTpm.R"
 
 
-# teloprime
+# ont
 rule drimseq_dmdsFromCountMatrix:
     input:
         txdb = "flair/{dataset}/flair.collapse.isoforms_txdb.sqlite",
@@ -24,6 +24,7 @@ rule drimseq_dmdsFromCountMatrix:
         "drimseq_dmdsFromCountMatrix.R"
 
 
+# common
 rule drimseq_stageR:
     input:
         dmds = "{file}_dmds.rds",

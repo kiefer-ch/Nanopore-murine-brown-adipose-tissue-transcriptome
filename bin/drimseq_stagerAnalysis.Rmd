@@ -23,7 +23,6 @@ library("stageR")
 BPPARAM = BiocParallel::MulticoreParam(snakemake@threads[[1]])
 ```
 
-
 ```{r importData}
 dmds <- read_rds(snakemake@input[["dmds"]])
 
@@ -70,7 +69,7 @@ plotPrecision(dmds) +
 
 ```{r buildResultsTables}
 res_gene <- DRIMSeq::results(dmds)
-res_tx <- DRIMSeq::results(dmds, level="feature")
+res_tx <- DRIMSeq::results(dmds, level = "feature")
 ```
 
 # Gene Level
@@ -128,7 +127,7 @@ stageRObj <- stageRTx(pScreen = pScreen, pConfirmation = pConfirmation,
 stageRObj <- stageWiseAdjustment(stageRObj, method = "dtu", alpha = 0.05)
 
 drim.padj <- getAdjustedPValues(stageRObj, order = TRUE,
-    onlySignificantGenes = TRUE)
+    onlySignificantGenes = FALSE)
 ```
 
 StageR looks at the pvalues for both genes and transcripts thereby allowing to 
