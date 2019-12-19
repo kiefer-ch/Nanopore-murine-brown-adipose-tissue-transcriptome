@@ -132,8 +132,7 @@ rule compare_dtu:
         teloprime_drim = "res/wien/teloprime_old/DRIMSeq_stageR/stageR/stageR_final_output_padj_GeneSymbols.tsv",
         illumina_dex = "res/dexseq/illumina/illumina_dexseq_results.csv.gz",
         teloprime_dex = "res/dexseq/teloprime/teloprime_dexseq_results.csv.gz",
-        chip = "res/chip/gencode_full_range.csv.gz",
-        biomaRt_gene = "annotation/biomaRt_gene.rds"
+        chip = "res/chip/gencode_full_range.csv.gz"
     output:
         "res/comparisons/comparisons_dtu.html"
     script:
