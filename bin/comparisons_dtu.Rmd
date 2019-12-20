@@ -67,7 +67,16 @@ df <- drimseq %>%
     mutate_if(is.numeric, function(x) tidyr::replace_na(x, 1))
 ```
 
-```{r upset}
+
+# All genes
+
+has_multiple_peaks means there is more than one h3k4me3 peak over the gene body
+of a gene.
+
+Multiple peaks are indicators of multiple TSS. The other methods identify not
+alternative TSS but also alternative splicing and alternative TES.
+
+```{r upset_withChip}
 df %>% 
     mutate_if(is.numeric, function(x) as.integer(x < .05)) %>%
     mutate(has_multiple_peaks = as.integer(has_multiple_peaks)) %>% 
@@ -79,16 +88,60 @@ df %>%
         sets.bar.color = c("green", rep(c("red", "blue"), each = 2)),
         nintersects = 14,
         order.by = "freq")
-    
+```
+
+#### Without chip
+
+```{r}
 df %>% 
     mutate_if(is.numeric, function(x) as.integer(x < .05)) %>%
     mutate(has_multiple_peaks = as.integer(has_multiple_peaks)) %>% 
     select(-has_multiple_peaks) %>% 
     as.data.frame() %>%
     tibble::column_to_rownames("ensembl_gene_id_version") %>% 
-    upset(nsets = 5, keep.order = TRUE,
+    upset(nsets = 4, keep.order = TRUE,
         sets.bar.color = c(rep(c("red", "blue"), each = 2)),
         nintersects = 14,
         order.by = "freq")
 ```
 
+<!-- # Subset to only those genes with multiple chip peaks -->
+
+<!-- ```{r subset} -->
+<!-- df_sub <- df %>%  -->
+<!--     filter(has_multiple_peaks) %>%  -->
+<!--     select(-has_multiple_peaks) -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- df_sub %>%  -->
+<!--     mutate_if(is.numeric, function(x) as.integer(x < .05)) %>% -->
+<!--     as.data.frame() %>% -->
+<!--     tibble::column_to_rownames("ensembl_gene_id_version") %>%  -->
+<!--     upset(nsets = 4, keep.order = TRUE, -->
+<!--         sets.bar.color = c(rep(c("red", "blue"), each = 2)), -->
+<!--         nintersects = 14, -->
+<!--         order.by = "freq") -->
+<!-- ``` -->
+
+#### List of genes that show DTU in any of the analyses
+
+```{r}
+biomart <- read_rds(snakemake@input[["biomaRt_gene"]])
+```
+
+```{r}
+df_sub <- df %>% 
+    left_join(biomart, by = "ensembl_gene_id_version") %>% 
+    select(ensembl_gene_id_version, mgi_symbol, description, gene_biotype, everything()) %>% 
+    arrange(illumina_dexseq_results)
+
+df_sub %>% 
+    filter_if(is.numeric, any_vars(. < .05)) %>%
+    knitr::kable(format = "html") %>%
+    kableExtra::kable_styling() %>%
+    kableExtra::scroll_box(width = "100%", height = "600px")
+
+df_sub %>% 
+    write_csv("res/comparisons/comparisons_dtu.csv")
+```

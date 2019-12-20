@@ -126,13 +126,15 @@ rule compare_differentialExpressionAnalysis2:
     script:
         "comparisons_dgeDte_onlyDetectedByBoth.Rmd"
 
+
 rule compare_dtu:
     input:
         illumina_drim = "res/drimseq/illumina/illumina_drimSeqStageR.csv",
         teloprime_drim = "res/wien/teloprime_old/DRIMSeq_stageR/stageR/stageR_final_output_padj_GeneSymbols.tsv",
         illumina_dex = "res/dexseq/illumina/illumina_dexseq_results.csv.gz",
         teloprime_dex = "res/dexseq/teloprime/teloprime_dexseq_results.csv.gz",
-        chip = "res/chip/gencode_full_range.csv.gz"
+        chip = "res/chip/gencode_full_range.csv.gz",
+        biomaRt_gene = "annotation/biomaRt_gene.rds"
     output:
         "res/comparisons/comparisons_dtu.html"
     script:

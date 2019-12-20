@@ -22,8 +22,8 @@ biomart <- read_rds(snakemake@input[["biomaRt_gene"]])
 dxr %>%
     as_tibble() %>%
     group_by(groupID) %>%
-    summarise(pvalue = min(pvalue),
-        padj = min(padj)) %>%
+    summarise(pvalue = min(pvalue, na.rm = TRUE),
+        padj = min(padj, na.rm = TRUE)) %>%
     arrange(pvalue) %>%
     dplyr::rename(ensembl_gene_id_version = "groupID") %>%
     left_join(biomart, by = "ensembl_gene_id_version") %>%
