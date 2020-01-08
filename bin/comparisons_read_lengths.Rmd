@@ -23,6 +23,11 @@ library("ggthemes")
 library("AnnotationDbi")
 ```
 
+```{r}
+dir.create(snakemake@params[["fig_folder"]],
+    recursive = TRUE, showWarnings = FALSE)
+```
+
 ```{r dataImport_tx_bam}
 get_map_type <- function(flag) {
     if_else(flag %in% c(0, 16), "primary",
@@ -41,7 +46,6 @@ df_tx <- snakemake@input[["teloprime_bam_tx"]] %>%
 ```
 
 ```{r dataImport_fastqReadLengths}
-# histogram of read lengths from fasta file
 df <- read_csv(snakemake@input[["teloprime_readLengths"]]) %>%
     tidyr::gather("sample", "counts", -read_length) %>% 
     tidyr::separate(sample, c("waste1", "waste2", "flowcell", "waste3", "barcode"), 
@@ -77,18 +81,37 @@ rm(df_genome)
 Read lengths from fastq files
 
 ```{r}
-df %>% 
+pl <- df %>% 
+    group_by(read_length) %>% 
+    summarise(counts = sum(counts)) %>% 
+    ggplot(aes(read_length, counts)) +
+    geom_freqpoly(stat = "identity") +
+    scale_x_log10() +
+    ylab("Reads") + 
+    xlab("Read length") +
+    theme_tufte() +
+    geom_rangeframe(sides = "lb")
+pl
+saveRDS(pl,
+    file.path(snakemake@params[["fig_folder"]], "read_length_histogram.rds"))
+```
+
+```{r readLength_Violin_teloprime}
+pl <- df %>% 
     group_by(flowcell, barcode) %>% 
     mutate(weight = counts / sum(counts)) %>% 
     ungroup() %>% 
     ggplot(aes(barcode, read_length, weight = weight, fill = flowcell)) +
     geom_violin() +
     scale_y_log10() +
-    scale_fill_viridis_d() +
+    scale_fill_brewer(type = "qual", palette = 2) +
     theme_tufte() +
     geom_rangeframe(sides = "l") +
     xlab(NULL) + 
     ylab("Read length")
+pl
+saveRDS(pl,
+    file.path(snakemake@params[["fig_folder"]], "read_length_violin_per_sample.rds"))
 ```
 
 #### Compared with tx length from GENCODE annotation
@@ -138,19 +161,23 @@ mapping_df2 %>%
     knitr::kable(format = "html") %>%
     kableExtra::kable_styling()
 
-mapping_df2 %>% 
+pl <- mapping_df2 %>% 
     mutate(type = factor(type, 
         levels = c("n_total", "n_primary_genome", "n_supplementary_genome",
             "n_primary_transcriptome", "n_supplementary_transcriptome"))) %>% 
     ggplot(aes(x = method, y = count,  fill = type)) +
     geom_bar(stat = "identity", position=position_dodge()) +
+    scale_y_continuous(labels = function(x) x / 10^6) +
     theme_tufte() +
     geom_rangeframe(sides = "l") +
     xlab(NULL) + 
-    ylab("Reads") +
-    scale_fill_viridis_d()
+    ylab("Mio. Reads") +
+    scale_fill_brewer(type = "qual", palette = 2)
+pl
+saveRDS(pl,
+    file.path(snakemake@params[["fig_folder"]], "read_alignment.rds"))
 
-rm(mapping_df_genome)
+rm(mapping_df_genome, pl)
 ```
 
 ## Length of primary and supplementary reads
@@ -194,7 +221,7 @@ Primary hits only
 From bam file
 
 ```{r plotTranscriptome}
-df_tx %>% 
+pl <- df_tx %>% 
     filter(type == "primary") %>% 
     ggplot(aes(qwidth, aligned)) +
     geom_hex(aes(fill = ..density..), binwidth = .025) +
@@ -205,10 +232,13 @@ df_tx %>%
     theme_tufte() +
     geom_rangeframe(sides = "bl") +
     xlab("Read Length") + 
-    ylab("Aligned Length") 
+    ylab("Aligned Length")
+pl
+saveRDS(pl,
+    file.path(snakemake@params[["fig_folder"]], "aligned_vs_readLength.rds"))
 ```
 
-## Aligned length vs expected length ()
+## Aligned length vs expected length
 
 ```{r import_txdb}
 biomart <- snakemake@input[["biomaRt_tx"]] %>% 
@@ -233,7 +263,7 @@ df_tx %>%
     ylab("Aligned length")
 ```
 
-## Read length vs expected length ()
+## Read length vs expected length
 
 ```{r}
 df_tx %>% 

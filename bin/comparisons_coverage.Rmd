@@ -13,6 +13,11 @@ editor_options:
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = FALSE)
 ```
 
+```{r}
+dir.create(snakemake@params[["fig_folder"]],
+    recursive = TRUE, showWarnings = FALSE)
+```
+
 ```{r loadPackages}
 source("packrat/init.R")
 library("dplyr")
@@ -61,11 +66,10 @@ teloprime <- snakemake@input[["geneBodyCoverage_teloprime"]] %>%
     mutate(sample = substr(sample, 1, 9)) %>% 
     left_join(sample_info, by = c("sample" = "ont")) %>% 
     dplyr::select(-sample, -illumina)
-
 ```
 
 ```{r plot_geneBodyCoverage}
-list(illumina, teloprime) %>% 
+pl <- list(illumina, teloprime) %>% 
     bind_rows() %>%
     group_by(dataset, sample_id) %>% 
     mutate(p = n / max(n)) %>% 
@@ -76,8 +80,10 @@ list(illumina, teloprime) %>%
         geom_rangeframe(sides = "bl") +
         xlab("Gene body percentile (5' -> 3')") +
         ylab("Coverage") +
-        scale_color_viridis_d()
-
+        scale_color_brewer(type = "qual", palette = 2)
+pl
+saveRDS(pl,
+    file.path(snakemake@params[["fig_folder"]], "geneBodyCoverage.rds"))
 rm(list = c("illumina", "teloprime"))
 ```
 
@@ -119,14 +125,19 @@ df <- teloprime %>%
     mutate(grouped_transcript_length = cut(transcript_length, 
         breaks = c(0, 500, 1000, 1500, 2000, 2500, 3000, max(transcript_length))))
 
-df %>% 
+pl <- df %>% 
     ggplot(aes(grouped_transcript_length, coverage)) +
     geom_violin() +
     xlab(NULL) +
     ylab("Fraction of transcript covered by read") +
     theme_tufte() +
     geom_rangeframe(sides = 'l')
+pl
+saveRDS(pl,
+    file.path(snakemake@params[["fig_folder"]], "coverage_by_transcriptLength.rds"))
+```
 
+```{r}
 df %>% 
     ggplot(aes(transcript_length, coverage)) +
     geom_hex(aes(fill = ..density..), binwidth = .025) +
@@ -136,7 +147,9 @@ df %>%
     geom_rangeframe(sides = "bl") +
     xlab("Transcript length") + 
     ylab("Fraction of transcript covered by read")
+```
 
+```{r}
 df %>% 
     mutate(is_fullLength = if_else(coverage > .9, TRUE, FALSE)) %>% 
     group_by(ensembl_transcript_id_version) %>% 

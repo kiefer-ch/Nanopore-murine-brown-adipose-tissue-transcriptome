@@ -86,8 +86,10 @@ rule read_lengths:
         biomaRt_tx = "annotation/biomaRt_tx.rds",
         teloprime_readLengths = "res/comparisons/countReads/teloprime_fastqReadLengths.csv",
         annotation_txLengths = "annotation/annotation_transcript_lengths.csv"
+    params:
+        fig_folder = "res/fig/read_lengths"
     output:
-        "res/comparisons/read_lengths.html"
+        "res/comparisons/comparisons_readLengths.html"
     script:
         "comparisons_read_lengths.Rmd"
 
@@ -148,6 +150,8 @@ rule coverage:
         coverage_teloprime = expand("res/comparisons/coverage/teloprime/{barcode}.rds", barcode = BARCODES),
         sample_info = "sample_info/sampleInfo.csv",
         biomaRt_tx = "annotation/biomaRt_tx.rds"
+    params:
+        fig_folder = "res/fig/coverage"
     output:
         "res/comparisons/comparisons_coverage.html"
     script:
