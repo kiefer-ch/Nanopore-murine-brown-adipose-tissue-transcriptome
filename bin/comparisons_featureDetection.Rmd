@@ -20,9 +20,15 @@ library("readr")
 library("eulerr")
 library("ggplot2")
 library("ggthemes")
+library("purrr")
 library("AnnotationDbi")
     rename <- dplyr::rename
     select <- dplyr::select
+```
+
+```{r}
+dir.create(snakemake@params[["fig_folder"]],
+    recursive = TRUE, showWarnings = FALSE)
 ```
 
 ```{r importData}
@@ -73,7 +79,7 @@ reads_perLibrary %>%
     geom_rangeframe(sides = 'l') +
     xlab(NULL) +
     ylab("Total counts") +
-    scale_color_viridis_d()
+    scale_color_brewer(type = "qual", palette = 2)
 
 reads_perLibrary %>% 
     select(sample, method, reads, condition_temp, teloprime_barcode = "ont") %>% 
@@ -130,7 +136,7 @@ df <- tibble(fraction = fractions) %>%
     mutate(reads = reads * fraction * 6) %>% 
     tidyr::separate(library, c("method", "feature_type"))
 
-df %>% 
+pl <- df %>% 
     ggplot(aes(reads, features)) +
     geom_point(aes(colour = method)) +
     geom_path(aes(colour = method)) +
@@ -139,8 +145,11 @@ df %>%
     facet_wrap(~feature_type, scale = "free_y") +
     xlab("Aligned reads") +
     ylab("Detected features") +
-    scale_color_viridis_d() +
+    scale_color_brewer(type = "qual", palette = 2) +
     theme(axis.text.x = element_text(angle = 90, hjust = 1))
+pl
+saveRDS(pl,
+    file.path(snakemake@params[["fig_folder"]], "saturationCurve.rds"))
 ```
 
 While the illumina dataset has reached saturation, the teloprime dataset has not
@@ -281,6 +290,34 @@ Even for coding transcripts, the teloprime protocol seems not good for detection
 of short transcripts. The teloprime protocol seems better in detecting coding
 transcripts than noncoding ones. This might be caused by generally higher expression 
 levels in the group of coding transcripts.
+
+#### Both
+
+```{r}
+df <- list(illumina_tx, teloprime_tx) %>% 
+    set_names("illumina", "teloprime") %>% 
+    map(get_groupedTxLength_byBiotype) %>% 
+    bind_rows(.id = "dataset") %>% 
+    filter(!grouped_biotype == c("small ncRNA")) %>% 
+    tidyr::drop_na(grouped_biotype) 
+
+pl2 <- df %>% 
+    ggplot(aes(grouped_transcript_length, rate)) +
+    geom_bar(aes(fill = dataset), stat = "identity", position = position_dodge()) +
+    facet_wrap(~grouped_biotype) +
+    xlab("Transcript length") +
+    ylab("Detected transcripts") +
+    theme_tufte() +
+    geom_rangeframe(
+        data = tibble(rate = c(0, .8), grouped_transcript_length = c(0,1)),
+        sides = 'l') +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    scale_fill_brewer(type = "qual", palette = 2)
+pl2
+saveRDS(pl2,
+    file.path(snakemake@params[["fig_folder"]], "transcriptDetection_by_datasetLength.rds"))
+```
+
 
 # Features not detected by one but by the other method
 

@@ -29,6 +29,8 @@ rule feature_detection:
         sample_info = "sample_info/sampleInfo.csv",
         biomaRt_tx = "annotation/biomaRt_tx.rds",
         biotype_groups = "data/biotype_groups.csv"
+    params:
+        fig_folder = "res/fig/feature_detection"
     output:
         "res/comparisons/feature_detection.html"
     script:
