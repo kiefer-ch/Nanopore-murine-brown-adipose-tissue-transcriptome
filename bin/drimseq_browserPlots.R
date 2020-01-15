@@ -1,8 +1,9 @@
 #!/usr/bin/Rscript --no-restore --no-environ --no-save
 
+save.image("drimseq.RData")
+
 # set libpaths to packrat local library
 source("packrat/init.R")
-
 suppressPackageStartupMessages(library("dplyr"))
 suppressPackageStartupMessages(library("readr"))
 suppressPackageStartupMessages(library("Gviz"))
@@ -15,16 +16,16 @@ suppressPackageStartupMessages(library("Mus.musculus"))
 #
 ################################################################################
 
-stageR <- read_tsv(snakemake@input[["stageR_results"]])
+stageR <- read_csv(snakemake@input[["stageR_results"]])
 txdb <- loadDb(snakemake@input[["txdb"]])
 biomart <- read_rds(snakemake@input[["biomaRt_tx"]])
 
 plot.bw <- function(gene_id = "ENSMUSG00000027327.16") {
     # stageR significant transcripts
     sig_tx <- stageR %>%
-        filter(geneID == gene_id) %>%
+        filter(ensembl_gene_id_version == gene_id) %>%
         filter(transcript < .05) %>%
-        pull(txID)
+        pull(ensembl_transcript_id_version)
 
     # df with chromosome, tx_start, tx_end and strand
     df <- AnnotationDbi::select(txdb, keys = gene_id,
@@ -92,7 +93,7 @@ plot.bw <- function(gene_id = "ENSMUSG00000027327.16") {
 
 genes <- stageR %>%
     filter(gene < .05) %>%
-    pull(geneID) %>%
+    pull(ensembl_gene_id_version) %>%
     unique()
 
 dir.create(snakemake@params[["out_folder"]],
