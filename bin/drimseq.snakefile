@@ -11,7 +11,7 @@ rule drimseq_dmdsFromScaledTpm:
 
 
 # ont
-rule drimseq_dmdsFromCountMatrix:
+rule drimseq_dmdsFromCountMatrix_flair:
     input:
         txdb = "flair/{dataset}/flair.collapse.isoforms_txdb.sqlite",
         counts = "flair/{dataset}/flair_teloprime_counts_matrix.tsv",
@@ -21,7 +21,13 @@ rule drimseq_dmdsFromCountMatrix:
     wildcard_constraints:
         dataset = "teloprime"
     script:
-        "drimseq_dmdsFromCountMatrix.R"
+        "drimseq_dmdsFromCountMatrix_flair.R"
+
+rule drimseq_dmdsFromCountMatrix:
+    input:
+        txdb = "annotation/annotation_txdb.sqlite",
+        counts =
+        sample_info = "sample_info/sampleInfo.csv"
 
 
 # common

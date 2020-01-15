@@ -67,11 +67,25 @@ rule flair_concatenate_teloprime:
         "cat {input} > {output}"
 
 
+rule bedtools_combineWarmColdH3k4:
+    input:
+        "data/chip/k4me3/NC_broad.bed"
+        "data/chip/k4me3/NW_broad.bed"
+    output:
+        "data/chip/k4me3/combined_broad.bed"
+    shell:
+        "TDIR=$(mktemp -d data/chip/k4me3/tmp.XXXXXXXXX) \
+        cat {input} > $TDIR/cat.bed \
+        sort -k1,1 -k2,2n $TDIR/cat.bed > $TDIR/cat.sorted.bed \
+        bedtools merge -i $TDIR/cat.sorted.bed > {output}"
+
+
 rule flair_collapse:
     input:
         genome = "annotation/genome.fa",
         annotation = "annotation/annotation.gtf",
         psl = "flair/{dataset}/bed/corrected/concatenated_all_corrected.psl",
+        promoters = "data/chip/k4me3/combined_broad.bed",
         fastq = expand("fastq/teloprime/{flowcell}/{barcode}_q7.fastq.gz",
                        flowcell=["X1_flowcell", "X3_flowcell"], barcode=BARCODES)
     output:
@@ -91,8 +105,9 @@ rule flair_collapse:
             -r {input.fastq} \
             -q {input.psl} \
             -t {threads} \
+            -p {input.promoters} \
             -o {params.out_prefix} \
-            -s 18 --stringent \
+            -s 10 --stringent \
             --temp_dir ./"
 
 
