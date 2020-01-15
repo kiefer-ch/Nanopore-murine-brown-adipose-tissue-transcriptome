@@ -134,7 +134,8 @@ rule compare_differentialExpressionAnalysis2:
 rule compare_dtu:
     input:
         illumina_drim = "res/drimseq/illumina/illumina_drimSeqStageR.csv",
-        teloprime_drim = "res/wien/teloprime_old/DRIMSeq_stageR/stageR/stageR_final_output_padj_GeneSymbols.tsv",
+        teloprime_drim = "res/drimseq/teloprime/teloprime_drimSeqStageR.csv",
+        teloprime_drim_flair = "res/drimseq/teloprime_flair/teloprime_flair_drimSeqStageR.csv",
         illumina_dex = "res/dexseq/illumina/illumina_dexseq_results.csv.gz",
         teloprime_dex = "res/dexseq/teloprime/teloprime_dexseq_results.csv.gz",
         chip = "res/chip/gencode_full_range.csv.gz",
