@@ -1,7 +1,5 @@
 #!/usr/bin/Rscript --no-restore --no-environ --no-save
 
-save.image("drimseq.RData")
-
 # set libpaths to packrat local library
 source("packrat/init.R")
 library("readr")
@@ -28,8 +26,7 @@ txdf <- AnnotationDbi::loadDb(snakemake@input[["txdb"]])  %>%
 
 message("Import counts...")
 cts <- read_tsv(snakemake@input[["counts"]]) %>%
-    tidyr::separate(transcript, c("TXNAME", "GENEID"), sep = '\\|', extra = "drop") %>%
-    tidyr::drop_na()
+    tidyr::separate(ids, c("TXNAME", "GENEID"), sep = '_')
 txdf <- txdf[match(cts$TXNAME, txdf$TXNAME),]
 
 counts <- cts %>%

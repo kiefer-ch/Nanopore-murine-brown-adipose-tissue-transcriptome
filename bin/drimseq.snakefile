@@ -23,11 +23,16 @@ rule drimseq_dmdsFromCountMatrix_flair:
     script:
         "drimseq_dmdsFromCountMatrix_flair.R"
 
-rule drimseq_dmdsFromCountMatrix:
+
+rule drimseq_dmdsFromCountMatrix_teloprime:
     input:
         txdb = "annotation/annotation_txdb.sqlite",
-        counts =
+        counts = "res/wien/teloprime/DE/ONT_newbasecalling/6samples_counts.tsv",
         sample_info = "sample_info/sampleInfo.csv"
+    output:
+        "res/drimseq/teloprime/teloprime_dmds.rds"
+    script:
+        "drimseq_dmdsFromCountMatrix.R"
 
 
 # common
@@ -55,7 +60,7 @@ rule drimseq_browserPlots:
         bw_cold = "bw/teloprime/barcode02.bw",
         txdb = "annotation/annotation_txdb.sqlite",
         biomaRt_tx = "annotation/biomaRt_tx.rds",
-        stageR_results = "res/wien/teloprime_old/DRIMSeq_stageR/stageR/stageR_final_output_padj_GeneSymbols.tsv"
+        stageR_results = "res/drimseq/teloprime/teloprime_drimSeqStageR.csv"
     script:
         "drimseq_browserPlots.R"
 
