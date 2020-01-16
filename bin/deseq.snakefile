@@ -1,5 +1,5 @@
-# tximport
-rule tximport_deseq_gene:
+# data import
+rule tximport_deseq_illumina_gene:
     input:
         salmon_out = expand("salmon/{sample}/quant.sf", sample=SAMPLES),
         txdb = "annotation/annotation_txdb.sqlite",
@@ -8,11 +8,12 @@ rule tximport_deseq_gene:
         txOut = 0,
         design = "~condition_temp"
     output:
-        "res/deseq/illumina/genelevel_all/illumina_genelevel_all_dds.rds"
+        "res/deseq/illumina/genelevel/illumina_genelevel_dds.rds"
     script:
-        "txImport_deseq.R"
+        "deseq_txImport.R"
 
-rule tximport_deseq_transcript:
+
+rule tximport_deseq_illumina_transcript:
     input:
         salmon_out = expand("salmon/{sample}/quant.sf", sample=SAMPLES),
         txdb = "annotation/annotation_txdb.sqlite",
@@ -21,9 +22,116 @@ rule tximport_deseq_transcript:
         txOut = 1,
         design = "~condition_temp"
     output:
-        "res/deseq/illumina/txlevel_all/illumina_txlevel_all_dds.rds"
+        "res/deseq/illumina/txlevel/illumina_txlevel_dds.rds"
     script:
-        "txImport_deseq.R"
+        "deseq_txImport.R"
+
+
+rule import_deseq_teloprime_gene:
+    input:
+        counts = "res/wien/teloprime/DE/ONT_newbasecalling/6samples_counts.tsv",
+        sample_info = "sample_info/sampleInfo.csv"
+    params:
+        txOut = 0,
+        design = "~condition_temp"
+    output:
+        dds = "res/deseq/teloprime/genelevel/teloprime_genelevel_dds.rds"
+    script:
+        "deseq_teloprime.R"
+
+
+rule import_deseq_teloprime_transcript:
+    input:
+        counts = "res/wien/teloprime/DE/ONT_newbasecalling/6samples_counts.tsv",
+        sample_info = "sample_info/sampleInfo.csv"
+    params:
+        txOut = 1,
+        design = "~condition_temp"
+    output:
+        dds = "res/deseq/teloprime/txlevel/teloprime_txlevel_dds.rds"
+    script:
+        "deseq_teloprime.R"
+
+
+# qc
+rule deseq_qc:
+    input:
+        dds = "{method}_dds.rds"
+    output:
+        "{method}_qc.html"
+    script:
+        "deseq_qc.Rmd"
+
+
+# cm export
+rule deseq_exportCm_illumina_genelevel:
+    input:
+        dds = "{file_path}/illumina_genelevel_dds.rds",
+        biomart = "annotation/biomaRt_gene.rds"
+    params:
+        tpm = 1,
+        level = "genelevel",
+        vst = 0
+    output:
+        cts = "{file_path}/illumina_genelevel_cm_cts.csv.gz",
+        ntd = "{file_path}/illumina_genelevel_cm_ntd.csv.gz",
+        rld = "{file_path}/illumina_genelevel_cm_rld.csv.gz",
+        tpm = "{file_path}/illumina_genelevel_cm_tpm.csv.gz"
+    script:
+        "deseq_exportCm.R"
+
+
+rule deseq_exportCm_illumina_txlevel:
+    input:
+        dds = "{file_path}/illumina_txlevel_dds.rds",
+        biomart = "annotation/biomaRt_tx.rds"
+    params:
+        tpm = 1,
+        level = "txlevel",
+        vst = 0
+    output:
+        cts = "{file_path}/illumina_txlevel_cm_cts.csv.gz",
+        ntd = "{file_path}/illumina_txlevel_cm_ntd.csv.gz",
+        rld = "{file_path}/illumina_txlevel_cm_rld.csv.gz",
+        tpm = "{file_path}/illumina_txlevel_cm_tpm.csv.gz"
+    script:
+        "deseq_exportCm.R"
+
+rule deseq_exportCm_ont_genelevel:
+    input:
+        dds = "{file_path}/{dataset}_genelevel_dds.rds",
+        biomart = "annotation/biomaRt_gene.rds"
+    params:
+        tpm = 0,
+        level = "genelevel",
+        vst = 0
+    wildcard_constraints:
+        datatset = "teloprime"
+    output:
+        cts = "{file_path}/{dataset}_genelevel_cm_cts.csv.gz",
+        ntd = "{file_path}/{dataset}_genelevel_cm_ntd.csv.gz",
+        rld = "{file_path}/{dataset}_genelevel_cm_rld.csv.gz"
+    script:
+        "deseq_exportCm.R"
+
+
+rule deseq_exportCm_ont_txlevel:
+    input:
+        dds = "{file_path}/{dataset}_txlevel_dds.rds",
+        biomart = "annotation/biomaRt_tx.rds"
+    params:
+        tpm = 0,
+        level = "txlevel",
+        vst = 0
+    output:
+        cts = "{file_path}/{dataset}_txlevel_cm_cts.csv.gz",
+        ntd = "{file_path}/{dataset}_txlevel_cm_ntd.csv.gz",
+        rld = "{file_path}/{dataset}_txlevel_cm_rld.csv.gz"
+    script:
+        "deseq_exportCm.R"
+
+
+# differential expression analysis
 
 
 # DGE
@@ -75,33 +183,3 @@ rule deseq_txlevel_all:
         "res/deseq/illumina/txlevel_all/deseq_txlevel_all.html"
     script:
         "deseq_txlevel_all.Rmd"
-
-# teloprime
-rule deseq_teloprime:
-    input:
-        ont_gene_raw = "res/wien/teloprime/DE/ONT_newbasecalling/ChrKiefer_6samples_raw_gene_counts.tsv",
-        sample_info = "sample_info/sampleInfo.csv",
-        biomaRt_tx = "annotation/biomaRt_tx.rds",
-        biomaRt_gene = "annotation/biomaRt_gene.rds"
-    threads: 4
-    output:
-        gene_rld = "res/deseq/teloprime/genelevel/teloprime_genelevel_cm_rld.csv.gz",
-        gene_cts = "res/deseq/teloprime/genelevel/teloprime_genelevel_cm_cts.csv.gz",
-        gene_ntd = "res/deseq/teloprime/genelevel/teloprime_genelevel_cm_ntd.csv.gz",
-        gene_de = "res/deseq/teloprime/genelevel/teloprime_genelevel_de.csv.gz",
-        gene_dds = "res/deseq/teloprime/genelevel/teloprime_genelevel_dds.rds",
-        tx_ntd = "res/deseq/teloprime/txlevel/teloprime_txlevel_cm_ntd.csv.gz",
-        tx_rld = "res/deseq/teloprime/txlevel/teloprime_txlevel_cm_rld.csv.gz",
-        tx_cts = "res/deseq/teloprime/txlevel/teloprime_txlevel_cm_cts.csv.gz",
-        tx_de = "res/deseq/teloprime/txlevel/teloprime_txlevel_de.csv.gz",
-        tx_dds = "res/deseq/teloprime/txlevel/teloprime_txlevel_dds.rds"
-    script:
-        "deseq_teloprime.R"
-
-rule deseq_qc:
-    input:
-        dds = "{method}_dds.rds"
-    output:
-        "{method}_qc.html"
-    script:
-        "deseq_qc.Rmd"

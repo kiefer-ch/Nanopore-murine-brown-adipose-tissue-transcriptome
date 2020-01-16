@@ -12,8 +12,6 @@ suppressPackageStartupMessages(library("DESeq2"))
 #
 ################################################################################
 
-save.image("tximport.RData")
-
 # generate tx2gene table
 tx2g <- AnnotationDbi::loadDb(snakemake@input[["txdb"]])  %>%
     AnnotationDbi::select(.,
@@ -25,7 +23,8 @@ tx2g <- AnnotationDbi::loadDb(snakemake@input[["txdb"]])  %>%
 # prepare sample_info
 sample_info <- read_csv(snakemake@input[["sample_info"]]) %>%
     mutate_at(vars(matches("condition")), as.factor) %>%
-    mutate(path = file.path("salmon", sample, "quant.sf")) # this line should be changed!
+    filter(!is.na(ont)) %>%
+    mutate(path = file.path("salmon", illumina, "quant.sf")) # this line should be changed!
 
 # create and output dds
 tximport(files = sample_info$path,
@@ -33,6 +32,6 @@ tximport(files = sample_info$path,
         tx2gene = tx2g,
         txOut = as.logical(snakemake@params[["txOut"]])) %>%
     DESeqDataSetFromTximport(.,
-        colData = tibble::column_to_rownames(as.data.frame(sample_info), "sample"),
+        colData = tibble::column_to_rownames(as.data.frame(sample_info), "sample_id"),
         design = as.formula(snakemake@params[["design"]])) %>%
     saveRDS(snakemake@output[[1]])
