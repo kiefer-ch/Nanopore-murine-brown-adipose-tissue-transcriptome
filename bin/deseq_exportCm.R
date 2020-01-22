@@ -37,7 +37,7 @@ ntd <- normTransform(dds)
 assay(rld) %>%
     as_tibble(rownames = id) %>%
     left_join(biomart, by = id) %>%
-    dplyr::select(ensembl_gene_id_version, mgi_symbol, description,
+    dplyr::select(starts_with("ensembl_"), mgi_symbol, description,
         gene_biotype, everything()) %>%
     write_csv(snakemake@output[["rld"]])
 
@@ -45,7 +45,7 @@ assay(rld) %>%
 assay(ntd) %>%
     as_tibble(rownames = id) %>%
     left_join(biomart, by = id) %>%
-    dplyr::select(ensembl_gene_id_version, mgi_symbol, description,
+    dplyr::select(starts_with("ensembl_"), mgi_symbol, description,
         gene_biotype, everything()) %>%
     write_csv(snakemake@output[["ntd"]])
 
@@ -62,7 +62,7 @@ if (as.logical(snakemake@params[["tpm"]])) {
     tpm %>%
         as_tibble(rownames = id) %>%
         left_join(biomart, by = id) %>%
-        dplyr::select(ensembl_gene_id_version, mgi_symbol, description,
+        dplyr::select(starts_with("ensembl_"), mgi_symbol, description,
             gene_biotype, everything()) %>%
         write_csv(snakemake@output[["tpm"]])
 }
@@ -71,6 +71,6 @@ if (as.logical(snakemake@params[["tpm"]])) {
 counts(dds, normalized = FALSE) %>%
     as_tibble(rownames = id) %>%
     left_join(biomart, by = id) %>%
-    dplyr::select(ensembl_gene_id_version, mgi_symbol, description,
+    dplyr::select(starts_with("ensembl_"), mgi_symbol, description,
         gene_biotype, everything()) %>%
     write_csv(snakemake@output[["cts"]])

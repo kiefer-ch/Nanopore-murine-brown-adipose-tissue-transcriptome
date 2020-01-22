@@ -135,51 +135,106 @@ rule deseq_exportCm_ont_txlevel:
 
 
 # DGE
-rule deseq_genelevel_ont:
-    threads: 4
-    params:
-        out_folder = "res/deseq/illumina/genelevel_ont"
+rule deseq_dge_apeglm:
     input:
-        "data/dds_gencode.vM22_gene_ont.rds",
-        "data/biotype_groups.csv"
+        dds = "{file_path}/{dataset}_genelevel_dds.rds",
+        biomart = "annotation/biomaRt_gene.rds"
     output:
-        "res/deseq/illumina/genelevel_ont/deseq_genelevel_ont.html"
+        "{file_path}/{dataset}_genelevel_apeglm_results.csv.gz",
+    params:
+        level = "genelevel",
+        shrink = 1,
+        lfcThreshold = 1,
+        alpha = 0.05
+    threads: 4
     script:
-        "deseq_genelevel_ont.Rmd"
+        "deseq_dge.R"
 
-rule deseq_genelevel_all:
-    threads: 4
-    params:
-        out_folder = "res/deseq/illumina/genelevel_all"
+
+rule deseq_dge_noShrink:
     input:
-        "data/dds_gencode.vM22_gene.rds",
-        "data/biotype_groups.csv"
+        dds = "{file_path}/{dataset}_genelevel_dds.rds",
+        biomart = "annotation/biomaRt_gene.rds"
     output:
-        "res/deseq/illumina/genelevel_all/deseq_genelevel_all.html"
+        "{file_path}/{dataset}_genelevel_noshrink_results.csv.gz",
+    params:
+        level = "genelevel",
+        shrink = 0,
+        lfcThreshold = 1,
+        alpha = 0.05
+    threads: 4
     script:
-        "deseq_genelevel_all.Rmd"
+        "deseq_dge.R"
+
 
 # DTE
-rule deseq_txlevel_ont:
-    threads: 4
-    params:
-        out_folder = "res/deseq/illumina/txlevel_ont"
+rule deseq_dte_apeglm:
     input:
-        "data/dds_gencode.vM22_transcript_ont.rds",
-        "data/biotype_groups.csv"
+        dds = "{file_path}/{dataset}_txlevel_dds.rds",
+        biomart = "annotation/biomaRt_tx.rds"
     output:
-        "res/deseq/illumina/txlevel_ont/deseq_txlevel_ont.html"
+        "{file_path}/{dataset}_txlevel_apeglm_results.csv.gz",
+    params:
+        level = "txlevel",
+        shrink = 1,
+        lfcThreshold = 1,
+        alpha = 0.05
+    threads: 4
     script:
-        "deseq_txlevel_ont.Rmd"
+        "deseq_dge.R"
 
-rule deseq_txlevel_all:
-    threads: 4
-    params:
-        out_folder = "res/deseq/illumina/txlevel_all"
+
+rule deseq_dte_noShrink:
     input:
-        "data/dds_gencode.vM22_transcript.rds",
-        "data/biotype_groups.csv"
+        dds = "{file_path}/{dataset}_txlevel_dds.rds",
+        biomart = "annotation/biomaRt_tx.rds"
     output:
-        "res/deseq/illumina/txlevel_all/deseq_txlevel_all.html"
+        "{file_path}/{dataset}_txlevel_noshrink_results.csv.gz",
+    params:
+        level = "txlevel",
+        shrink = 0,
+        lfcThreshold = 1,
+        alpha = 0.05
+    threads: 4
     script:
-        "deseq_txlevel_all.Rmd"
+        "deseq_dge.R"
+
+
+# pathway analysis
+rule topgo_analysis:
+    input:
+        "{file}_results.csv.gz"
+    output:
+        "{file}_topgo.csv.gz"
+    params:
+        level = "genelevel",
+        shrink = 1
+    script:
+        "deseq_topgo.R"
+
+
+rule reactome_analysis:
+    input:
+        "{file}_{level}_{shrink}_results.csv.gz"
+    output:
+        "{file}_{level}_{shrink}_reactome.rds"
+    params:
+        level = "{level}",
+        shrink = "{shrink}"
+    wildcard_constraints:
+        level = "genelevel|txlevel",
+        shrink = "apeglm|noShrink"
+    script:
+        "deseq_reactome.R"
+
+
+# summary
+rule deseq_summary:
+    input:
+        res = "{file}_results.csv.gz",
+        topgo = "{file}_topgo.csv.gz",
+        reactome = "{file}_reactome.rds"
+    output:
+        "{file}.html"
+    script:
+        "deseq_summary.Rmd"
