@@ -39,7 +39,7 @@ res <- results(dds,
     parallel = TRUE, BPPARAM = BPPARAM)
 
 # shrinking log2 fold change
-if (as.logical(snakemake@params[["shrink"]])) {
+if (snakemake@params[["shrink"]] == "apeglm") {
     res <- lfcShrink(dds,
         coef = "condition_temp_4_vs_22",
         res = res,

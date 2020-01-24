@@ -52,6 +52,7 @@ geneList_signif <- df_reactome %>%
     filter(get(pvalue_name) < .05) %>%
     dplyr::select(log2FoldChange, entrezgene_id) %>%
     tibble::deframe()
+saveRDS(geneList_signif, snakemake@output[[2]])
 
 # perform pathway analysis
 res_reactome <- enrichPathway(geneList_signif,
