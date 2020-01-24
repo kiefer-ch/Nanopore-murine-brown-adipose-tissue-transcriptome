@@ -53,6 +53,34 @@ rule import_deseq_teloprime_transcript:
         "deseq_teloprime.R"
 
 
+rule import_deseq_cdna_gene:
+    input:
+        counts = expand("res/wien/direct_cDNA/pool{pool}/20200108_pool{pool}_transcriptome_barcode{barcode}_q7_counts.tsv.gz",
+            barcode=["07","08","09","10","11","12"], pool=[1,2]),
+        sample_info = "sample_info/sampleInfo.csv"
+    params:
+        txOut = 0,
+        design = "~condition_temp"
+    output:
+        dds = "res/deseq/cdna/genelevel/cdna_genelevel_dds.rds"
+    script:
+        "deseq_cDNA.R"
+
+
+rule import_deseq_cdna_tx:
+    input:
+        counts = expand("res/wien/direct_cDNA/pool{pool}/20200108_pool{pool}_transcriptome_barcode{barcode}_q7_counts.tsv.gz",
+            barcode=["07","08","09","10","11","12"], pool=[1,2]),
+        sample_info = "sample_info/sampleInfo.csv"
+    params:
+        txOut = 1,
+        design = "~condition_temp"
+    output:
+        dds = "res/deseq/cdna/txlevel/cdna_txlevel_dds.rds"
+    script:
+        "deseq_cDNA.R"
+
+
 # qc
 rule deseq_qc:
     input:
@@ -99,7 +127,7 @@ rule deseq_exportCm_ont:
         level = "{level}",
         vst = 0
     wildcard_constraints:
-        dataset = "teloprime",
+        dataset = "teloprime|cdna",
         level = "genelevel|txlevel"
     output:
         cts = "{file_path}/{dataset}_{level}_cm_cts.csv.gz",
