@@ -1,11 +1,11 @@
 rule tximport_dexseq_illumina:
     input:
-        salmone_out = expand("salmon/{sample}/quant.sf", sample=SAMPLES_ont),
+        salmon_out = expand("salmon/{sample}/quant.sf", sample=SAMPLES_ont),
         sample_info = "sample_info/sampleInfo.csv"
     output:
         "res/dexseq/illumina/dexseq_scaledTPM.rds"
     script:
-        "txImport_dexseq.R"
+        "dexseq_txImport.R"
 
 
 rule dexseq_prefilterIsoforms_illumina:
@@ -22,16 +22,18 @@ rule dexseq_prefilterIsoforms_illumina:
         "dexseq_prefilterIsoforms.R"
 
 
-rule dexseq_prefilterIsoforms_teloprime:
+rule dexseq_prefilterIsoforms_ont:
     input:
+        counts = "res/deseq/{dataset}/txlevel/{dataset}_txlevel_cm_ntd.csv.gz",
         annotation = "annotation/annotation.gtf",
         txdb = "annotation/annotation_txdb.sqlite",
-        counts = "res/deseq/teloprime/txlevel/teloprime_txlevel_cm_ntd.csv.gz",
         sampleInfo = "sample_info/sampleInfo.csv"
     params:
         threshold = 15
     output:
-        "indices/dexseq/annotation_teloprime_prefiltered.gtf"
+        "indices/dexseq/annotation_{dataset}_prefiltered.gtf"
+    wildcard_constraints:
+        dataset = "teloprime|cdna"
     script:
         "dexseq_prefilterIsoforms_ont.R"
 
@@ -43,7 +45,7 @@ rule dexseq_prepareAnnotation:
         gff = "indices/dexseq/annotation_{dataset}_flat.gff",
         gtf = "indices/dexseq/annotation_{dataset}_flat.gtf"
     wildcard_constraints:
-        dataset = "illumina|teloprime"
+        dataset = "illumina|teloprime|cdna"
     shell:
         "python3 bin/dexseq_prepare_annotation2.py \
             --aggregate no \
@@ -52,14 +54,24 @@ rule dexseq_prepareAnnotation:
             {output.gff}"
 
 
-rule featureCounts_count_teloprime:
+def get_bam_ont(wildcards):
+    if wildcards.dataset == "teloprime":
+        BARC = SAMPLE_INFO_illumina[SAMPLE_INFO_illumina["ont"].notnull()]["ont"].tolist()
+    elif wildcards.dataset == "cdna":
+        BARC = SAMPLE_INFO_illumina[SAMPLE_INFO_illumina["cdna"].notnull()]["cdna"].tolist()
+    return expand("bam/{dataset}/{barcode}_genome.bam", barcode=BARC, dataset=wildcards.dataset)
+
+
+rule featureCounts_count_ont:
     input:
-        files = expand("bam/teloprime/{barcode}_genome.bam", barcode=BARCODES),
-        annotation = "indices/dexseq/annotation_teloprime_flat.gtf",
+        files = get_bam_ont,
+        annotation = "indices/dexseq/annotation_{dataset}_flat.gtf",
     threads:
         20
     output:
-        "res/dexseq/teloprime/teloprime_featureCounts.out"
+        "res/dexseq/{dataset}/{dataset}_featureCounts.out"
+    wildcard_constraints:
+        dataset = "illumina|teloprime|cdna"
     shell:
         "featureCounts --donotsort \
             -L \
@@ -100,7 +112,7 @@ rule dexseq_importCounts_from_featureCounts:
         annotation = "indices/dexseq/annotation_{dataset}_flat.gtf",
         sample_info = "sample_info/sampleInfo.csv"
     wildcard_constraints:
-        dataset = "illumina|teloprime"
+        dataset = "illumina|teloprime|cdna"
     output:
         "res/dexseq/{dataset}/{dataset}_dxd.rds",
     script:

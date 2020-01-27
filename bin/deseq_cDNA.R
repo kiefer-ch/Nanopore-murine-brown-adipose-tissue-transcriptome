@@ -55,6 +55,7 @@ if (as.logical(snakemake@params[["txOut"]])) {
         data.matrix()
 }
 
+# set colnames to sample_id
 lookup <- sample_info$sample_id
 names(lookup) <- sample_info$cdna
 

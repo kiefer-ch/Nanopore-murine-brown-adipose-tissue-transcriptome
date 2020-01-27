@@ -1,7 +1,5 @@
 #!/usr/bin/Rscript --no-restore --no-environ --no-save
 
-save.image("drimseq.RData")
-
 # set libpaths to packrat local library
 source("packrat/init.R")
 library("readr")
@@ -27,13 +25,15 @@ txdf <- AnnotationDbi::loadDb(snakemake@input[["txdb"]])  %>%
     ungroup()
 
 message("Import counts...")
-cts <- read_tsv(snakemake@input[["counts"]]) %>%
-    tidyr::separate(transcript, c("TXNAME", "GENEID"), sep = '\\|', extra = "drop") %>%
-    tidyr::drop_na()
+cts <- read_csv(snakemake@input[["counts"]]) %>%
+    dplyr::select(-ensembl_gene_id_version, -mgi_symbol, -description, -gene_biotype, -transcript_biotype,
+        -transcript_length) %>%
+    dplyr::rename(TXNAME = "ensembl_transcript_id_version")
+
 txdf <- txdf[match(cts$TXNAME, txdf$TXNAME),]
 
 counts <- cts %>%
-    left_join(txdf, by = c("TXNAME", "GENEID")) %>%
+    left_join(txdf, by = "TXNAME") %>%
     dplyr::rename(gene_id = "GENEID",
         feature_id = "TXNAME") %>%
     as.data.frame()
@@ -44,10 +44,6 @@ sample_info <- read_csv(snakemake@input[["sample_info"]]) %>%
     mutate_at(vars(matches("condition")), as.factor) %>%
     as.data.frame()
 
-# This line is not good style!
-colnames(counts)[3:8] <- sample_info$sample_id
-
-message("Create dnds")
+message("Create dmds")
 dmds <- dmDSdata(counts = counts, samples = sample_info)
 saveRDS(dmds, snakemake@output[[1]])
-

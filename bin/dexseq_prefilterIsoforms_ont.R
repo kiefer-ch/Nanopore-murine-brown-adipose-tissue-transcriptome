@@ -1,10 +1,8 @@
 #!/usr/bin/Rscript --no-restore --no-environ --no-save
 
-# set libpaths to packrat local library
 source("packrat/init.R")
-
-suppressPackageStartupMessages(library("readr"))
-suppressPackageStartupMessages(library("dplyr"))
+library("readr")
+library("dplyr")
 
 ################################################################################
 #
@@ -26,20 +24,20 @@ tx2g <- AnnotationDbi::loadDb(snakemake@input[["txdb"]]) %>%
 message("Collecting sample info")
 sample_info <- suppressMessages(read_csv(snakemake@input[["sampleInfo"]])) %>%
     mutate_at(vars(matches("condition")), as.factor) %>%
-    dplyr::select(sample = "illumina", condition_temp) %>%
-    filter(!is.na(sample))
+    dplyr::select(sample_id, condition_temp)
 
 message("Calculating which transcripts should be kept...")
 # keep only those transcripts, that in at least one condition have more then
 # threshold % of the TPM
 df <- read_csv(snakemake@input[["counts"]]) %>%
-    dplyr::select(-mgi_symbol, -gene_name) %>%
-    dplyr::rename(ensembl_transcript_id_version = "transcript_id_ens") %>%
+    dplyr::select(-mgi_symbol, -ensembl_gene_id_version, -description,
+        -gene_biotype, -transcript_biotype, -transcript_length) %>%
     left_join(tx2g, by = "ensembl_transcript_id_version") %>%
-    tidyr::gather(key = sample, value = "counts", -ensembl_gene_id_version,
+    tidyr::gather(key = sample_id, value = "counts", -ensembl_gene_id_version,
         -ensembl_transcript_id_version) %>%
+    mutate(counts = (2^counts) - 1) %>% # ntd is log2(x+1)
     filter(counts != 0) %>%
-    left_join(sample_info, by = "sample") %>%
+    left_join(sample_info, by = "sample_id") %>%
     group_by(condition_temp, ensembl_gene_id_version, ensembl_transcript_id_version) %>%
     summarise(counts = sum(counts)) %>%
     mutate(freq = counts / sum(counts)) %>%

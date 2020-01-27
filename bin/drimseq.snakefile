@@ -1,8 +1,19 @@
 # illumina reads
+rule tximport_drimseq_illumina:
+    input:
+        salmon_out = expand("salmon/{sample}/quant.sf", sample=SAMPLES_ont),
+        txdb = "annotation/annotation_txdb.sqlite",
+        sample_info = "sample_info/sampleInfo.csv"
+    output:
+        "res/drimseq/illumina/drimseq_dtuScaledTPM.rds"
+    script:
+        "drimseq_txImport.R"
+
+
 rule drimseq_dmdsFromScaledTpm:
     input:
+        tpm = "res/drimseq/illumina/drimseq_dtuScaledTPM.rds",
         txdb = "annotation/annotation_txdb.sqlite",
-        tpm = "res/dexseq/illumina/dexseq_scaledTPM.rds",
         sample_info = "sample_info/sampleInfo.csv"
     output:
         "res/drimseq/illumina/illumina_dmds.rds"
@@ -19,34 +30,46 @@ rule drimseq_dmdsFromCountMatrix_flair:
     output:
         "res/drimseq/{dataset}_flair/{dataset}_flair_dmds.rds"
     wildcard_constraints:
-        dataset = "teloprime"
+        dataset = "teloprime|cdna"
     script:
         "drimseq_dmdsFromCountMatrix_flair.R"
 
 
-rule drimseq_dmdsFromCountMatrix_teloprime:
+rule drimseq_dmdsFromCountMatrix:
     input:
         txdb = "annotation/annotation_txdb.sqlite",
-        counts = "res/wien/teloprime/DE/ONT_newbasecalling/6samples_counts.tsv",
+        counts = "res/deseq/{dataset}/txlevel/{dataset}_txlevel_cm_cts.csv.gz",
         sample_info = "sample_info/sampleInfo.csv"
     output:
-        "res/drimseq/teloprime/teloprime_dmds.rds"
+        "res/drimseq/{dataset}/{dataset}_dmds.rds"
+    wildcard_constraints:
+        dataset = "teloprime|cdna"
     script:
         "drimseq_dmdsFromCountMatrix.R"
 
 
 # common
-rule drimseq_stageR:
+rule drimseq_dtu:
     input:
         dmds = "{file}_dmds.rds",
-        biomaRt_gene = "annotation/biomaRt_gene.rds",
-        biomaRt_tx = "annotation/biomaRt_tx.rds"
-    params:
-        out_folder = "{file}"
+        biomaRt_gene = "annotation/biomaRt_gene.rds"
     output:
-        "{file}_drimSeqStageR.html"
+        dmds = "{file}_dmds_dtu.rds",
+        res = "{file}_drimSeqStageR.csv"
     threads:
         4
+    script:
+        "drimseq_dtu.R"
+
+
+rule drimseq_report:
+    input:
+        dmds = "{file}_dmds_dtu.rds",
+        res = "{file}_drimSeqStageR.csv",
+        biomaRt_gene = "annotation/biomaRt_gene.rds",
+        biomaRt_tx = "annotation/biomaRt_tx.rds"
+    output:
+        "{file}_drimSeqStageR.html"
     script:
         "drimseq_stagerAnalysis.Rmd"
 
