@@ -52,7 +52,7 @@ rule bam_getCoverage:
         "bam/{dataset}/{file}_transcriptome.bam",
         "bam/{dataset}/{file}_transcriptome.bam.bai"
     wildcard_constraints:
-        dataset = "teloprime"
+        dataset = "teloprime|cdna"
     output:
         "res/comparisons/coverage/{dataset}/{file}.rds"
     script:
