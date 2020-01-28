@@ -44,6 +44,21 @@ rule merge_bam_teloprime:
     shell:
         "samtools merge {output} {input.bam1} {input.bam2}"
 
+
+rule merge_bam_cDNA:
+    input:
+        bam1 = "bam/cdna/pool1/20200108_pool1_{type}_{barcode}_q7_sort.bam",
+        bai1 = "bam/cdna/pool1/20200108_pool1_{type}_{barcode}_q7_sort.bam.bai",
+        bam2 = "bam/cdna/pool2/20200108_pool2_{type}_{barcode}_q7_sort.bam",
+        bai2 = "bam/cdna/pool2/20200108_pool2_{type}_{barcode}_q7_sort.bam.bai"
+    wildcard_constraints:
+        type = "genome|transcriptome"
+    output:
+        "bam/cdna/{barcode}_{type}.bam"
+    shell:
+        "samtools merge {output} {input.bam1} {input.bam2}"
+
+
 rule bamCoverage_nonstranded:
     input:
         bam = "bam/teloprime/{barcode}_genome.bam",

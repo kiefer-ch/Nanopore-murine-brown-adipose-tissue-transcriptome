@@ -19,6 +19,7 @@ MASHMAP = "/data/home/christophak/bin/mashmap"
 
 # Sample IDs
 SAMPLE_INFO = pd.read_csv("sample_info/sampleInfo.csv", sep=',')
+SAMPLE_INFO = SAMPLE_INFO.set_index("sample_id")
 SAMPLE_INFO_illumina = SAMPLE_INFO[SAMPLE_INFO["illumina"].notnull()]
 SAMPLES = SAMPLE_INFO_illumina["illumina"].tolist()
 SAMPLE_INFO_ont = SAMPLE_INFO[SAMPLE_INFO["ont"].notnull()]
@@ -87,6 +88,13 @@ rule illumina_trimm:
             qc/fastqc qc/cutadapt \
             -o qc \
             -n multiqc_trimmed.html"
+
+rule dexseq_all:
+    input:
+        expand("res/dexseq/{dataset}/{dataset}_heatmap.html",
+            dataset=["illumina", "teloprime", "cdna"]),
+        expand("res/dexseq/illumina/illumina_dexseq_results.csv.gz",
+            dataset=["illumina", "teloprime", "cdna"])
 
 # Include other rules
 include: "bin/annotation.snakefile"

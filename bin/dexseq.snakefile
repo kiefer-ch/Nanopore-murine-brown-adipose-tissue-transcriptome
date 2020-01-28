@@ -17,7 +17,7 @@ rule dexseq_prefilterIsoforms_illumina:
     params:
         threshold = 15
     output:
-        "indices/dexseq/annotation_prefiltered.gtf"
+        "indices/dexseq/annotation_illumina_prefiltered.gtf"
     script:
         "dexseq_prefilterIsoforms.R"
 
@@ -55,11 +55,18 @@ rule dexseq_prepareAnnotation:
 
 
 def get_bam_ont(wildcards):
+    files = list()
     if wildcards.dataset == "teloprime":
-        BARC = SAMPLE_INFO_illumina[SAMPLE_INFO_illumina["ont"].notnull()]["ont"].tolist()
+        for barcode in SAMPLE_INFO_ont["ont"]:
+            filename = "bam/{}/{}_genome.bam".format(
+                wildcards.dataset, barcode)
+            files.append(filename)
     elif wildcards.dataset == "cdna":
-        BARC = SAMPLE_INFO_illumina[SAMPLE_INFO_illumina["cdna"].notnull()]["cdna"].tolist()
-    return expand("bam/{dataset}/{barcode}_genome.bam", barcode=BARC, dataset=wildcards.dataset)
+        for barcode in SAMPLE_INFO_ont["cdna"]:
+            filename = "bam/{}/{}_genome.bam".format(
+                wildcards.dataset, barcode)
+            files.append(filename)
+    return files
 
 
 rule featureCounts_count_ont:
@@ -71,7 +78,7 @@ rule featureCounts_count_ont:
     output:
         "res/dexseq/{dataset}/{dataset}_featureCounts.out"
     wildcard_constraints:
-        dataset = "illumina|teloprime|cdna"
+        dataset = "teloprime|cdna"
     shell:
         "featureCounts --donotsort \
             -L \
@@ -93,7 +100,7 @@ rule featureCounts_count_illumina:
     threads:
         20
     output:
-        "res/dexseq/illumina/illlumina_featureCounts.out"
+        "res/dexseq/illumina/illumina_featureCounts.out"
     shell:
         "featureCounts --donotsort \
             -s 2 -p \
@@ -108,7 +115,7 @@ rule featureCounts_count_illumina:
 
 rule dexseq_importCounts_from_featureCounts:
     input:
-        counts = "res/dexseq/{dataset}/{dataset}_flair_featureCounts.out",
+        counts = "res/dexseq/{dataset}/{dataset}_featureCounts.out",
         annotation = "indices/dexseq/annotation_{dataset}_flat.gtf",
         sample_info = "sample_info/sampleInfo.csv"
     wildcard_constraints:
@@ -123,30 +130,36 @@ rule dexseq_diffExonUsage:
     threads:
         10
     input:
-        "{file}_dxd.rds",
+        "res/dexseq/{dataset}/{dataset}_dxd.rds",
     output:
-        dxd = "{file}_dxd_diff.rds",
-        report = "{file}_dexseq.html"
+        dxd = "res/dexseq/{dataset}/{dataset}_dxd_diff.rds",
+        report = "res/dexseq/{dataset}/{dataset}_dexseq.html"
+    wildcard_constraints:
+        dataset = "illumina|teloprime|cdna"
     script:
         "dexseq_diffExonUsage.R"
 
 
 rule dexseq_heatmap:
     input:
-        dxd = "{file}_dxd_diff.rds",
+        dxd = "res/dexseq/{dataset}/{dataset}_dxd_diff.rds",
         biomaRt_gene = "annotation/biomaRt_gene.rds"
     params:
         pvalue_cutoff = .05
     output:
-        "{file}_heatmap.html"
+        "res/dexseq/{dataset}/{dataset}_heatmap.html"
+    wildcard_constraints:
+        dataset = "illumina|teloprime|cdna"
     script:
         "dexseq_heatmap.Rmd"
 
 rule dexseq_resultsTable:
     input:
-        dxd = "{file}_dxd_diff.rds",
+        dxd = "res/dexseq/{dataset}/{dataset}_dxd_diff.rds",
         biomaRt_gene = "annotation/biomaRt_gene.rds"
     output:
-        "{file}_dexseq_results.csv.gz"
+        "res/dexseq/{dataset}/{dataset}_dexseq_results.csv.gz"
+    wildcard_constraints:
+        dataset = "illumina|teloprime|cdna"
     script:
         "dexseq_resultsTable.R"

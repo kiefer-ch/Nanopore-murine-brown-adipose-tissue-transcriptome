@@ -25,7 +25,7 @@ rule drimseq_dmdsFromScaledTpm:
 rule drimseq_dmdsFromCountMatrix_flair:
     input:
         txdb = "flair/{dataset}/flair.collapse.isoforms_txdb.sqlite",
-        counts = "flair/{dataset}/flair_teloprime_counts_matrix.tsv",
+        counts = "flair/{dataset}/flair_{dataset}_counts_matrix.tsv",
         sample_info = "sample_info/sampleInfo.csv"
     output:
         "res/drimseq/{dataset}_flair/{dataset}_flair_dmds.rds"
