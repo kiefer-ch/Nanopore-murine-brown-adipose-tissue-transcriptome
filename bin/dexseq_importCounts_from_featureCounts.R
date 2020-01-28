@@ -2,9 +2,9 @@
 
 # set libpaths to packrat local library
 source("packrat/init.R")
-suppressPackageStartupMessages(library("readr"))
-suppressPackageStartupMessages(library("dplyr"))
-suppressPackageStartupMessages(library("DEXSeq"))
+library("readr")
+library("dplyr")
+library("DEXSeq")
 source("bin/load_SubreadOutput.R")
 
 ################################################################################

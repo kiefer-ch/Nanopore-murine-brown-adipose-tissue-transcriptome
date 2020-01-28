@@ -13,10 +13,6 @@ editor_options:
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = FALSE)
 ```
 
-```{r}
-#save.image("quantification_correlation.RData")
-```
-
 ```{r loadPackages}
 source("packrat/init.R")
 library("dplyr")
@@ -31,69 +27,40 @@ library("scales")
 ```
 
 ```{r importData}
-teloprime_tx_raw <- read_csv(snakemake@input[["teloprime_tx_raw"]])
-illumina_tx_raw <- read_csv(snakemake@input[["illumina_tx_raw"]])
-teloprime_tx_ntd <- read_csv(snakemake@input[["teloprime_tx_norm"]])
-tpm_tx <- read_csv(snakemake@input[["tpm_tx"]])
-
-teloprime_gene_raw <- read_csv(snakemake@input[["teloprime_gene_raw"]])
-illumina_gene_raw <- read_csv(snakemake@input[["illumina_gene_raw"]])
-teloprime_gene_ntd <- read_csv(snakemake@input[["teloprime_gene_norm"]])
-tpm_gene <- read_csv(snakemake@input[["tpm_gene"]])
-
-
-sample_info <- read_csv(snakemake@input[["sample_info"]]) %>% 
-    filter(!is.na(ont)) %>%
-    mutate_at(vars(matches("condition")), as.factor) %>%
-    rename(sample = "illumina")
-
+# biomart
 biomaRt_tx <- read_rds(snakemake@input[["biomaRt_tx"]])
 biomaRt_gene <- read_rds(snakemake@input[["biomaRt_gene"]])
 biotype_groups <- read_csv(snakemake@input[["biotype_groups"]])
-```
 
-```{r}
-get_detectedFeatures <- function(df, cutoff = 1) {
-    df %>% 
-        select(-mgi_symbol, -gene_name) %>%
-        as.data.frame() %>%
-        magrittr::set_rownames(.$gene_id_ens) %>%
-        `[`( ,-1) %>%
-        data.matrix() %>% 
-        rowSums() %>% 
-        (function(x) x >= cutoff) %>% 
-        tibble::enframe() %>% 
-        filter(value == TRUE) %>% 
-        pull(name)
-}
-```
+# gene level
+df_gene <- c(snakemake@input[["gene_counts"]], snakemake@input[["gene_tpm"]]) %>% 
+    set_names(basename(.)) %>% 
+    map(read_csv) %>%
+    map(select, -mgi_symbol, -description, -gene_biotype) %>% 
+    map(tidyr::gather, key = "sample_id", value = "counts", -ensembl_gene_id_version) %>% 
+    bind_rows(.id = "dataset") %>% 
+    tidyr::separate(dataset, "dataset", extra = "drop")
 
-# Transcripts
+df_gene_average <- df_gene %>% 
+    group_by(dataset, ensembl_gene_id_version) %>% 
+    summarise(average_counts = mean(counts)) %>% 
+    left_join(biomaRt_gene, by = "ensembl_gene_id_version") %>% 
+    left_join(biotype_groups, by = c("gene_biotype" = "transcript_biotype"))
 
-```{r}
-detected_by_teloprime <- get_detectedFeatures(teloprime_tx_raw)
-detected_by_illumina <- get_detectedFeatures(illumina_tx_raw)
-```
+# tx level
+df_tx <- c(snakemake@input[["tx_counts"]], snakemake@input[["tx_tpm"]]) %>% 
+    set_names(basename(.)) %>% 
+    map(read_csv) %>%
+    map(select, -mgi_symbol, -description, -gene_biotype, -transcript_biotype, -transcript_length) %>% 
+    map(tidyr::gather, key = "sample_id", value = "counts", 
+        -ensembl_gene_id_version, -ensembl_transcript_id_version) %>% 
+    bind_rows(.id = "dataset") %>% 
+    tidyr::separate(dataset, "dataset", extra = "drop")
 
-```{r}
-get_averageExpression <- function(df) {
-    df %>% 
-        select(-mgi_symbol, -gene_name) %>%
-        as.data.frame() %>%
-        magrittr::set_rownames(.$transcript_id_ens) %>%
-        `[`( ,-1) %>%
-        data.matrix() %>% 
-        (function(x) exp(rowMeans(log(x), na.rm = TRUE))) %>% 
-        tibble::enframe("ensembl_transcript_id_version", "counts")
-}
-
-df <- list(teloprime_tx_ntd, tpm_tx) %>% 
-    map(get_averageExpression) %>% 
-    reduce(left_join, by = "ensembl_transcript_id_version",
-        suffix = c("_teloprime", "_tpm")) %>% 
-    filter(ensembl_transcript_id_version %in% detected_by_teloprime | 
-        ensembl_transcript_id_version %in% detected_by_illumina) %>% 
-    left_join(biomaRt_tx, by = "ensembl_transcript_id_version") %>% 
+df_tx_average <- df_tx %>% 
+    group_by(dataset, ensembl_gene_id_version) %>% 
+    summarise(average_counts = mean(counts)) %>% 
+    left_join(biomaRt_tx, by = "ensembl_gene_id_version") %>% 
     left_join(biotype_groups, by = "transcript_biotype")
 ```
 
@@ -104,17 +71,25 @@ mylog10_trans <- function (base = 10) {
   trans_new(paste0("log-", format(base)), trans, inv, log_breaks(base = base), 
             domain = c(1e-100, Inf))
 }
+```
 
-df %>% 
+# Illumina vs teloprime
+
+## Genes
+
+```{r}
+df_gene_average %>% 
+    filter(dataset %in% c("illumina", "teloprime")) %>% 
+    mutate(average_counts = 2^average_counts - 1) %>% 
+    tidyr::spread(dataset, average_counts) %>%
     tidyr::drop_na() %>% 
-    mutate(counts_teloprime = 2^counts_teloprime - 1) %>% 
-    ggplot(aes(counts_tpm, counts_teloprime)) +
-    geom_point(aes(colour = grouped_biotype)) +
-    geom_abline(slope = 1) +
+    ggplot(aes(illumina, teloprime)) +
+    geom_point(aes(colour = grouped_biotype))  +
+    geom_abline(slope = 1, lty = 2) +
     stat_poly_eq(formula = y ~ x,
-            aes(label = paste(..rr.label.., sep = "~~~")),
-            parse = TRUE, family = "serif", size = 3, colour = "grey30",
-            label.x.npc = "left", label.y.npc = "top") +
+        aes(label = paste(..rr.label.., sep = "~~~")),
+        parse = TRUE, family = "serif", size = 3, colour = "grey30",
+        label.x.npc = "left", label.y.npc = "top") +
     scale_x_continuous(
         breaks = c(.1, 1, 10, 100, 1000, 10000),
         labels = function(x) signif(x),
@@ -123,28 +98,28 @@ df %>%
         breaks = c(.1, 1, 10, 100, 1000, 10000),
         labels = function(x) signif(x),
         trans = "mylog10") +
-    scale_colour_viridis_d() +
+    scale_colour_viridis_d(name = "Gene biotype") +
     theme_tufte() +
     geom_rangeframe(sides = 'bl', na.rm = FALSE) +
     xlab("Average illumina tpm") +
     ylab("Average teloprime counts")
 ```
 
-#### Transcript length, only coding transcripts
+## Transcripts
 
-```{r transcripts_by_length}
-df %>% 
-    filter(transcript_biotype == "protein_coding") %>% 
-    filter(transcript_length < 10000) %>% 
+```{r}
+df_tx_average %>% 
+    filter(dataset %in% c("illumina", "teloprime")) %>% 
+    mutate(average_counts = 2^average_counts - 1) %>% 
+    tidyr::spread(dataset, average_counts) %>%
     tidyr::drop_na() %>% 
-    mutate(counts_teloprime = 2^counts_teloprime - 1) %>% 
-    ggplot(aes(counts_tpm, counts_teloprime)) +
-    geom_point(aes(colour = transcript_length)) +
-    geom_abline(slope = 1) +
+    ggplot(aes(illumina, teloprime)) +
+    geom_point(aes(colour = grouped_biotype))  +
+    geom_abline(slope = 1, lty = 2) +
     stat_poly_eq(formula = y ~ x,
-            aes(label = paste(..rr.label.., sep = "~~~")),
-            parse = TRUE, family = "serif", size = 3, colour = "grey30",
-            label.x.npc = "left", label.y.npc = "top") +
+        aes(label = paste(..rr.label.., sep = "~~~")),
+        parse = TRUE, family = "serif", size = 3, colour = "grey30",
+        label.x.npc = "left", label.y.npc = "top") +
     scale_x_continuous(
         breaks = c(.1, 1, 10, 100, 1000, 10000),
         labels = function(x) signif(x),
@@ -153,26 +128,30 @@ df %>%
         breaks = c(.1, 1, 10, 100, 1000, 10000),
         labels = function(x) signif(x),
         trans = "mylog10") +
-    scale_colour_viridis_c(trans = "log") +
+    scale_colour_viridis_d(name = "Transcript biotype") +
     theme_tufte() +
     geom_rangeframe(sides = 'bl', na.rm = FALSE) +
     xlab("Average illumina tpm") +
     ylab("Average teloprime counts")
 ```
 
+# Illumina vs direct cDNA
+
+## Genes
 
 ```{r}
-df %>% 
+df_gene_average %>% 
+    filter(dataset %in% c("illumina", "cdna")) %>% 
+    mutate(average_counts = 2^average_counts - 1) %>% 
+    tidyr::spread(dataset, average_counts) %>%
     tidyr::drop_na() %>% 
-    mutate(counts_teloprime = 2^counts_teloprime - 1) %>% 
-    ggplot(aes(counts_tpm, counts_teloprime)) +
-    geom_hex() +
-    geom_abline(slope = 1) +
+    ggplot(aes(illumina, cdna)) +
+    geom_point(aes(colour = grouped_biotype))  +
+    geom_abline(slope = 1, lty = 2) +
     stat_poly_eq(formula = y ~ x,
-            aes(label = paste(..rr.label.., sep = "~~~")),
-            parse = TRUE, family = "serif", size = 3, colour = "grey30",
-            label.x.npc = "left", label.y.npc = "top") +
-    facet_wrap(~ grouped_biotype) +
+        aes(label = paste(..rr.label.., sep = "~~~")),
+        parse = TRUE, family = "serif", size = 3, colour = "grey30",
+        label.x.npc = "left", label.y.npc = "top") +
     scale_x_continuous(
         breaks = c(.1, 1, 10, 100, 1000, 10000),
         labels = function(x) signif(x),
@@ -181,54 +160,28 @@ df %>%
         breaks = c(.1, 1, 10, 100, 1000, 10000),
         labels = function(x) signif(x),
         trans = "mylog10") +
-    scale_fill_viridis_c(trans = "log") +
+    scale_colour_viridis_d(name = "Gene biotype") +
     theme_tufte() +
-    geom_rangeframe(sides = "bl") +
+    geom_rangeframe(sides = 'bl', na.rm = FALSE) +
     xlab("Average illumina tpm") +
-    ylab("Average teloprime counts")
+    ylab("Average direct cDNA counts")
 ```
 
-# Genes
+## Transcripts
 
 ```{r}
-detected_by_teloprime <- get_detectedFeatures(teloprime_gene_raw)
-detected_by_illumina <- get_detectedFeatures(illumina_gene_raw)
-```
-
-```{r}
-get_averageExpression <- function(df) {
-    df %>% 
-        select(-mgi_symbol, -gene_name) %>%
-        as.data.frame() %>%
-        magrittr::set_rownames(.$gene_id_ens) %>%
-        `[`( ,-1) %>%
-        data.matrix() %>% 
-        (function(x) exp(rowMeans(log(x), na.rm = TRUE))) %>% 
-        tibble::enframe("ensembl_gene_id_version", "counts")
-}
-
-df <- list(teloprime_gene_ntd, tpm_gene) %>% 
-    map(get_averageExpression) %>% 
-    reduce(left_join, by = "ensembl_gene_id_version",
-        suffix = c("_teloprime", "_tpm")) %>% 
-    filter(ensembl_gene_id_version %in% detected_by_teloprime | 
-        ensembl_gene_id_version %in% detected_by_illumina) %>% 
-    left_join(biomaRt_gene, by = "ensembl_gene_id_version") %>% 
-    left_join(biotype_groups %>% rename(gene_biotype = "transcript_biotype"),
-        by = "gene_biotype")
-```
-
-```{r}
-df %>% 
+df_tx_average %>% 
+    filter(dataset %in% c("illumina", "cdna")) %>% 
+    mutate(average_counts = 2^average_counts - 1) %>% 
+    tidyr::spread(dataset, average_counts) %>%
     tidyr::drop_na() %>% 
-    mutate(counts_teloprime = 2^counts_teloprime - 1) %>% 
-    ggplot(aes(counts_tpm, counts_teloprime)) +
-    geom_point(aes(colour = grouped_biotype)) +
-    geom_abline(slope = 1) +
+    ggplot(aes(illumina, cdna)) +
+    geom_point(aes(colour = grouped_biotype))  +
+    geom_abline(slope = 1, lty = 2) +
     stat_poly_eq(formula = y ~ x,
-            aes(label = paste(..rr.label.., sep = "~~~")),
-            parse = TRUE, family = "serif", size = 3, colour = "grey30",
-            label.x.npc = "left", label.y.npc = "top") +
+        aes(label = paste(..rr.label.., sep = "~~~")),
+        parse = TRUE, family = "serif", size = 3, colour = "grey30",
+        label.x.npc = "left", label.y.npc = "top") +
     scale_x_continuous(
         breaks = c(.1, 1, 10, 100, 1000, 10000),
         labels = function(x) signif(x),
@@ -237,25 +190,30 @@ df %>%
         breaks = c(.1, 1, 10, 100, 1000, 10000),
         labels = function(x) signif(x),
         trans = "mylog10") +
-    scale_colour_viridis_d() +
+    scale_colour_viridis_d(name = "Transcript biotype") +
     theme_tufte() +
-    geom_rangeframe(sides = "bl") +
+    geom_rangeframe(sides = 'bl', na.rm = FALSE) +
     xlab("Average illumina tpm") +
-    ylab("Average teloprime counts")
+    ylab("Average direct cDNA counts")
 ```
 
+# Teloprime vs direct cDNA
+
+## Genes
+
 ```{r}
-df %>% 
+df_gene_average %>% 
+    filter(dataset %in% c("teloprime", "cdna")) %>% 
+    mutate(average_counts = 2^average_counts - 1) %>% 
+    tidyr::spread(dataset, average_counts) %>%
     tidyr::drop_na() %>% 
-    mutate(counts_teloprime = 2^counts_teloprime - 1) %>% 
-    ggplot(aes(counts_tpm, counts_teloprime)) +
-    geom_hex() +
-    geom_abline(slope = 1) +
+    ggplot(aes(teloprime, cdna)) +
+    geom_point(aes(colour = grouped_biotype))  +
+    geom_abline(slope = 1, lty = 2) +
     stat_poly_eq(formula = y ~ x,
-            aes(label = paste(..rr.label.., sep = "~~~")),
-            parse = TRUE, family = "serif", size = 3, colour = "grey30",
-            label.x.npc = "left", label.y.npc = "top") +
-    facet_wrap(~ grouped_biotype) +
+        aes(label = paste(..rr.label.., sep = "~~~")),
+        parse = TRUE, family = "serif", size = 3, colour = "grey30",
+        label.x.npc = "left", label.y.npc = "top") +
     scale_x_continuous(
         breaks = c(.1, 1, 10, 100, 1000, 10000),
         labels = function(x) signif(x),
@@ -264,9 +222,39 @@ df %>%
         breaks = c(.1, 1, 10, 100, 1000, 10000),
         labels = function(x) signif(x),
         trans = "mylog10") +
-    scale_fill_viridis_c(trans = "log") +
+    scale_colour_viridis_d(name = "Gene biotype") +
     theme_tufte() +
-    geom_rangeframe(sides = "bl") +
-    xlab("Average illumina tpm") +
-    ylab("Average teloprime counts")
+    geom_rangeframe(sides = 'bl', na.rm = FALSE) +
+    xlab("Average teloprime counts") +
+    ylab("Average direct cDNA counts")
+```
+
+## Transcripts
+
+```{r}
+df_tx_average %>% 
+    filter(dataset %in% c("teloprime", "cdna")) %>% 
+    mutate(average_counts = 2^average_counts - 1) %>% 
+    tidyr::spread(dataset, average_counts) %>%
+    tidyr::drop_na() %>% 
+    ggplot(aes(teloprime, cdna)) +
+    geom_point(aes(colour = grouped_biotype))  +
+    geom_abline(slope = 1, lty = 2) +
+    stat_poly_eq(formula = y ~ x,
+        aes(label = paste(..rr.label.., sep = "~~~")),
+        parse = TRUE, family = "serif", size = 3, colour = "grey30",
+        label.x.npc = "left", label.y.npc = "top") +
+    scale_x_continuous(
+        breaks = c(.1, 1, 10, 100, 1000, 10000),
+        labels = function(x) signif(x),
+        trans = "mylog10") +
+    scale_y_continuous(
+        breaks = c(.1, 1, 10, 100, 1000, 10000),
+        labels = function(x) signif(x),
+        trans = "mylog10") +
+    scale_colour_viridis_d(name = "Transcript biotype") +
+    theme_tufte() +
+    geom_rangeframe(sides = 'bl', na.rm = FALSE) +
+    xlab("Average teloprime counts") +
+    ylab("Average direct cDNA counts")
 ```
