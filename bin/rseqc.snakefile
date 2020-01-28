@@ -19,6 +19,7 @@ rule rseqc_junctionBED:
     shell:
         "gunzip {input}"
 
+
 rule rseqc_genebodyCoverage:
     input:
         bam = "bam/illumina/{sample}_Aligned.sortedByCoord.out.bam",
@@ -35,6 +36,7 @@ rule rseqc_genebodyCoverage:
             -i {input.bam} \
             -o {params.outputDir}"
 
+
 rule rseqc_genebodyCoverage_ont:
     input:
         bam = "bam/{dataset}/{barcode}_genome.bam",
@@ -46,12 +48,13 @@ rule rseqc_genebodyCoverage_ont:
     params:
         outputDir = "res/comparisons/geneBody_coverage/{dataset}/{barcode}"
     wildcard_constraints:
-        dataset = "teloprime"
+        dataset = "teloprime|cdna"
     shell:
         "geneBody_coverage.py \
             -r {input.bed} \
             -i {input.bam} \
             -o {params.outputDir}"
+
 
 rule rseqc_readDuplication:
     input:

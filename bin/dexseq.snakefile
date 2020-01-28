@@ -95,7 +95,7 @@ rule featureCounts_count_ont:
 rule featureCounts_count_illumina:
     input:
         files = expand("bam/illumina/{sample}_Aligned.sortedByCoord.out.bam",
-                       sample=SAMPLES),
+                       sample=SAMPLES_ont),
         annotation = "indices/dexseq/annotation_illumina_flat.gtf",
     threads:
         20
