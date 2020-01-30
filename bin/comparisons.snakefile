@@ -60,6 +60,28 @@ rule bam_getCoverage:
         "comparisons_bam_getCoverage.R"
 
 
+rule coverage:
+    input:
+        geneBodyCoverage_teloprime = expand("res/comparisons/geneBody_coverage/teloprime/{barcode}.geneBodyCoverage.txt",
+            barcode=SAMPLE_INFO_ont["ont"]),
+        geneBodyCoverage_cdna =  expand("res/comparisons/geneBody_coverage/cdna/{barcode}.geneBodyCoverage.txt",
+            barcode=SAMPLE_INFO_ont["cdna"]),
+        geneBodyCoverage_illumina = expand("qc/RSeQC/geneBody_coverage/{sample}.geneBodyCoverage.txt",
+            sample=SAMPLES_ont),
+        coverage_teloprime = expand("res/comparisons/coverage/teloprime/{barcode}.rds",
+            barcode=SAMPLE_INFO_ont["ont"]),
+        coverage_cdna = expand("res/comparisons/coverage/cdna/{barcode}.rds",
+            barcode=SAMPLE_INFO_ont["cdna"]),
+        sample_info = "sample_info/sampleInfo.csv",
+        biomaRt_tx = "annotation/biomaRt_tx.rds"
+    params:
+        fig_folder = "res/fig/coverage"
+    output:
+        "res/comparisons/comparisons_coverage.html"
+    script:
+        "comparisons_coverage.Rmd"
+
+
 rule fastq_readLengthHistogram:
     input:
         expand(
@@ -144,19 +166,7 @@ rule compare_dtu:
         "comparisons_dtu.Rmd"
 
 
-rule coverage:
-    input:
-        geneBodyCoverage_teloprime = expand("res/comparisons/geneBody_coverage/teloprime/{barcode}.geneBodyCoverage.txt", barcode = BARCODES),
-        geneBodyCoverage_illumina = expand("qc/RSeQC/geneBody_coverage/{sample}.geneBodyCoverage.txt", sample = SAMPLES_ont),
-        coverage_teloprime = expand("res/comparisons/coverage/teloprime/{barcode}.rds", barcode = BARCODES),
-        sample_info = "sample_info/sampleInfo.csv",
-        biomaRt_tx = "annotation/biomaRt_tx.rds"
-    params:
-        fig_folder = "res/fig/coverage"
-    output:
-        "res/comparisons/comparisons_coverage.html"
-    script:
-        "comparisons_coverage.Rmd"
+
 
 
 rule render_GOcomp:
