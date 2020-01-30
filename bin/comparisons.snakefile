@@ -82,6 +82,19 @@ rule coverage:
         "comparisons_coverage.Rmd"
 
 
+rule compare_dtu:
+    input:
+        drimseq = expand("res/drimseq/{dataset}/{dataset}_drimSeqStageR.csv",
+            dataset=["illumina","cdna","teloprime","cdna_flair","teloprime_flair"]),
+        dexseq = expand("res/dexseq/{dataset}/{dataset}_dexseq_results.csv.gz",
+            dataset=["illumina","cdna","teloprime"]),
+        biomaRt_gene = "annotation/biomaRt_gene.rds"
+    output:
+        "res/comparisons/comparisons_dtu.html"
+    script:
+        "comparisons_dtu.Rmd"
+
+
 rule fastq_readLengthHistogram:
     input:
         expand(
@@ -151,19 +164,7 @@ rule compare_differentialExpressionAnalysis2:
         "comparisons_dgeDte_onlyDetectedByBoth.Rmd"
 
 
-rule compare_dtu:
-    input:
-        illumina_drim = "res/drimseq/illumina/illumina_drimSeqStageR.csv",
-        teloprime_drim = "res/drimseq/teloprime/teloprime_drimSeqStageR.csv",
-        teloprime_drim_flair = "res/drimseq/teloprime_flair/teloprime_flair_drimSeqStageR.csv",
-        illumina_dex = "res/dexseq/illumina/illumina_dexseq_results.csv.gz",
-        teloprime_dex = "res/dexseq/teloprime/teloprime_dexseq_results.csv.gz",
-        chip = "res/chip/gencode_full_range.csv.gz",
-        biomaRt_gene = "annotation/biomaRt_gene.rds"
-    output:
-        "res/comparisons/comparisons_dtu.html"
-    script:
-        "comparisons_dtu.Rmd"
+
 
 
 

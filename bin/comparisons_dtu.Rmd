@@ -14,6 +14,7 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = FA
 ```
 
 ```{r library, include=FALSE}
+save.image("dtu.RData")
 source("packrat/init.R")
 library("dplyr")
 library("readr")
@@ -24,98 +25,83 @@ library("UpSetR")
 ```
 
 ```{r dataImport}
-# chip
-chip <- read_csv(snakemake@input[["chip"]]) %>% 
-    mutate_if(is.numeric, function(x) x > 1) %>% 
-    rowwise() %>% 
-    mutate(has_multiple_peaks = any(NW_broad.bed_fullRange, NC_broad.bed_fullRange)) %>% 
-    select(ensembl_gene_id_version, has_multiple_peaks)
-
 # dexseq 
-dexseq <- c(snakemake@input[["illumina_dex"]],
-            snakemake@input[["teloprime_dex"]]) %>% 
+dexseq <- snakemake@input[["dexseq"]] %>% 
     set_names(., tools::file_path_sans_ext(basename(.), compression = TRUE)) %>% 
-    as.list() %>% 
     map(read_csv) %>% 
-    map(select, ensembl_gene_id_version, padj) %>% 
     bind_rows(.id = "dataset") %>% 
-    tidyr::spread(dataset, padj)
+    select(-mgi_symbol, -pvalue, -description) %>% 
+    tidyr::separate(dataset, c("dataset", "library"), extra = "drop") %>% 
+    tidyr::unite("method", dataset, library) %>% 
+    tidyr::spread(method, padj)
 
 # drimseq
-drimseq <- c(snakemake@input[["illumina_drim"]],
-             snakemake@input[["teloprime_drim"]],
-             snakemake@input[["teloprime_drim_flair"]]) %>% 
+drimseq <- snakemake@input[["drimseq"]] %>% 
     set_names(., tools::file_path_sans_ext(basename(.), compression = TRUE)) %>% 
-    as.list() %>% 
-    map(read_csv) %>%
-    map(select, ensembl_gene_id_version, padj = "gene") %>% 
-    map(group_by, ensembl_gene_id_version) %>% 
-    map(summarise, padj = min(padj)) %>% 
+    map(read_csv) %>% 
+    map(select, -mgi_symbol, -transcript, -description) %>% 
     bind_rows(.id = "dataset") %>% 
-    tidyr::spread(dataset, padj)
+    group_by(dataset, ensembl_gene_id_version) %>% 
+    summarise(gene_biotype = unique(gene_biotype),
+        padj = min(gene)) %>% 
+    tidyr::separate(dataset, c("dataset", "flair"), extra = "drop") %>% 
+    mutate(library = "drimseq") %>% 
+    mutate(dataset = if_else(flair == "flair", paste0(dataset, "_flair"), dataset)) %>% 
+    select(-flair) %>% 
+    tidyr::unite("method", dataset, library) %>% 
+    tidyr::spread(method, padj) %>% 
+    filter(substr(ensembl_gene_id_version, 1, 3) == "ENS") 
 
-df <- drimseq %>% 
-    full_join(dexseq, by = "ensembl_gene_id_version") %>% 
-    full_join(chip, by = "ensembl_gene_id_version") %>% 
-    mutate_if(is.numeric, function(x) tidyr::replace_na(x, 1)) %>% 
-    filter(substr(ensembl_gene_id_version, 1, 3) != "chr")
+
+df <- list(drimseq, dexseq) %>%
+    reduce(full_join, by = c("ensembl_gene_id_version", "gene_biotype")) %>%
+    mutate_if(is.numeric, function(x) tidyr::replace_na(x, 1))
 ```
 
-# All genes
-
-has_multiple_peaks means there is more than one h3k4me3 peak over the gene body
-of a gene.
-
-Multiple peaks are indicators of multiple TSS. The other methods identify not
-alternative TSS but also alternative splicing and alternative TES.
-
-```{r upset_withChip}
-df %>% 
-    mutate_if(is.numeric, function(x) as.integer(x < .05)) %>%
-    mutate(has_multiple_peaks = as.integer(has_multiple_peaks)) %>% 
-    as.data.frame() %>%
-    tibble::column_to_rownames("ensembl_gene_id_version") %>% 
-    upset(nsets = 6, keep.order = TRUE,
-        scale.intersections = "log10",
-        scale.sets = "log10",
-        sets.bar.color = c("green", rep(c("red", "blue"), c(2, 3))),
-        nintersects = 14,
-        order.by = "freq")
-```
-
-#### Without chip
+# All datasets
 
 ```{r}
 df %>% 
     mutate_if(is.numeric, function(x) as.integer(x < .05)) %>%
-    mutate(has_multiple_peaks = as.integer(has_multiple_peaks)) %>% 
-    select(-has_multiple_peaks) %>% 
     as.data.frame() %>%
     tibble::column_to_rownames("ensembl_gene_id_version") %>% 
-    upset(nsets = 5, keep.order = TRUE,
-        sets.bar.color = c(rep(c("red", "blue"), c(2, 3))),
-        nintersects = 14,
+    upset(nsets = 8,
+        nintersects = 204,
         order.by = "freq")
 ```
 
-<!-- # Subset to only those genes with multiple chip peaks -->
+```{r}
+df %>% 
+    select_at(vars(-matches("illumina"))) %>% 
+    mutate_if(is.numeric, function(x) as.integer(x < .05)) %>%
+    as.data.frame() %>%
+    tibble::column_to_rownames("ensembl_gene_id_version") %>% 
+    upset(nsets = 6,
+        nintersects = 204,
+        order.by = "freq")
+```
 
-<!-- ```{r subset} -->
-<!-- df_sub <- df %>%  -->
-<!--     filter(has_multiple_peaks) %>%  -->
-<!--     select(-has_multiple_peaks) -->
-<!-- ``` -->
+```{r}
+df %>% 
+    select_at(vars(-matches("drimseq"))) %>% 
+    mutate_if(is.numeric, function(x) as.integer(x < .05)) %>%
+    as.data.frame() %>%
+    tibble::column_to_rownames("ensembl_gene_id_version") %>% 
+    upset(nsets = 6,
+        nintersects = 204,
+        order.by = "freq")
+```
 
-<!-- ```{r} -->
-<!-- df_sub %>%  -->
-<!--     mutate_if(is.numeric, function(x) as.integer(x < .05)) %>% -->
-<!--     as.data.frame() %>% -->
-<!--     tibble::column_to_rownames("ensembl_gene_id_version") %>%  -->
-<!--     upset(nsets = 4, keep.order = TRUE, -->
-<!--         sets.bar.color = c(rep(c("red", "blue"), each = 2)), -->
-<!--         nintersects = 14, -->
-<!--         order.by = "freq") -->
-<!-- ``` -->
+```{r}
+df %>% 
+    select_at(vars(-matches("dexseq"))) %>% 
+    mutate_if(is.numeric, function(x) as.integer(x < .05)) %>%
+    as.data.frame() %>%
+    tibble::column_to_rownames("ensembl_gene_id_version") %>% 
+    upset(nsets = 6,
+        nintersects = 204,
+        order.by = "freq")
+```
 
 #### List of genes that show DTU in any of the analyses
 
@@ -124,10 +110,11 @@ biomart <- read_rds(snakemake@input[["biomaRt_gene"]])
 ```
 
 ```{r}
-df_sub <- df %>% 
+df_sub <- df %>%
+    select(-gene_biotype) %>% 
     left_join(biomart, by = "ensembl_gene_id_version") %>% 
     select(ensembl_gene_id_version, mgi_symbol, description, gene_biotype, everything()) %>% 
-    arrange(illumina_dexseq_results)
+    arrange(illumina_dexseq)
 
 df_sub %>% 
     filter_if(is.numeric, any_vars(. < .05)) %>%
