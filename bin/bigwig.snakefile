@@ -7,13 +7,41 @@ rule samtools_index:
     shell:
         "samtools index {input}"
 
+
+def get_bamnames_bw(wildcards):
+    if wildcards.dataset == "cdna":
+        barcode = SAMPLE_INFO.loc[wildcards.sample]["cdna"]
+        filename = "bam/{}/{}_genome.bam".format(wildcards.dataset, barcode)
+    elif wildcards.dataset == "teloprime":
+        barcode = SAMPLE_INFO.loc[wildcards.sample]["ont"]
+        filename = "bam/{}/{}_genome.bam".format(wildcards.dataset, barcode)
+    elif wildcards.dataset == "illumina":
+        barcode = SAMPLE_INFO.loc[wildcards.sample]["illumina"]
+        filename = "bam/illumina/{}_Aligned.sortedByCoord.out.bam".format(barcode)
+    return filename
+
+def get_bainames_bw(wildcards):
+    if wildcards.dataset == "cdna":
+        barcode = SAMPLE_INFO.loc[wildcards.sample]["cdna"]
+        filename = "bam/{}/{}_genome.bam.bai".format(wildcards.dataset, barcode)
+    elif wildcards.dataset == "teloprime":
+        barcode = SAMPLE_INFO.loc[wildcards.sample]["ont"]
+        filename = "bam/{}/{}_genome.bam.bai".format(wildcards.dataset, barcode)
+    elif wildcards.dataset == "illumina":
+        barcode = SAMPLE_INFO.loc[wildcards.sample]["illumina"]
+        filename = "bam/illumina/{}_Aligned.sortedByCoord.out.bam.bai".format(barcode)
+    return filename
+
+
 rule bamCoverage_stranded:
     input:
-        bam = "bam/illumina/{sample}_Aligned.sortedByCoord.out.bam",
-        bai = "bam/illumina/{sample}_Aligned.sortedByCoord.out.bam.bai"
+        bam = get_bamnames_bw,
+        bai = get_bainames_bw
     output:
-        fw = "bw/illumina/{sample}_fw.bw",
-        rv = "bw_illumina/{sample}_rv.bw"
+        fw = "bw/{dataset}/{sample}_{dataset}_fw.bw",
+        rv = "bw/{dataset}/{sample}_{dataset}_rv.bw"
+    wildcard_constraints:
+        dataset = "illumina"
     threads: 10
     shell:
         "bamCoverage \
@@ -61,11 +89,13 @@ rule merge_bam_cDNA:
 
 rule bamCoverage_nonstranded:
     input:
-        bam = "bam/teloprime/{barcode}_genome.bam",
-        bai = "bam/teloprime/{barcode}_genome.bam.bai"
+        bam = get_bamnames_bw,
+        bai = get_bainames_bw
     output:
-        "bw/teloprime/{barcode}.bw"
+        "bw/{dataset}/{sample}_{dataset}.bw"
     threads: 10
+    wildcard_constraints:
+        dataset = "cdna|teloprime"
     shell:
         "bamCoverage \
             -b {input.bam} \
@@ -76,17 +106,22 @@ rule bamCoverage_nonstranded:
 
 rule makeHub:
     input:
-        expand("bw/illumina/{sample}_fw.bw", sample=SAMPLES),
-        expand("bw/illumina/{sample}_rv.bw", sample=SAMPLES),
-        expand("bw/teloprime/{barcode}.bw", barcode=BARCODES),
+        expand("bw/illumina/{sample}_illumina_fw.bw",
+            sample=SAMPLE_INFO_ont.index),
+        expand("bw/illumina/{sample}_illumina_rv.bw",
+            sample=SAMPLE_INFO_ont.index),
+        expand("bw/teloprime/{sample}_teloprime.bw",
+            sample=SAMPLE_INFO_ont.index),
+        expand("bw/cdna/{sample}_cdna.bw",
+            sample=SAMPLE_INFO_ont.index),
         sample_info = "sample_info/sampleInfo.csv"
-    output:
-        "nanoporeibat_hub/hub/hub.txt",
-        "nanoporeibat_hub/hub/genomes.txt",
-        "nanoporeibat_hub/hub/mm10/trackDb.txt",
-        expand("nanoporeibat_hub/bw/{sample}_fw.bw", sample=SAMPLES),
-        expand("nanoporeibat_hub/bw/{sample}_rv.bw", sample=SAMPLES)
-    params:
-        url = "http://bioinformatik.sdu.dk/solexa/webshare/christoph/nanoporeibat_hub"
-    shell:
-        "bin/generateUCSChub.R {input.sample_info} {params.url}"
+    # output:
+    #     "nanoporeibat_hub/hub/hub.txt",
+    #     "nanoporeibat_hub/hub/genomes.txt",
+    #     "nanoporeibat_hub/hub/mm10/trackDb.txt",
+    #     expand("nanoporeibat_hub/bw/{sample}_fw.bw", sample=SAMPLES),
+    #     expand("nanoporeibat_hub/bw/{sample}_rv.bw", sample=SAMPLES)
+    # params:
+    #     url = "http://bioinformatik.sdu.dk/solexa/webshare/christoph/nanoporeibat_hub"
+    # shell:
+    #     "bin/generateUCSChub.R {input.sample_info} {params.url}"
