@@ -95,12 +95,26 @@ rule compare_dtu:
         "comparisons_dtu.Rmd"
 
 
+def get_fastqnames(wildcards):
+    files = list()
+    if wildcards.dataset == "teloprime":
+        for barcode in SAMPLE_INFO_ont["ont"]:
+            filename = "fastq/{}/merged/{}_merged.fastq.gz".format(
+                wildcards.dataset, barcode)
+            files.append(filename)
+    elif wildcards.dataset == "cdna":
+        for barcode in SAMPLE_INFO_ont["cdna"]:
+            filename = "fastq/{}/merged/{}_merged.fastq.gz".format(
+                wildcards.dataset, barcode)
+            files.append(filename)
+    return files
+
+
 rule fastq_readLengthHistogram:
     input:
-        expand(
-            "fastq/teloprime/X{flowcell}_flowcell/{barcode}_q7.fastq.gz", barcode=BARCODES, flowcell=[1, 3])
+        get_fastqnames
     output:
-        "res/comparisons/countReads/teloprime_fastqReadLengths.csv"
+        "res/comparisons/readLengthDistribution/{dataset}_fastqReadLengths.csv"
     script:
         "comparisons_fastq_readLengthHistogram.py"
 

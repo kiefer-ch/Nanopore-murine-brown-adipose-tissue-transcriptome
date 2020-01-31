@@ -142,7 +142,9 @@ pl <- df %>%
     ylab("Fraction of transcript covered by read") +
     theme_tufte() +
     geom_rangeframe(sides = 'l') +
-    scale_fill_colorblind()
+    scale_fill_colorblind() +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
 pl
 saveRDS(pl,
     file.path(snakemake@params[["fig_folder"]], "coverage_by_transcriptLength.rds"))
