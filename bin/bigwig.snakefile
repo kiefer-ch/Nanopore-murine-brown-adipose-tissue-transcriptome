@@ -111,7 +111,7 @@ rule gtfToGenePred:
     input:
         "flair/{dataset}/flair.collapse.isoforms.gtf"
     output:
-        "nanoporeibat_hub/bigGenePred/flair_{dataset}.genePred"
+        temp("nanoporeibat_hub/bigGenePred/flair_{dataset}.genePred")
     wildcard_constraints:
         dataset = "cdna|teloprime"
     shell:
@@ -122,7 +122,7 @@ rule genePredToBigGenePred:
     input:
         "{file}.genePred"
     output:
-        "{file}.txt"
+        temp("{file}.txt")
     shell:
         "genePredToBigGenePred {input} {output}"
 
@@ -135,19 +135,27 @@ rule getBigGenePredHelper:
             - https://genome.ucsc.edu/goldenPath/help/examples/bigGenePred.as \
             > {output}"
 
+rule bedSort:
+    input:
+        "{file}.txt"
+    output:
+        temp("{file}_sort.txt")
+    shell:
+        "bedSort {input} {output}"
+
 rule bed2bb:
     input:
-        txt = "{file}.txt"
+        txt = "{file}_sort.txt",
         chromSizes = "annotation/genome.fa.fai",
         helper = "data/bigGenePred.as"
     output:
-        "{file.txt}"
+        "{file}.bb"
     shell:
         "bedToBigBed -type=bed12+8 -tab \
             -as={input.helper} \
             {input.txt} \
             {input.chromSizes} \
-            {output}
+            {output}"
 
 
 rule makeHub:
