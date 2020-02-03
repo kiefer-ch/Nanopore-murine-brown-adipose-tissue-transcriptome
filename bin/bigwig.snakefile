@@ -107,6 +107,49 @@ rule bamCoverage_nonstranded:
             --normalizeUsing BPM"
 
 
+rule gtfToGenePred:
+    input:
+        "flair/{dataset}/flair.collapse.isoforms.gtf"
+    output:
+        "nanoporeibat_hub/bigGenePred/flair_{dataset}.genePred"
+    wildcard_constraints:
+        dataset = "cdna|teloprime"
+    shell:
+        "gtfToGenePred -genePredExt {input} {output}"
+
+
+rule genePredToBigGenePred:
+    input:
+        "{file}.genePred"
+    output:
+        "{file}.txt"
+    shell:
+        "genePredToBigGenePred {input} {output}"
+
+
+rule getBigGenePredHelper:
+    output:
+        "data/bigGenePred.as"
+    shell:
+        "wget -q -O \
+            - https://genome.ucsc.edu/goldenPath/help/examples/bigGenePred.as \
+            > {output}"
+
+rule bed2bb:
+    input:
+        txt = "{file}.txt"
+        chromSizes = "annotation/genome.fa.fai",
+        helper = "data/bigGenePred.as"
+    output:
+        "{file.txt}"
+    shell:
+        "bedToBigBed -type=bed12+8 -tab \
+            -as={input.helper} \
+            {input.txt} \
+            {input.chromSizes} \
+            {output}
+
+
 rule makeHub:
     input:
         expand("bw/illumina/{sample}_illumina_fw.bw",
@@ -115,6 +158,8 @@ rule makeHub:
             sample=SAMPLE_INFO_ont.index),
         expand("bw/{dataset}/{sample}_{dataset}.bw",
             dataset=["teloprime", "cdna"], sample=SAMPLE_INFO_ont.index),
+        expand("nanoporeibat_hub/bigGenePred/flair_{dataset}.bigGenePred",
+            dataset=["teloprime", "cdna"]),
         sample_info = "sample_info/sampleInfo.csv"
     output:
         "nanoporeibat_hub/hub/hub.txt",

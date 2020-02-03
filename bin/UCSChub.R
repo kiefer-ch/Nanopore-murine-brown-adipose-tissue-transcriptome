@@ -7,8 +7,6 @@
 #
 ################################################################################
 
-save.image("hub.RData")
-
 source("packrat/init.R")
 library("dplyr")
 library("readr")
@@ -116,4 +114,26 @@ for (dataset in c("cdna", "teloprime")) {
 
         file.copy(file.path("bw", dataset, file), file.path(bw, file))
     }
+}
+
+# flair
+for (file in c("nanoporeibat_hub/bigGenePred/flair_teloprime.bigGenePred",
+               "nanoporeibat_hub/bigGenePred/flair_cdna.bigGenePred")) {
+
+    name <- basename(file)
+
+    track <- c(
+        sprintf("track %s", c(tools::file_path_sans_ext(name))),
+        sprintf("bigDataUrl %s",
+            file.path(snakemake@params[["url"]], "bigGenePred", name)),
+        sprintf("shortLabel %s", tools::file_path_sans_ext(name)),
+        sprintf("longLabel %s", tools::file_path_sans_ext(name)),
+        "type bigGenePred",
+        "visibility full",
+        "")
+
+        cat(track,
+            file = file.path(hub, "mm10", "trackDb.txt"),
+            sep = '\n',
+            append = TRUE)
 }
