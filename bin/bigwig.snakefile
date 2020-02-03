@@ -20,6 +20,7 @@ def get_bamnames_bw(wildcards):
         filename = "bam/illumina/{}_Aligned.sortedByCoord.out.bam".format(barcode)
     return filename
 
+
 def get_bainames_bw(wildcards):
     if wildcards.dataset == "cdna":
         barcode = SAMPLE_INFO.loc[wildcards.sample]["cdna"]
@@ -58,6 +59,7 @@ rule bamCoverage_stranded:
             -p {threads} \
             --effectiveGenomeSize 2652783500 \
             --normalizeUsing BPM"
+
 
 rule merge_bam_teloprime:
     input:
@@ -104,24 +106,25 @@ rule bamCoverage_nonstranded:
             --effectiveGenomeSize 2652783500  \
             --normalizeUsing BPM"
 
+
 rule makeHub:
     input:
         expand("bw/illumina/{sample}_illumina_fw.bw",
             sample=SAMPLE_INFO_ont.index),
         expand("bw/illumina/{sample}_illumina_rv.bw",
             sample=SAMPLE_INFO_ont.index),
-        expand("bw/teloprime/{sample}_teloprime.bw",
-            sample=SAMPLE_INFO_ont.index),
-        expand("bw/cdna/{sample}_cdna.bw",
-            sample=SAMPLE_INFO_ont.index),
+        expand("bw/{dataset}/{sample}_{dataset}.bw",
+            dataset=["teloprime", "cdna"], sample=SAMPLE_INFO_ont.index),
         sample_info = "sample_info/sampleInfo.csv"
-    # output:
-    #     "nanoporeibat_hub/hub/hub.txt",
-    #     "nanoporeibat_hub/hub/genomes.txt",
-    #     "nanoporeibat_hub/hub/mm10/trackDb.txt",
-    #     expand("nanoporeibat_hub/bw/{sample}_fw.bw", sample=SAMPLES),
-    #     expand("nanoporeibat_hub/bw/{sample}_rv.bw", sample=SAMPLES)
-    # params:
-    #     url = "http://bioinformatik.sdu.dk/solexa/webshare/christoph/nanoporeibat_hub"
-    # shell:
-    #     "bin/generateUCSChub.R {input.sample_info} {params.url}"
+    output:
+        "nanoporeibat_hub/hub/hub.txt",
+        "nanoporeibat_hub/hub/genomes.txt",
+        "nanoporeibat_hub/hub/mm10/trackDb.txt",
+        expand("nanoporeibat_hub/bw/{sample}_illumina_fw.bw", sample=SAMPLES),
+        expand("nanoporeibat_hub/bw/{sample}_illumina_rv.bw", sample=SAMPLES),
+        expand("nanoporeibat_hub/bw/{sample}_{dataset}_rv.bw",
+            dataset=["teloprime", "cdna"], sample=SAMPLES)
+    params:
+        url = "http://bioinformatik.sdu.dk/solexa/webshare/christoph/nanoporeibat_hub"
+    script:
+        "UCSChub.R"
