@@ -41,12 +41,20 @@ rule bam_getAlignedLength:
         "bam/{dataset}/{file}_{type}.bam.bai"
     wildcard_constraints:
         type = "genome|transcriptome",
-        datatset = "teloprime"
+        datatset = "teloprime|cdna"
     output:
         "res/comparisons/countReads/{dataset}_{file}_bam_{type}.rds"
     script:
         "comparisons_bam_getAlignedLength.R"
 
+rule bam_getFlagStats_cdna:
+    input:
+        expand("bam/cdna/{barcode}_genome.bam",
+            barcode=["barcode07", "barcode08"])
+    output:
+        "res/comparisons/countReads/cdna_flagstats.csv"
+    script:
+        "comparisons_bam_countFlags.py"
 
 rule bam_getCoverage:
     input:
