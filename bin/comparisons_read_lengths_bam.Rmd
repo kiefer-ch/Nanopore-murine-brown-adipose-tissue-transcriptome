@@ -29,118 +29,126 @@ dir.create(snakemake@params[["fig_folder"]],
     recursive = TRUE, showWarnings = FALSE)
 ```
 
-# Length of reads per sample and flowcell
+# Length of reads per sample and flowcell 
+
+These plots are based on the fastq files. 
+
+```{r}
+sample_info <- read_csv(snakemake@input[["sample_info"]]) %>% 
+    filter(!is.na(ont)) %>%
+    mutate_at(vars(matches("condition")), as.factor) %>% 
+    dplyr::select(sample_id, illumina, ont, cdna) %>% 
+    tidyr::gather("method", "barcode", -sample_id) %>% 
+    dplyr::select(-method)
+```
 
 ```{r dataImport_fastqReadLengths}
-#df <- 
-snakemake@input[["readLengths"]] %>% 
+df <- snakemake@input[["readLengths"]] %>% 
     map(read_csv) %>%
     map(tidyr::gather, "sample", "counts", -read_length) %>% 
     bind_rows() %>% 
-    tidyr::separate(sample, c("waste1", "method", "flowcell", "waste3", "barcode"), 
+    tidyr::separate(sample, c("waste1", "method", "flowcell", "barcode"),
+        sep = "/",
         extra = "drop") %>% 
-    select_at(vars(-matches("waste"))) 
+    tidyr::separate(barcode, c("barcode"), extra = "drop") %>% 
+    select_at(vars(-matches("waste"))) %>%
+    mutate(flowcell = if_else(flowcell %in% c("X1_flowcell", "pool1"), "cell_1", "cell_2")) %>% 
+    left_join(sample_info, by = "barcode") %>% 
+    dplyr::select(-barcode) %>% 
+    mutate_if(is.character, as.factor) %>% 
+    filter(counts != 0)
 ```
 
 Read lengths from fastq files
 
 ```{r}
-pl <- df %>% 
-    group_by(read_length) %>% 
+df %>% 
+    group_by(method, read_length) %>% 
     summarise(counts = sum(counts)) %>% 
     ggplot(aes(read_length, counts)) +
-    geom_freqpoly(stat = "identity") +
-    scale_x_log10() +
-    ylab("Reads") + 
-    xlab("Read length") +
-    theme_tufte() +
-    geom_rangeframe(sides = "lb")
-pl
-saveRDS(pl,
-    file.path(snakemake@params[["fig_folder"]], "read_length_histogram.rds"))
+        geom_freqpoly(stat = "identity") +
+        facet_wrap(~method, ncol = 1) +
+        scale_x_log10() +
+        ylab("Reads") + 
+        xlab("Read length") +
+        theme_tufte() +
+        geom_rangeframe(sides = "lb")
 ```
 
-```{r readLength_Violin_teloprime}
-pl <- df %>% 
-    group_by(flowcell, barcode) %>% 
+```{r readLength_Violin}
+df %>% 
+    group_by(method, flowcell, sample_id) %>% 
     mutate(weight = counts / sum(counts)) %>% 
     ungroup() %>% 
-    ggplot(aes(barcode, read_length, weight = weight, fill = flowcell)) +
+    ggplot(aes(sample_id, read_length, weight = weight, fill = flowcell)) +
     geom_violin() +
+    facet_wrap(~method, ncol = 1) +
     scale_y_log10() +
-    scale_fill_brewer(type = "qual", palette = 2) +
+    scale_fill_colorblind() +
     theme_tufte() +
     geom_rangeframe(sides = "l") +
     xlab(NULL) + 
     ylab("Read length")
-pl
-saveRDS(pl,
-    file.path(snakemake@params[["fig_folder"]], "read_length_violin_per_sample.rds"))
 ```
-
-#### Compared with tx length from GENCODE annotation
 
 ```{r}
 df %>% 
-    group_by(read_length) %>% 
-    summarise(n = sum(counts),
-        group = "teloprime") %>%
+    group_by(method, flowcell) %>% 
+    mutate(weighted_length = read_length * counts) %>% 
+    summarise(counts = sum(counts),
+        sum_weigthed_readlengths = sum(weighted_length),
+        max_readLength = max(read_length)) %>% 
+    mutate(avg_readlength = sum_weigthed_readlengths / counts) %>% 
+    dplyr::select(-sum_weigthed_readlengths) %>% 
+    knitr::kable(format = "html") %>%
+    kableExtra::kable_styling()
+
+df %>% 
+    group_by(method, sample_id) %>% 
+    mutate(weighted_length = read_length * counts) %>% 
+    summarise(counts = sum(counts),
+        sum_weigthed_readlengths = sum(weighted_length),
+        max_readLength = max(read_length)) %>% 
+    dplyr::select(-sum_weigthed_readlengths) %>% 
+    knitr::kable(format = "html") %>%
+    kableExtra::kable_styling()
+
+df %>% 
+    group_by(method, flowcell, sample_id) %>% 
+    mutate(weighted_length = read_length * counts) %>% 
+    summarise(counts = sum(counts),
+        sum_weigthed_readlengths = sum(weighted_length),
+        max_readLength = max(read_length)) %>% 
+    mutate(avg_readlength = sum_weigthed_readlengths / counts) %>% 
+    dplyr::select(-sum_weigthed_readlengths) %>% 
+    knitr::kable(format = "html") %>%
+    kableExtra::kable_styling()
+```
+
+## Compared with tx length from GENCODE annotation
+
+```{r dataImport_referenceTxLengths}
+referenceTxLengths <- read_csv(snakemake@input[["annotation_txLengths"]]) %>% 
+    mutate(method = "gencode")
+```
+
+```{r}
+df %>% 
+    group_by(method, read_length) %>% 
+    summarise(n = sum(counts)) %>%
     bind_rows(referenceTxLengths) %>%
-    group_by(group) %>% 
+    group_by(method) %>% 
     mutate(weight = n / sum(n)) %>% 
     ungroup() %>% 
-    ggplot(aes(group, read_length, weight = weight)) +
+    ggplot(aes(method, read_length, weight = weight)) +
     geom_violin() +
     scale_y_log10() +
-    scale_fill_viridis_d() +
+    scale_fill_colorblind() +
     theme_tufte() +
     geom_rangeframe(sides = "l") +
     xlab(NULL) + 
     ylab("Read/transcript length")
 ```
-
-
-```{r dataImport_tx_bam}
-get_map_type <- function(flag) {
-    if_else(flag %in% c(0, 16), "primary",
-        if_else(flag %in% c(256, 275), "secondary", "supplementary"))
-}
-
-df_tx <- c(snakemake@input[["teloprime_bam_tx"]], snakemake@input[["cdna_bam_tx"]]) %>%
-    set_names(basename(snakemake@input[["teloprime_bam_tx"]]), basename(snakemake@input[["cdna_bam_tx"]])) %>% 
-    map(read_rds) %>%     
-    map(mutate, type = get_map_type(flag)) %>% 
-    map(tidyr::separate, col = seqnames,
-        into = c("ensembl_transcript_id_version", "ensembl_gene_id_version"),
-        sep = '\\|', extra = "drop") %>% 
-    bind_rows(.id = "sample") %>% 
-    tidyr::separate(sample, c("library", "barcode"), extra = "drop")
-```
-
-```{r dataImport_referenceTxLengths}
-referenceTxLengths <- read_csv(snakemake@input[["annotation_txLengths"]]) %>% 
-    mutate(group = "gencode")
-```
-
-```{r dataImport_genome}
-df_genome <- snakemake@input[["teloprime_bam_genome"]] %>%
-    as.list() %>% 
-    set_names(snakemake@input[["teloprime_bam_genome"]]) %>% 
-    map(read_rds) %>%     
-    map(mutate, type = get_map_type(flag)) %>% 
-    map(dplyr::select, -seqnames) %>% 
-    bind_rows(.id = "sample")
-
-mapping_df_genome <- df_genome %>% 
-    dplyr::select(qname, type) %>% 
-    group_by(qname) %>% 
-    summarise(has_primary = any(type == "primary"),
-        has_supplementary = any(type == "supplementary"))
-
-rm(df_genome)
-```
-
-
 
 # Reads and mapping
 
@@ -186,6 +194,47 @@ saveRDS(pl,
 
 rm(mapping_df_genome, pl)
 ```
+
+
+```{r dataImport_tx_bam}
+get_map_type <- function(flag) {
+    if_else(flag %in% c(0, 16), "primary",
+        if_else(flag %in% c(256, 275), "secondary", "supplementary"))
+}
+
+df_tx <- c(snakemake@input[["teloprime_bam_tx"]], snakemake@input[["cdna_bam_tx"]]) %>%
+    set_names(basename(snakemake@input[["teloprime_bam_tx"]]), basename(snakemake@input[["cdna_bam_tx"]])) %>% 
+    map(read_rds) %>%     
+    map(mutate, type = get_map_type(flag)) %>% 
+    map(tidyr::separate, col = seqnames,
+        into = c("ensembl_transcript_id_version", "ensembl_gene_id_version"),
+        sep = '\\|', extra = "drop") %>% 
+    bind_rows(.id = "sample") %>% 
+    tidyr::separate(sample, c("library", "barcode"), extra = "drop")
+```
+
+
+```{r dataImport_genome}
+df_genome <- snakemake@input[["teloprime_bam_genome"]] %>%
+    as.list() %>% 
+    set_names(snakemake@input[["teloprime_bam_genome"]]) %>% 
+    map(read_rds) %>%     
+    map(mutate, type = get_map_type(flag)) %>% 
+    map(dplyr::select, -seqnames) %>% 
+    bind_rows(.id = "sample")
+
+mapping_df_genome <- df_genome %>% 
+    dplyr::select(qname, type) %>% 
+    group_by(qname) %>% 
+    summarise(has_primary = any(type == "primary"),
+        has_supplementary = any(type == "supplementary"))
+
+rm(df_genome)
+```
+
+
+
+
 
 ## Length of primary and supplementary reads
 

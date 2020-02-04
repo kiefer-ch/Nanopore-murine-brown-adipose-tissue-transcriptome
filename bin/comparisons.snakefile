@@ -101,7 +101,7 @@ def get_fastqnames(wildcards):
         for barcode in SAMPLE_INFO_ont["ont"]:
             for flowcell in ["X1_flowcell", "X3_flowcell"]:
                 filename = "fastq/{}/{}/{}_q7.fastq.gz".format(
-                    wildcards.dataset, barcode)
+                    wildcards.dataset, flowcell, barcode)
                 files.append(filename)
     elif wildcards.dataset == "cdna":
         for barcode in SAMPLE_INFO_ont["cdna"]:
@@ -130,7 +130,21 @@ rule fasta_readLengthHistogram:
         "comparisons_fasta_readLengthHistogram.py"
 
 
-rule read_lengths:
+rule read_lengths_fastq:
+    input:
+        readLengths = expand("res/comparisons/readLengthDistribution/{dataset}_fastqReadLengths.csv",
+            dataset=["teloprime", "cdna"]),
+        annotation_txLengths = "annotation/annotation_transcript_lengths.csv",
+        sample_info = "sample_info/sampleInfo.csv"
+    params:
+        fig_folder = "res/fig/read_lengths"
+    output:
+        "res/comparisons/comparisons_readLengths_fastq.html"
+    script:
+        "comparisons_read_lengths_fastq.Rmd"
+
+
+rule read_lengths_bam:
     input:
         teloprime_bam_genome = expand("res/comparisons/countReads/teloprime_{barcode}_bam_genome.rds",
             barcode=SAMPLE_INFO_ont["ont"]),
@@ -142,14 +156,14 @@ rule read_lengths:
             barcode=SAMPLE_INFO_ont["cdna"]),
         readLengths = expand("res/comparisons/readLengthDistribution/{dataset}_fastqReadLengths.csv",
             dataset=["teloprime", "cdna"]),
-        annotation_txLengths = "annotation/annotation_transcript_lengths.csv",
-        biomaRt_tx = "annotation/biomaRt_tx.rds"
+        biomaRt_tx = "annotation/biomaRt_tx.rds",
+        sample_info = "sample_info/sampleInfo.csv"
     params:
         fig_folder = "res/fig/read_lengths"
     output:
-        "res/comparisons/comparisons_readLengths.html"
+        "res/comparisons/comparisons_readLengths_bam.html"
     script:
-        "comparisons_read_lengths.Rmd"
+        "comparisons_read_lengths_bam.Rmd"
 
 
 rule compare_differentialExpressionAnalysis:
