@@ -154,8 +154,6 @@ rule read_lengths_bam:
             barcode=SAMPLE_INFO_ont["cdna"]),
         cdna_bam_tx = expand("res/comparisons/countReads/cdna_{barcode}_bam_transcriptome.rds",
             barcode=SAMPLE_INFO_ont["cdna"]),
-        readLengths = expand("res/comparisons/readLengthDistribution/{dataset}_fastqReadLengths.csv",
-            dataset=["teloprime", "cdna"]),
         biomaRt_tx = "annotation/biomaRt_tx.rds",
         sample_info = "sample_info/sampleInfo.csv"
     params:
@@ -199,13 +197,6 @@ rule compare_differentialExpressionAnalysis2:
         "res/comparisons/comparisons_dgeDte_onlyDetectedByBoth.html"
     script:
         "comparisons_dgeDte_onlyDetectedByBoth.Rmd"
-
-
-
-
-
-
-
 
 rule render_GOcomp:
     input:
