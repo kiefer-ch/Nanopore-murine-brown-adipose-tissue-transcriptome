@@ -17,6 +17,7 @@ for file in snakemake.input:
 
     unmapped = 0
     primary = 0
+    secondary = 0
     supplementary = 0
 
     inFile = pysam.AlignmentFile(file)
@@ -27,9 +28,12 @@ for file in snakemake.input:
         elif read.flag == 0 or read.flag == 16:
             primary += 1
         elif read.flag == 256 or read.flag == 275:
+            secondary += 1
+        else:
             supplementary += 1
 
-    data = data = {"unmapped": unmapped, "primary": primary, "supplementary": supplementary, "file": file}
+    data = data = {"unmapped": unmapped, "primary": primary,
+        "secondary": secondary, "supplementary": supplementary, "file": file}
     df_list.append(data)
 
 df = pd.DataFrame(df_list)

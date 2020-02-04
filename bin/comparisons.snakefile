@@ -48,22 +48,33 @@ rule bam_getAlignedLength:
         "comparisons_bam_getAlignedLength.R"
 
 
+def get_bamnames(wildcards):
+    files = list()
+    if wildcards.dataset == "teloprime":
+        for barcode in SAMPLE_INFO_ont["ont"]:
+            for flowcell in ["X1_flowcell", "X3_flowcell"]:
+                shortFlowcell = flowcell[0:2]
+                for type in ["transcriptome", "genome"]:
+                    filename = "bam/{}/{}/20191107_{}_{}_{}_q7_sort.bam".format(
+                        wildcards.dataset, flowcell, shortFlowcell, type, barcode)
+                    files.append(filename)
+    elif wildcards.dataset == "cdna":
+        for barcode in SAMPLE_INFO_ont["cdna"]:
+            for pool in ["pool1", "pool2"]:
+                for type in ["transcriptome", "genome"]:
+                    filename = "bam/{}/{}/20200108_{}_{}_{}_q7_sort.bam".format(
+                        wildcards.dataset, pool, pool, type, barcode)
+                    files.append(filename)
+    return files
+
+
 rule bam_getFlagStats_cdna:
     input:
-        expand("bam/cdna/{barcode}_genome.bam",
-            barcode=["barcode07", "barcode08"])
+        get_bamnames
     output:
-        "res/comparisons/countReads/cdna_flagstats.csv"
-    script:
-        "comparisons_bam_countFlags.py"
-
-
-rule bam_getFlagStats_teloprime:
-    input:
-        expand("bam/teloprime/{barcode}_genome.bam",
-            barcode=["barcode01", "barcode02"])
-    output:
-        "res/comparisons/countReads/teloprime_flagstats.csv"
+        "res/comparisons/countReads/{dataset}_flagstats.csv"
+    wildcard_constraints:
+        dataset = "teloprime|cdna"
     script:
         "comparisons_bam_countFlags.py"
 
@@ -175,7 +186,9 @@ rule read_lengths_bam:
         cdna_bam_tx = expand("res/comparisons/countReads/cdna_{barcode}_bam_transcriptome.rds",
             barcode=SAMPLE_INFO_ont["cdna"]),
         biomaRt_tx = "annotation/biomaRt_tx.rds",
-        sample_info = "sample_info/sampleInfo.csv"
+        sample_info = "sample_info/sampleInfo.csv",
+        flagstats = expand("res/comparisons/countReads/{dataset}_flagstats.csv",
+            dataset=["illumina", "teloprime"])
     params:
         fig_folder = "res/fig/read_lengths"
     output:
