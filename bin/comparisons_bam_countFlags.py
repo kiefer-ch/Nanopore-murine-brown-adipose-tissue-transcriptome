@@ -29,7 +29,7 @@ for file in snakemake.input:
         elif read.flag == 256 or read.flag == 275:
             supplementary += 1
 
-    data = data = {"unmapped": unmapped, "primary": primary, "supplementary": supplementary, "file": inFile}
+    data = data = {"unmapped": unmapped, "primary": primary, "supplementary": supplementary, "file": file}
     df_list.append(data)
 
 df = pd.DataFrame(df_list)

@@ -47,6 +47,7 @@ rule bam_getAlignedLength:
     script:
         "comparisons_bam_getAlignedLength.R"
 
+
 rule bam_getFlagStats_cdna:
     input:
         expand("bam/cdna/{barcode}_genome.bam",
@@ -55,6 +56,17 @@ rule bam_getFlagStats_cdna:
         "res/comparisons/countReads/cdna_flagstats.csv"
     script:
         "comparisons_bam_countFlags.py"
+
+
+rule bam_getFlagStats_teloprime:
+    input:
+        expand("bam/teloprime/{barcode}_genome.bam",
+            barcode=["barcode01", "barcode02"])
+    output:
+        "res/comparisons/countReads/teloprime_flagstats.csv"
+    script:
+        "comparisons_bam_countFlags.py"
+
 
 rule bam_getCoverage:
     input:
