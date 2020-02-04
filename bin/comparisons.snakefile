@@ -99,14 +99,16 @@ def get_fastqnames(wildcards):
     files = list()
     if wildcards.dataset == "teloprime":
         for barcode in SAMPLE_INFO_ont["ont"]:
-            filename = "fastq/{}/merged/{}_merged.fastq.gz".format(
-                wildcards.dataset, barcode)
-            files.append(filename)
+            for flowcell in ["X1_flowcell", "X3_flowcell"]:
+                filename = "fastq/{}/{}/{}_q7.fastq.gz".format(
+                    wildcards.dataset, barcode)
+                files.append(filename)
     elif wildcards.dataset == "cdna":
         for barcode in SAMPLE_INFO_ont["cdna"]:
-            filename = "fastq/{}/merged/{}_merged.fastq.gz".format(
-                wildcards.dataset, barcode)
-            files.append(filename)
+            for pool in ["pool1", "pool2"]:
+                filename = "fastq/{}/{}/{}_q7.fastq.gz".format(
+                    wildcards.dataset, pool, barcode)
+                files.append(filename)
     return files
 
 
@@ -130,11 +132,18 @@ rule fasta_readLengthHistogram:
 
 rule read_lengths:
     input:
-        teloprime_bam_genome = expand("res/comparisons/countReads/teloprime_{barcode}_bam_genome.rds", barcode=BARCODES),
-        teloprime_bam_tx = expand("res/comparisons/countReads/teloprime_{barcode}_bam_transcriptome.rds", barcode=BARCODES),
-        biomaRt_tx = "annotation/biomaRt_tx.rds",
-        teloprime_readLengths = "res/comparisons/countReads/teloprime_fastqReadLengths.csv",
-        annotation_txLengths = "annotation/annotation_transcript_lengths.csv"
+        teloprime_bam_genome = expand("res/comparisons/countReads/teloprime_{barcode}_bam_genome.rds",
+            barcode=SAMPLE_INFO_ont["ont"]),
+        teloprime_bam_tx = expand("res/comparisons/countReads/teloprime_{barcode}_bam_transcriptome.rds",
+            barcode=SAMPLE_INFO_ont["ont"]),
+        cdna_bam_genome = expand("res/comparisons/countReads/cdna_{barcode}_bam_genome.rds",
+            barcode=SAMPLE_INFO_ont["cdna"]),
+        cdna_bam_tx = expand("res/comparisons/countReads/cdna_{barcode}_bam_transcriptome.rds",
+            barcode=SAMPLE_INFO_ont["cdna"]),
+        readLengths = expand("res/comparisons/readLengthDistribution/{dataset}_fastqReadLengths.csv",
+            dataset=["teloprime", "cdna"]),
+        annotation_txLengths = "annotation/annotation_transcript_lengths.csv",
+        biomaRt_tx = "annotation/biomaRt_tx.rds"
     params:
         fig_folder = "res/fig/read_lengths"
     output:

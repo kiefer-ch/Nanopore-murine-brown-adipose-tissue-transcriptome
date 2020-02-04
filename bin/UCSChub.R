@@ -117,8 +117,8 @@ for (dataset in c("cdna", "teloprime")) {
 }
 
 # flair
-for (file in c("nanoporeibat_hub/bigGenePred/flair_teloprime.bigGenePred",
-               "nanoporeibat_hub/bigGenePred/flair_cdna.bigGenePred")) {
+for (file in c("nanoporeibat_hub/bigGenePred/flair_teloprime.bb",
+               "nanoporeibat_hub/bigGenePred/flair_cdna.bb")) {
 
     name <- basename(file)
 
