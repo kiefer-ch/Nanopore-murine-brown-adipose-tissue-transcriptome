@@ -14,14 +14,12 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = FA
 ```
 
 ```{r loadPackages}
-save.image("readLengths.RData")
 source("packrat/init.R")
 library("dplyr")
 library("readr")
 library("purrr")
 library("ggplot2")
 library("ggthemes")
-library("AnnotationDbi")
 ```
 
 ```{r}
@@ -121,7 +119,7 @@ names(df_tx) <- strsplit(names(df_tx), '_') %>%
     map(`[`, 1:2) %>% 
     map(paste, collapse = '_')
 
-df_tx <- df_tx[c(1,7)] %>% 
+df_tx <- df_tx %>% 
     map(read_rds) %>%  
     map(mutate, type = get_map_type(flag)) %>% 
     map(dplyr::select, -flag) %>% 
@@ -139,7 +137,6 @@ df_tx <- df_tx[c(1,7)] %>%
 ```{r}
 df_tx %>% 
     dplyr::select(-barcode) %>% 
-    left_join(mapping_df_tx %>% dplyr::select(-library), by = "qname") %>% 
     mutate(category = if_else(type == "supplementary", "supplementary",
         if_else(has_supplementary, "primary_with_supplementary", "primary_wo_supplementary"))) %>% 
     ggplot(aes(category, qwidth)) + 
@@ -154,8 +151,7 @@ df_tx %>%
 
 ```{r}
 df_tx %>% 
-    dplyr::select(-sample, -flag) %>% 
-    left_join(mapping_df_tx %>% dplyr::select(-library), by = "qname") %>% 
+    dplyr::select(-barcode) %>% 
     mutate(category = if_else(type == "supplementary", "supplementary",
         if_else(has_supplementary, "primary_with_supplementary", "primary_wo_supplementary"))) %>% 
     ggplot(aes(category, aligned)) + 
@@ -168,16 +164,14 @@ df_tx %>%
     ylab("Aligned read length")
 ```
 
-
-# Transcriptome
-
-## Aligned length vs read length
+# Aligned length vs read length
 
 Primary hits only
 
 ```{r plotTranscriptome}
 df_tx %>% 
     filter(type == "primary") %>% 
+    dplyr::select(library, qwidth, aligned) %>% 
     ggplot(aes(qwidth, aligned)) +
     geom_hex(aes(fill = ..density..), binwidth = .025) +
     facet_grid(~library) +
@@ -191,7 +185,7 @@ df_tx %>%
     ylab("Aligned Length")
 ```
 
-## Aligned length vs expected length
+# Aligned length vs expected length
 
 ```{r import_txdb}
 biomart <- snakemake@input[["biomaRt_tx"]] %>% 
@@ -201,7 +195,7 @@ biomart <- snakemake@input[["biomaRt_tx"]] %>%
 ```{r}
 df_tx %>% 
     filter(type == "primary") %>% 
-    dplyr::select(ensembl_transcript_id_version, aligned) %>% 
+    dplyr::select(library, ensembl_transcript_id_version, aligned) %>% 
     left_join(biomart, by = "ensembl_transcript_id_version") %>% 
     filter(!is.na(transcript_length)) %>% 
     ggplot(aes(transcript_length, aligned)) +
@@ -217,12 +211,12 @@ df_tx %>%
     ylab("Aligned length")
 ```
 
-## Read length vs expected length
+# Read length vs expected length
 
 ```{r}
 df_tx %>% 
     filter(type == "primary") %>% 
-    dplyr::select(ensembl_transcript_id_version, qwidth) %>% 
+    dplyr::select(library, ensembl_transcript_id_version, qwidth) %>% 
     left_join(biomart, by = "ensembl_transcript_id_version") %>% 
     filter(!is.na(transcript_length)) %>% 
     ggplot(aes(transcript_length, qwidth)) +
