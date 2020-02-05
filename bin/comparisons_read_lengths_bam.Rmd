@@ -35,8 +35,73 @@ sample_info <- read_csv(snakemake@input[["sample_info"]]) %>%
     mutate_at(vars(matches("condition")), as.factor) %>% 
     dplyr::select(sample_id, illumina, ont, cdna) %>% 
     tidyr::gather("method", "barcode", -sample_id) %>% 
-    dplyr::select(-method)
+    dplyr::select(-method) 
 ```
+
+# Reads and mapping
+
+```{r import_flagstats}
+flagstats <- snakemake@input[["flagstats"]] %>% 
+    map(read_csv) %>% 
+    bind_rows() %>%  
+    tidyr::separate(file, c("waste", "library", "flowcell", "filename"),
+        sep = '/') %>% 
+    tidyr::separate(filename, c("waste1", "waste2", "type", "barcode"),
+        extra = "drop") %>% 
+    left_join(sample_info, by = "barcode") %>% 
+    dplyr::select(-barcode) %>% 
+    dplyr::select_at(vars(-matches("waste"))) %>% 
+    mutate(flowcell = if_else(flowcell %in% c("X1_flowcell", "pool1"),
+        "cell_1", "cell_2")) %>% 
+    dplyr::select(sample_id, everything())
+
+flagstats %>% 
+    knitr::kable(format = "html") %>%
+    kableExtra::kable_styling()
+```
+
+```{r plot_flagstats}
+add_total <- function(df) {
+    df %>% add_row(library = unique(.$library), 
+        type = unique(.$type),
+        mapping_type = "total",
+        count = .$count[.$mapping_type == "primary"] +
+            .$count[.$mapping_type == "unmapped"]) 
+}
+
+grouped_flagstats <- flagstats %>% 
+    group_by(library, type) %>%
+    summarise_if(is.numeric, sum) %>%
+    ungroup() %>% 
+    tidyr::gather("mapping_type", "count", -library, -type) %>% 
+    arrange(type, library) %>% 
+    split(list(.$library, .$type)) %>% 
+    map(add_total) %>% 
+    bind_rows()
+
+grouped_flagstats %>% 
+    tidyr::spread(mapping_type, count) %>% 
+    knitr::kable(format = "html") %>%
+    kableExtra::kable_styling()
+
+grouped_flagstats %>% 
+    filter(mapping_type != "secondary") %>%
+    mutate(mapping_type = factor(mapping_type,
+        levels = c("total", "primary", "unmapped", "supplementary"))) %>% 
+    ggplot(aes(x = library, y = count,  fill = mapping_type)) +
+    geom_bar(stat = "identity", position = position_dodge()) +
+    facet_wrap(~type) +
+    scale_y_continuous(labels = function(x) x / 10^6) +
+    theme_tufte() +
+    geom_rangeframe(sides = "l") +
+    xlab(NULL) + 
+    ylab("Mio. Reads") +
+    scale_fill_colorblind()
+```
+
+# Length of primary and supplementary reads
+
+Based on the mapping against the transcriptome. From bam files.
 
 ```{r }
 get_map_type <- function(flag) {
@@ -48,30 +113,28 @@ get_map_type <- function(flag) {
 
 ```{r dataImport_tx_bam}
 df_tx <- c(snakemake@input[["teloprime_bam_tx"]], snakemake@input[["cdna_bam_tx"]]) %>%
-    set_names(basename(snakemake@input[["teloprime_bam_tx"]]), basename(snakemake@input[["cdna_bam_tx"]])) %>% 
-    map(read_rds) %>%     
+    set_names(  
+        tools::file_path_sans_ext(basename(snakemake@input[["teloprime_bam_tx"]])),
+        tools::file_path_sans_ext(basename(snakemake@input[["cdna_bam_tx"]])))
+
+names(df_tx) <- strsplit(names(df_tx), '_') %>% 
+    map(`[`, 1:2) %>% 
+    map(paste, collapse = '_')
+
+df_tx <- df_tx[c(1,7)] %>% 
+    map(read_rds) %>%  
     map(mutate, type = get_map_type(flag)) %>% 
     map(dplyr::select, -flag) %>% 
     map(tidyr::separate, col = seqnames,
-        into = c("ensembl_transcript_id_version", "ensembl_gene_id_version"),
+        into = "ensembl_transcript_id_version",
         sep = '\\|', extra = "drop") %>% 
+    map(as_tibble) %>% 
+    map(group_by, qname) %>% 
+    map(mutate, has_supplementary = any(type == "supplementary")) %>% 
+    map(ungroup) %>% 
     bind_rows(.id = "sample") %>% 
-    tidyr::separate(sample, c("library", "barcode"), extra = "drop")
+    tidyr::separate(sample, c("library", "barcode"), sep = '_')
 ```
-
-```{r}
-mapping_df_tx <- df_tx %>% 
-    dplyr::select(library, qname, type) %>% 
-    group_by(library, qname) %>% 
-    summarise(has_primary = any(type == "primary"),
-        has_supplementary = any(type == "supplementary")) %>% 
-    ungroup()
-```
-
-
-## Length of primary and supplementary reads
-
-Based on the mapping against the transcriptome. From bam files.
 
 ```{r}
 df_tx %>% 
@@ -105,56 +168,6 @@ df_tx %>%
     ylab("Aligned read length")
 ```
 
-
-```{r dataImport_genome}
-mapping_df_genome <- c(snakemake@input[["teloprime_bam_genome"]], snakemake@input[["cdna_bam_genome"]]) %>%
-    set_names(basename(snakemake@input[["teloprime_bam_genome"]]), basename(snakemake@input[["cdna_bam_genome"]])) %>% 
-    map(read_rds) %>%     
-    map(mutate, type = get_map_type(flag)) %>% 
-    map(dplyr::select, -seqnames, -flag) %>% 
-    bind_rows(.id = "sample") %>% 
-    dplyr::select(library, qname, type) %>% 
-    group_by(library, qname) %>% 
-    summarise(has_primary = any(type == "primary"),
-        has_supplementary = any(type == "supplementary"))
-```
-
-
-```{r}
-mapping_df2 <- mapping_df_tx %>% 
-    left_join(mapping_df_genome, by = "qname", suffix = c("_tx", "_genome")) %>% 
-    group_by(library) %>% 
-    summarise(n_primary_genome = sum(has_primary_genome, na.rm = TRUE),
-        n_supplementary_genome = sum(has_supplementary_genome, na.rm = TRUE),
-        n_primary_transcriptome = sum(has_primary_tx, na.rm = TRUE),
-        n_supplementary_transcriptome = sum(has_supplementary_tx, na.rm = TRUE)) %>% 
-        tidyr::gather("type", "count", -library)
-
-# The unmapped reads are not in he input files because genomicAlignments cannot
-# handle them. They have to be entered from somewhere else
-#mapping_df2 %>% 
-#    group_by(library) %>% 
-#    mutate(p = count/count[type == "n_total"]) %>% 
-#    ungroup()
-
-mapping_df2 %>% 
-    knitr::kable(format = "html") %>%
-    kableExtra::kable_styling()
-
-mapping_df2 %>% 
-    mutate(type = factor(type, 
-        levels = c("n_primary_genome", "n_supplementary_genome",
-            "n_primary_transcriptome", "n_supplementary_transcriptome"))) %>% 
-    ggplot(aes(x = method, y = count,  fill = type)) +
-    geom_bar(stat = "identity", position=position_dodge()) +
-    scale_y_continuous(labels = function(x) x / 10^6) +
-    theme_tufte() +
-    facet_wrap(~library) +
-    geom_rangeframe(sides = "l") +
-    xlab(NULL) + 
-    ylab("Mio. Reads") +
-    scale_fill_colorblind()
-```
 
 # Transcriptome
 

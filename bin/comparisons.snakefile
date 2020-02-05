@@ -177,18 +177,14 @@ rule read_lengths_fastq:
 
 rule read_lengths_bam:
     input:
-        teloprime_bam_genome = expand("res/comparisons/countReads/teloprime_{barcode}_bam_genome.rds",
-            barcode=SAMPLE_INFO_ont["ont"]),
         teloprime_bam_tx = expand("res/comparisons/countReads/teloprime_{barcode}_bam_transcriptome.rds",
             barcode=SAMPLE_INFO_ont["ont"]),
-        cdna_bam_genome = expand("res/comparisons/countReads/cdna_{barcode}_bam_genome.rds",
-            barcode=SAMPLE_INFO_ont["cdna"]),
         cdna_bam_tx = expand("res/comparisons/countReads/cdna_{barcode}_bam_transcriptome.rds",
             barcode=SAMPLE_INFO_ont["cdna"]),
         biomaRt_tx = "annotation/biomaRt_tx.rds",
         sample_info = "sample_info/sampleInfo.csv",
         flagstats = expand("res/comparisons/countReads/{dataset}_flagstats.csv",
-            dataset=["illumina", "teloprime"])
+            dataset=["cdna", "teloprime"])
     params:
         fig_folder = "res/fig/read_lengths"
     output:
