@@ -1,0 +1,224 @@
+---
+title: "Nanopore iBAT, PCA"
+author: "Christoph Kiefer"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+    html_document:
+        toc: true
+editor_options:
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = FALSE)
+```
+
+```{r loadPackages}
+source("packrat/init.R")
+library("dplyr")
+library("readr")
+library("ggplot2")
+library("ggthemes")
+library("purrr")
+library("tidyr")
+```
+
+```{r importData}
+# sample info
+sample_info <- read_csv(snakemake@input[["sample_info"]]) %>% 
+    mutate_at(vars(matches("condition")), as.factor)
+
+# gene level
+df_gene <- snakemake@input[["gene_counts"]] %>% 
+    set_names(basename(.)) %>% 
+    map(read_csv) %>%
+    map(select, -mgi_symbol, -description, -gene_biotype) %>% 
+    map(tidyr::gather, key = "sample_id", value = "counts", -ensembl_gene_id_version) %>% 
+    bind_rows(.id = "dataset") %>% 
+    tidyr::separate(dataset, "dataset", extra = "drop")
+
+# tx level
+df_tx <- snakemake@input[["tx_counts"]] %>% 
+    set_names(basename(.)) %>% 
+    map(read_csv) %>%
+    map(select, -mgi_symbol, -description, -gene_biotype, -transcript_biotype, -transcript_length) %>% 
+    map(tidyr::gather, key = "sample_id", value = "counts", 
+        -ensembl_gene_id_version, -ensembl_transcript_id_version) %>% 
+    bind_rows(.id = "dataset") %>% 
+    tidyr::separate(dataset, "dataset", extra = "drop")
+```
+
+# Simple filtering
+
+Every feature with more then 10 counts in total is kept.
+
+```{r normalise}
+cm_gene <- df_gene %>% 
+    unite(sample, dataset, sample_id) %>% 
+    spread(sample, counts) %>% 
+    tibble::column_to_rownames("ensembl_gene_id_version") %>% 
+    mutate_all(replace_na, 0) %>% 
+    data.matrix() %>% 
+    `[`(rowSums(.) > 10,) %>% 
+    DESeq2::rlog(blind = TRUE)
+
+cm_tx <- df_tx %>% 
+    dplyr::select(-ensembl_gene_id_version) %>% 
+    unite(sample, dataset, sample_id) %>% 
+    spread(sample, counts) %>% 
+    tibble::column_to_rownames("ensembl_transcript_id_version") %>% 
+    mutate_all(replace_na, 0) %>% 
+    data.matrix() %>% 
+    `[`(rowSums(.) > 10,) %>% 
+    DESeq2::rlog(blind = TRUE)
+```
+
+## Gene level
+
+```{r}
+# calculate pcs
+pca <- prcomp(t(cm_gene), scale. = FALSE)
+
+# importance for labels of the plot
+importance <- summary(pca)[[6]]
+pca <- as_tibble(pca$x, rownames = "sample") %>% 
+    separate(sample, c("library", "sample_id"), extra = "merge") %>% 
+    left_join(sample_info, by = "sample_id")
+
+ggplot(pca, aes(PC1, PC2, colour = library, pch = condition_temp)) +
+    geom_point(size = 2) +
+    theme_tufte() +
+    geom_rangeframe(colour = "black", sides = 'bl') +
+    scale_y_continuous(breaks = extended_range_breaks()(pca[, 4]),
+                       labels = function(x) round(x, 1),
+                       name = sprintf("PC2 (%s %% variance)",
+                                      round(importance[2,2] * 100, 1))) +
+    scale_x_continuous(breaks = extended_range_breaks()(pca[, 3]),
+                       labels = function(x) round(x, 1),
+                       name = sprintf("PC1 (%s %% variance)",
+                                      round(importance[2,1] * 100, 1))) +
+    scale_color_colorblind()
+```
+
+## Transcript level
+
+```{r}
+# calculate pcs
+pca <- prcomp(t(cm_tx), scale. = FALSE)
+
+# importance for labels of the plot
+importance <- summary(pca)[[6]]
+pca <- as_tibble(pca$x, rownames = "sample") %>% 
+    separate(sample, c("library", "sample_id"), extra = "merge") %>% 
+    left_join(sample_info, by = "sample_id")
+
+ggplot(pca, aes(PC1, PC2, colour = library, pch = condition_temp)) +
+    geom_point(size = 2) +
+    theme_tufte() +
+    geom_rangeframe(colour = "black", sides = 'bl') +
+    scale_y_continuous(breaks = extended_range_breaks()(pca[, 4]),
+                       labels = function(x) round(x, 1),
+                       name = sprintf("PC2 (%s %% variance)",
+                                      round(importance[2,2] * 100, 1))) +
+    scale_x_continuous(breaks = extended_range_breaks()(pca[, 3]),
+                       labels = function(x) round(x, 1),
+                       name = sprintf("PC1 (%s %% variance)",
+                                      round(importance[2,1] * 100, 1))) +
+    scale_color_colorblind()
+```
+
+# Genes expressed in all samples
+
+Only features with at least 5 counts per library.
+
+```{r normalise2}
+expressed_genes <- df_gene %>% 
+    group_by(ensembl_gene_id_version, dataset) %>% 
+    summarize(is_expressed = if_else(sum(counts) > 5, TRUE, FALSE)) %>% 
+    summarise(is_expressed_all = if_else(sum(is_expressed) == 3, TRUE, FALSE)) %>% 
+    filter(is_expressed_all) %>% 
+    pull(ensembl_gene_id_version)
+
+cm_gene <- df_gene %>%
+    filter(ensembl_gene_id_version %in% expressed_genes) %>% 
+    unite(sample, dataset, sample_id) %>% 
+    spread(sample, counts) %>% 
+    tibble::column_to_rownames("ensembl_gene_id_version") %>% 
+    mutate_all(replace_na, 0) %>% 
+    data.matrix() %>% 
+    `[`(rowSums(.) > 10,) %>% 
+    DESeq2::rlog(blind = TRUE)
+
+
+expressed_transcripts <- df_tx %>% 
+    group_by(ensembl_transcript_id_version, dataset) %>% 
+    summarize(is_expressed = if_else(sum(counts) > 5, TRUE, FALSE)) %>% 
+    summarise(is_expressed_all = if_else(sum(is_expressed) == 3, TRUE, FALSE)) %>% 
+    filter(is_expressed_all) %>% 
+    pull(ensembl_transcript_id_version)
+
+cm_tx <- df_tx %>% 
+    filter(ensembl_transcript_id_version %in% expressed_transcripts) %>% 
+    dplyr::select(-ensembl_gene_id_version) %>% 
+    unite(sample, dataset, sample_id) %>% 
+    spread(sample, counts) %>% 
+    tibble::column_to_rownames("ensembl_transcript_id_version") %>% 
+    mutate_all(replace_na, 0) %>% 
+    data.matrix() %>% 
+    `[`(rowSums(.) > 10,) %>% 
+    DESeq2::rlog(blind = TRUE)
+```
+
+## Gene level
+
+```{r}
+# calculate pcs
+pca <- prcomp(t(cm_gene), scale. = FALSE)
+
+# importance for labels of the plot
+importance <- summary(pca)[[6]]
+pca <- as_tibble(pca$x, rownames = "sample") %>% 
+    separate(sample, c("library", "sample_id"), extra = "merge") %>% 
+    left_join(sample_info, by = "sample_id")
+
+ggplot(pca, aes(PC1, PC2, colour = library, pch = condition_temp)) +
+    geom_point(size = 2) +
+    theme_tufte() +
+    geom_rangeframe(colour = "black", sides = 'bl') +
+    scale_y_continuous(breaks = extended_range_breaks()(pca[, 4]),
+                       labels = function(x) round(x, 1),
+                       name = sprintf("PC2 (%s %% variance)",
+                                      round(importance[2,2] * 100, 1))) +
+    scale_x_continuous(breaks = extended_range_breaks()(pca[, 3]),
+                       labels = function(x) round(x, 1),
+                       name = sprintf("PC1 (%s %% variance)",
+                                      round(importance[2,1] * 100, 1))) +
+    scale_color_colorblind()
+```
+
+## Transcript level
+
+```{r}
+# calculate pcs
+pca <- prcomp(t(cm_tx), scale. = FALSE)
+
+# importance for labels of the plot
+importance <- summary(pca)[[6]]
+pca <- as_tibble(pca$x, rownames = "sample") %>% 
+    separate(sample, c("library", "sample_id"), extra = "merge") %>% 
+    left_join(sample_info, by = "sample_id")
+
+ggplot(pca, aes(PC1, PC2, colour = library, pch = condition_temp)) +
+    geom_point(size = 2) +
+    theme_tufte() +
+    geom_rangeframe(colour = "black", sides = 'bl') +
+    scale_y_continuous(breaks = extended_range_breaks()(pca[, 4]),
+                       labels = function(x) round(x, 1),
+                       name = sprintf("PC2 (%s %% variance)",
+                                      round(importance[2,2] * 100, 1))) +
+    scale_x_continuous(breaks = extended_range_breaks()(pca[, 3]),
+                       labels = function(x) round(x, 1),
+                       name = sprintf("PC1 (%s %% variance)",
+                                      round(importance[2,1] * 100, 1))) +
+    scale_color_colorblind()
+```

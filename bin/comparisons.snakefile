@@ -16,6 +16,18 @@ rule quantification_correlation:
         "comparisons_quantification_correlation.Rmd"
 
 
+rule counts_pca:
+    input:
+        tx_counts = expand("res/deseq/{dataset}/txlevel/{dataset}_txlevel_cm_cts.csv.gz",
+            dataset=["cdna", "teloprime", "illumina"]),
+        gene_counts = expand("res/deseq/{dataset}/genelevel/{dataset}_genelevel_cm_cts.csv.gz",
+            dataset=["cdna", "teloprime", "illumina"]),
+        sample_info = "sample_info/sampleInfo.csv"
+    output:
+        "res/comparisons/comparisons_countsPCA.html"
+    script:
+        "comparisons_countsPCA.Rmd"
+
 rule feature_detection:
     input:
         tx_counts = expand("res/deseq/{dataset}/txlevel/{dataset}_txlevel_cm_cts.csv.gz",
