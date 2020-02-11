@@ -205,23 +205,21 @@ rule read_lengths_bam:
         "comparisons_read_lengths_bam.Rmd"
 
 
-rule compare_differentialExpressionAnalysis:
+rule compare_dge:
     input:
-        illumina_tx = "res/deseq/illumina/txlevel_ont/txlevel_ont_de.csv.gz",
-        illumina_gene = "res/deseq/illumina/genelevel_ont/genelevel_ont_de.csv.gz",
-        illumina_dtu = "res/drimseq/illumina/dtu_ont/stageR_drimseq_dtu.csv.gz",
-        teloprime_tx = "res/deseq/teloprime/txlevel/teloprime_txlevel_de.csv.gz",
-        teloprime_gene = "res/deseq/teloprime/genelevel/teloprime_genelevel_de.csv.gz",
-        teloprime_dtu = "res/wien/teloprime_old/DRIMSeq_stageR/stageR/stageR_final_output_padj_GeneSymbols.tsv",
-        teloprime_counts = "res/deseq/teloprime/genelevel/teloprime_genelevel_cm_cts.csv.gz",
-        illumina_counts = "res/deseq/illumina/genelevel_ont/genelevel_ont_cm_cts.csv.gz",
-        biomaRt_gene = "annotation/biomaRt_gene.rds",
-        grouped_biotypes = "data/biotype_groups.csv",
-        tpm_gene = "res/deseq/illumina/genelevel_ont/genelevel_ont_cm_tpm.csv.gz"
+        dte = expand("res/deseq/{dataset}/txlevel/{dataset}_txlevel_apeglm_results.csv.gz",
+            dataset = ["illumina", "teloprime", "cdna"]),
+        dge = expand("res/deseq/{dataset}/genelevel/{dataset}_genelevel_apeglm_results.csv.gz",
+            dataset = ["illumina", "teloprime", "cdna"]),
+        gene_counts = expand("res/deseq/{dataset}/genelevel/{dataset}_genelevel_cm_cts.csv.gz",
+            dataset=["cdna", "teloprime", "illumina"]),
+        tx_counts = expand("res/deseq/{dataset}/txlevel/{dataset}_txlevel_cm_cts.csv.gz",
+            dataset=["cdna", "teloprime", "illumina"]),
+        grouped_biotypes = "data/biotype_groups.csv"
     output:
-        "res/comparisons/comparisons_dgeDteDtu.html"
+        "res/comparisons/comparisons_dgeDte.html"
     script:
-        "comparisons_dgeDteDtu.Rmd"
+        "comparisons_dgeDte.Rmd"
 
 
 rule compare_differentialExpressionAnalysis2:
