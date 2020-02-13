@@ -13,10 +13,6 @@ editor_options:
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = FALSE)
 ```
 
-```{r}
-save.image("dge.RData")
-```
-
 ```{r library, include=FALSE}
 source("packrat/init.R")
 library("dplyr")
