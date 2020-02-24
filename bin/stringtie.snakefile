@@ -24,7 +24,7 @@ rule stringtie_merge:
             sample=SAMPLES_ont),
         annotation = "annotation/annotation.gtf"
     output:
-        "stringtie/illumina/stringtie_illumina_merged.gtf"
+        "stringtie/illumina/stringtie_illumina_merged_ref.gtf"
     params:
     threads:
         8
@@ -33,7 +33,6 @@ rule stringtie_merge:
             -G {input.annotation} \
             -p {threads} \
             -l 'stringtie_merge' \
-            -c 10 \
             -o {output} \
             {input.gtfs}"
 
@@ -50,6 +49,5 @@ rule stringtie_merge_noRef:
         "stringtie --merge \
             -p {threads} \
             -l 'stringtie_merge' \
-            -c 10 \
             -o {output} \
             {input.gtfs}"
