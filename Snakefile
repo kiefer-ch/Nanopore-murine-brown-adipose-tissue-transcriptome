@@ -111,4 +111,4 @@ include: "bin/drimseq.snakefile"
 include: "bin/flair.snakefile"
 include: "bin/chip.snakefile"
 include: "bin/stringtie.snakefile"
-
+include: "bin/gffcompare.snakefile"
