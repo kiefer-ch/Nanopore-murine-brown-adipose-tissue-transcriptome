@@ -18,36 +18,58 @@ rule stringtie:
             -o {output} \
             -j 10"
 
+
 rule stringtie_merge:
     input:
         gtfs = expand("stringtie/illumina/stringtie_illumina_{sample}.gtf",
-            sample=SAMPLES_ont),
-        annotation = "annotation/annotation.gtf"
+            sample=SAMPLES_ont)
     output:
-        "stringtie/illumina/stringtie_illumina_merged_ref.gtf"
+        "stringtie/illumina/stringtie_illumina_merged.gtf"
     params:
     threads:
         8
     shell:
         "stringtie --merge \
-            -G {input.annotation} \
             -p {threads} \
             -l 'stringtie_merge' \
             -o {output} \
             {input.gtfs}"
 
-rule stringtie_merge_noRef:
+
+rule stringtie_gffcompare:
     input:
-        gtfs = expand("stringtie/illumina/stringtie_illumina_{sample}.gtf",
-            sample=SAMPLES_ont)
+        "annotation/genome.fa.fai",
+        stringtie = "stringtie/illumina/stringtie_illumina_merged.gtf",
+        reference = "annotation/annotation.gtf",
+        genome = "annotation/genome.fa"
     output:
-        "stringtie/illumina/stringtie_illumina_merged_noRef.gtf"
+        "stringtie/illumina/gffcompare/illumina_gffcompare.loci",
+        "stringtie/illumina/gffcompare/illumina_gffcompare.stats",
+        "stringtie/illumina/gffcompare/illumina_gffcompare.annotated.gtf",
+        "stringtie/illumina/gffcompare/illumina_gffcompare.tracking"
     params:
-    threads:
-        8
+        out_prefix = "stringtie/illumina/gffcompare/illumina_gffcompare"
     shell:
-        "stringtie --merge \
-            -p {threads} \
-            -l 'stringtie_merge' \
-            -o {output} \
-            {input.gtfs}"
+        "gffcompare -R -T \
+            -o  {params.out_prefix} \
+            -r {input.reference} \
+            {input.stringtie}"
+
+
+rule stringtie_sqanti:
+    input:
+        "annotation/genome.fa.fai",
+        isoforms = "stringtie/illumina/stringtie_illumina_merged.gtf",
+        annotation = "annotation/annotation.gtf",
+        genome = "annotation/genome.fa"
+    output:
+        "stringtie/illumina/sqanti/stringtie.collapse.isoforms_report.pdf",
+        "stringtie/illumina/sqanti/stringtie.collapse.isoforms_classification.txt"
+    params:
+        out_dir = "stringtie/illumina/sqanti"
+    threads:
+        10
+    shell:
+        "sqanti_qc2 -g \
+            -d {params.out_dir} \
+            {input.isoforms} {input.annotation} {input.genome}"
