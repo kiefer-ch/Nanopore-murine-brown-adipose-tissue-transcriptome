@@ -18,15 +18,23 @@ rule gffcompare:
             {input.gtfs}"
 
 
+rule filterUnknownStrand_fasta:
+    input:
+        "{file}.gtf"
+    output:
+        "{file}_noUnknownStrand.gtf"
+    script:
+        "stringtie_filter_fasta.R"
+
 rule sqanti_illumina:
     input:
         "annotation/genome.fa.fai",
-        isoforms = "stringtie/illumina/stringtie_illumina_merged.gtf",
+        isoforms = "stringtie/illumina/stringtie_illumina_merged_noUnknownStrand.gtf",
         annotation = "annotation/annotation.gtf",
         genome = "annotation/genome.fa"
     output:
-        "stringtie/illumina/sqanti/stringtie.collapse.isoforms_report.pdf",
-        "stringtie/illumina/sqanti/stringtie.collapse.isoforms_classification.txt"
+        "stringtie/illumina/sqanti/stringtie_illumina_merged_noUnknownStrand_report.pdf",
+        "stringtie/illumina/sqanti/stringtie_illumina_merged_noUnknownStrand_classification.txt"
     params:
         out_dir = "stringtie/illumina/sqanti"
     shell:
