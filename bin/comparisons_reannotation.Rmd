@@ -34,7 +34,15 @@ df <- snakemake@input[["gffcompare"]] %>%
 # correct colnames
 colnames(df)[10:13] <- colnames(df)[11:14]
 df <- df[, -14]
+
+# load sqanti
+df2 <- snakemake@input[["sqanti"]] %>% 
+    set_names(., strsplit(snakemake@input[["gffcompare"]], "/all") %>% map(`[`, 1)) %>% 
+    map(read_tsv) %>% 
+    bind_rows(.id = "dataset")
 ```
+
+# Gffcompare
 
 ```{r plot_gffcompare}
 df %>% 
@@ -56,6 +64,7 @@ df %>%
     theme_tufte() +
     geom_rangeframe(sides = 'l') +
     ylab(NULL) +
+    xlab(NULL) +
     scale_y_continuous(labels = scales::percent)
 
 df %>% 
@@ -68,3 +77,39 @@ df %>%
     ylab("Transcript length [nt]")
 ```
 
+# Sqanti
+
+```{r plot_sqanti}
+df2 %>% 
+    mutate(grouped_num_exons = cut(exons, 
+        breaks = c(0, 1, 2, 5, max(exons)))) %>% 
+    ggplot(aes(structural_category)) +
+    geom_bar(aes(fill = grouped_num_exons), position = "fill") +
+    facet_wrap(~dataset) +
+    scale_fill_colorblind() +
+    theme_tufte() +
+    geom_rangeframe(sides = 'l') +
+    ylab(NULL) +
+    scale_y_continuous(labels = scales::percent) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+df2 %>% 
+    ggplot(aes(dataset)) +
+    geom_bar(aes(fill = structural_category), position = "fill") +
+    scale_fill_colorblind() +
+    theme_tufte() +
+    geom_rangeframe(sides = 'l') +
+    ylab(NULL) +
+    xlab(NULL) +
+    scale_y_continuous(labels = scales::percent)
+
+df2 %>% 
+    ggplot(aes(structural_category, length)) +
+    geom_boxplot() +
+    facet_wrap(~dataset) +
+    scale_y_log10() +
+    theme_tufte() +
+    geom_rangeframe(sides = 'l') +
+    ylab("Transcript length [nt]") +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```

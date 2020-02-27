@@ -2,10 +2,10 @@
 rule quantification_correlation:
     input:
         tx_counts = expand("res/deseq/{dataset}/txlevel/{dataset}_txlevel_cm_ntd.csv.gz",
-            dataset=["cdna", "teloprime"]),
+                           dataset=["cdna", "teloprime"]),
         tx_tpm = "res/deseq/illumina/txlevel/illumina_txlevel_cm_ntd.csv.gz",
         gene_counts = expand("res/deseq/{dataset}/genelevel/{dataset}_genelevel_cm_ntd.csv.gz",
-            dataset=["cdna", "teloprime"]),
+                             dataset=["cdna", "teloprime"]),
         gene_tpm = "res/deseq/illumina/genelevel/illumina_genelevel_cm_ntd.csv.gz",
         biomaRt_gene = "annotation/biomaRt_gene.rds",
         biomaRt_tx = "annotation/biomaRt_tx.rds",
@@ -19,21 +19,22 @@ rule quantification_correlation:
 rule counts_pca:
     input:
         tx_counts = expand("res/deseq/{dataset}/txlevel/{dataset}_txlevel_cm_cts.csv.gz",
-            dataset=["cdna", "teloprime", "illumina"]),
+                           dataset=["cdna", "teloprime", "illumina"]),
         gene_counts = expand("res/deseq/{dataset}/genelevel/{dataset}_genelevel_cm_cts.csv.gz",
-            dataset=["cdna", "teloprime", "illumina"]),
+                             dataset=["cdna", "teloprime", "illumina"]),
         sample_info = "sample_info/sampleInfo.csv"
     output:
         "res/comparisons/comparisons_countsPCA.html"
     script:
         "comparisons_countsPCA.Rmd"
 
+
 rule feature_detection:
     input:
         tx_counts = expand("res/deseq/{dataset}/txlevel/{dataset}_txlevel_cm_cts.csv.gz",
-            dataset=["cdna", "teloprime", "illumina"]),
+                           dataset=["cdna", "teloprime", "illumina"]),
         gene_counts = expand("res/deseq/{dataset}/genelevel/{dataset}_genelevel_cm_cts.csv.gz",
-            dataset=["cdna", "teloprime", "illumina"]),
+                             dataset=["cdna", "teloprime", "illumina"]),
         gene_tpm = "res/deseq/illumina/genelevel/illumina_genelevel_cm_ntd.csv.gz",
         biomaRt_gene = "annotation/biomaRt_gene.rds",
         biomaRt_tx = "annotation/biomaRt_tx.rds",
@@ -106,15 +107,15 @@ rule bam_getCoverage:
 rule coverage:
     input:
         geneBodyCoverage_teloprime = expand("res/comparisons/geneBody_coverage/teloprime/{barcode}.geneBodyCoverage.txt",
-            barcode=SAMPLE_INFO_ont["ont"]),
-        geneBodyCoverage_cdna =  expand("res/comparisons/geneBody_coverage/cdna/{barcode}.geneBodyCoverage.txt",
-            barcode=SAMPLE_INFO_ont["cdna"]),
+                                            barcode=SAMPLE_INFO_ont["ont"]),
+        geneBodyCoverage_cdna = expand("res/comparisons/geneBody_coverage/cdna/{barcode}.geneBodyCoverage.txt",
+                                       barcode=SAMPLE_INFO_ont["cdna"]),
         geneBodyCoverage_illumina = expand("qc/RSeQC/geneBody_coverage/{sample}.geneBodyCoverage.txt",
-            sample=SAMPLES_ont),
+                                           sample=SAMPLES_ont),
         coverage_teloprime = expand("res/comparisons/coverage/teloprime/{barcode}.rds",
-            barcode=SAMPLE_INFO_ont["ont"]),
+                                    barcode=SAMPLE_INFO_ont["ont"]),
         coverage_cdna = expand("res/comparisons/coverage/cdna/{barcode}.rds",
-            barcode=SAMPLE_INFO_ont["cdna"]),
+                               barcode=SAMPLE_INFO_ont["cdna"]),
         sample_info = "sample_info/sampleInfo.csv",
         biomaRt_tx = "annotation/biomaRt_tx.rds"
     params:
@@ -128,9 +129,9 @@ rule coverage:
 rule compare_dtu:
     input:
         drimseq = expand("res/drimseq/{dataset}/{dataset}_drimSeqStageR.csv",
-            dataset=["illumina","cdna","teloprime","cdna_flair","teloprime_flair"]),
+                         dataset=["illumina", "cdna", "teloprime", "cdna_flair", "teloprime_flair"]),
         dexseq = expand("res/dexseq/{dataset}/{dataset}_dexseq_results.csv.gz",
-            dataset=["illumina","cdna","teloprime"]),
+                        dataset=["illumina", "cdna", "teloprime"]),
         biomaRt_gene = "annotation/biomaRt_gene.rds"
     output:
         "res/comparisons/comparisons_dtu.html"
@@ -176,7 +177,7 @@ rule fasta_readLengthHistogram:
 rule read_lengths_fastq:
     input:
         readLengths = expand("res/comparisons/readLengthDistribution/{dataset}_fastqReadLengths.csv",
-            dataset=["teloprime", "cdna"]),
+                             dataset=["teloprime", "cdna"]),
         annotation_txLengths = "annotation/annotation_transcript_lengths.csv",
         sample_info = "sample_info/sampleInfo.csv"
     params:
@@ -190,13 +191,13 @@ rule read_lengths_fastq:
 rule read_lengths_bam:
     input:
         teloprime_bam_tx = expand("res/comparisons/countReads/teloprime_{barcode}_bam_transcriptome.rds",
-            barcode=SAMPLE_INFO_ont["ont"]),
+                                  barcode=SAMPLE_INFO_ont["ont"]),
         cdna_bam_tx = expand("res/comparisons/countReads/cdna_{barcode}_bam_transcriptome.rds",
-            barcode=SAMPLE_INFO_ont["cdna"]),
+                             barcode=SAMPLE_INFO_ont["cdna"]),
         biomaRt_tx = "annotation/biomaRt_tx.rds",
         sample_info = "sample_info/sampleInfo.csv",
         flagstats = expand("res/comparisons/countReads/{dataset}_flagstats.csv",
-            dataset=["cdna", "teloprime"])
+                           dataset=["cdna", "teloprime"])
     params:
         fig_folder = "res/fig/read_lengths"
     output:
@@ -208,13 +209,13 @@ rule read_lengths_bam:
 rule compare_dge:
     input:
         dte = expand("res/deseq/{dataset}/txlevel/{dataset}_txlevel_apeglm_results.csv.gz",
-            dataset = ["illumina", "teloprime", "cdna"]),
+                     dataset=["illumina", "teloprime", "cdna"]),
         dge = expand("res/deseq/{dataset}/genelevel/{dataset}_genelevel_apeglm_results.csv.gz",
-            dataset = ["illumina", "teloprime", "cdna"]),
+                     dataset=["illumina", "teloprime", "cdna"]),
         gene_counts = expand("res/deseq/{dataset}/genelevel/{dataset}_genelevel_cm_cts.csv.gz",
-            dataset=["cdna", "teloprime", "illumina"]),
+                             dataset=["cdna", "teloprime", "illumina"]),
         tx_counts = expand("res/deseq/{dataset}/txlevel/{dataset}_txlevel_cm_cts.csv.gz",
-            dataset=["cdna", "teloprime", "illumina"]),
+                           dataset=["cdna", "teloprime", "illumina"]),
         grouped_biotypes = "data/biotype_groups.csv"
     output:
         "res/comparisons/comparisons_dgeDte.html"
@@ -225,8 +226,11 @@ rule compare_dge:
 rule compare_reannotation:
     input:
         gffcompare = ["stringtie/illumina/all_gffcompare.stringtie_illumina_merged.gtf.tmap",
-            expand("flair/{dataset}/all_gffcompare.flair.collapse.isoforms.gtf.tmap",
-                dataset = ["cdna", "teloprime"])]
+                      expand("flair/{dataset}/all_gffcompare.flair.collapse.isoforms.gtf.tmap",
+                             dataset=["cdna", "teloprime"])],
+        sqanti = ["stringtie/illumina/sqanti/stringtie_illumina_merged_noUnknownStrand_classification.txt",
+                  expand("flair/{dataset}/sqanti/flair.collapse.isoforms_classification.txt",
+                         dataset=["cdna", "teloprime"])]
     output:
         "res/comparisons/comparisons_reannotation.html"
     script:
