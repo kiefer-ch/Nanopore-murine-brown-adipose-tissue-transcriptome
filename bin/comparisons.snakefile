@@ -222,6 +222,17 @@ rule compare_dge:
         "comparisons_dgeDte.Rmd"
 
 
+rule compare_reannotation:
+    input:
+        gffcompare = ["stringtie/illumina/all_gffcompare.stringtie_illumina_merged.gtf.tmap",
+            expand("flair/{dataset}/all_gffcompare.flair.collapse.isoforms.gtf.tmap",
+                dataset = ["cdna", "teloprime"])]
+    output:
+        "res/comparisons/comparisons_reannotation.html"
+    script:
+        "comparisons_reannotation.Rmd"
+
+
 rule render_GOcomp:
     input:
         "res/txlevel_ont/txlevel_ont_de.csv.gz",

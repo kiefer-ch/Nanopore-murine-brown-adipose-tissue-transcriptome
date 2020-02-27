@@ -1,0 +1,70 @@
+---
+title: "Comparison of DGE and DTE"
+author: "Christoph Kiefer"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+    html_document:
+        toc: true
+editor_options:
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = FALSE)
+```
+
+```{r library, include=FALSE}
+source("packrat/init.R")
+library("dplyr")
+library("readr")
+library("purrr")
+library("ggplot2")
+library("ggthemes")
+library("UpSetR")
+library("ggpmisc")
+```
+
+```{r dataImport}
+# load gffcompare
+df <- snakemake@input[["gffcompare"]] %>% 
+    set_names(., strsplit(snakemake@input[["gffcompare"]], "/all") %>% map(`[`, 1)) %>% 
+    map(read_tsv) %>%  
+    bind_rows(.id = "dataset")
+
+# correct colnames
+colnames(df)[10:13] <- colnames(df)[11:14]
+df <- df[, -14]
+```
+
+```{r plot_gffcompare}
+df %>% 
+    mutate(grouped_num_exons = cut(num_exons, 
+        breaks = c(0, 1, 2, 5, max(num_exons)))) %>% 
+    ggplot(aes(class_code)) +
+    geom_bar(aes(fill = grouped_num_exons), position = "fill") +
+    facet_wrap(~dataset) +
+    scale_fill_colorblind() +
+    theme_tufte() +
+    geom_rangeframe(sides = 'l') +
+    ylab(NULL) +
+    scale_y_continuous(labels = scales::percent)
+
+df %>% 
+    ggplot(aes(dataset)) +
+    geom_bar(aes(fill = class_code), position = "fill") +
+    scale_fill_viridis_d() +
+    theme_tufte() +
+    geom_rangeframe(sides = 'l') +
+    ylab(NULL) +
+    scale_y_continuous(labels = scales::percent)
+
+df %>% 
+    ggplot(aes(class_code, len)) +
+    geom_boxplot() +
+    facet_wrap(~dataset) +
+    scale_y_log10() +
+    theme_tufte() +
+    geom_rangeframe(sides = 'l') +
+    ylab("Transcript length [nt]")
+```
+
