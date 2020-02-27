@@ -26,6 +26,7 @@ rule filterUnknownStrand_fasta:
     script:
         "stringtie_filter_fasta.R"
 
+
 rule sqanti_illumina:
     input:
         "annotation/genome.fa.fai",
@@ -33,7 +34,7 @@ rule sqanti_illumina:
         annotation = "annotation/annotation.gtf",
         genome = "annotation/genome.fa"
     output:
-        "stringtie/illumina/sqanti/stringtie_illumina_merged_noUnknownStrand_report.pdf",
+        "stringtie/illumina/sqanti/stringtie_illumina_merged_noUnknownStrand_sqanti_report.pdf",
         "stringtie/illumina/sqanti/stringtie_illumina_merged_noUnknownStrand_classification.txt"
     params:
         out_dir = "stringtie/illumina/sqanti"
