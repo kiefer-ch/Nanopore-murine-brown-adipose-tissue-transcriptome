@@ -1,5 +1,5 @@
 # comparisons
-rule quantification_correlation:
+rule quantification_averageCounts_tables:
     input:
         tx_counts = expand("res/deseq/{dataset}/txlevel/{dataset}_txlevel_cm_ntd.csv.gz",
                            dataset=["cdna", "teloprime"]),
@@ -10,6 +10,16 @@ rule quantification_correlation:
         biomaRt_gene = "annotation/biomaRt_gene.rds",
         biomaRt_tx = "annotation/biomaRt_tx.rds",
         biotype_groups = "data/biotype_groups.csv"
+    output:
+        gene = "res/comparisons/comparisons_meanCounts_gene.csv.gz",
+        tx = "res/comparisons/comparisons_meanCounts_tx.csv.gz"
+    script:
+        "comparisons_quantification_averageCountsTable.R"
+
+rule quantification_correlation:
+    input:
+        gene = "res/comparisons/comparisons_meanCounts_gene.csv.gz",
+        tx = "res/comparisons/comparisons_meanCounts_tx.csv.gz"
     output:
         "res/comparisons/comparisons_quantification_correlation.html"
     script:
@@ -132,7 +142,8 @@ rule compare_dtu:
                          dataset=["illumina", "cdna", "teloprime", "cdna_flair", "teloprime_flair"]),
         dexseq = expand("res/dexseq/{dataset}/{dataset}_dexseq_results.csv.gz",
                         dataset=["illumina", "cdna", "teloprime"]),
-        biomaRt_gene = "annotation/biomaRt_gene.rds"
+        biomaRt_gene = "annotation/biomaRt_gene.rds",
+        counts = "res/comparisons/comparisons_meanCounts_gene.csv.gz"
     output:
         "res/comparisons/comparisons_dtu.html"
     script:
