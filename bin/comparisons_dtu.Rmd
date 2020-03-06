@@ -14,6 +14,7 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = FA
 ```
 
 ```{r library, include=FALSE}
+save.image("dtu.RData")
 source("packrat/init.R")
 library("dplyr")
 library("readr")
@@ -50,7 +51,6 @@ drimseq <- snakemake@input[["drimseq"]] %>%
     tidyr::unite("method", dataset, library) %>% 
     tidyr::spread(method, padj) %>% 
     filter(substr(ensembl_gene_id_version, 1, 3) == "ENS") 
-
 
 df <- list(drimseq, dexseq) %>%
     reduce(full_join, by = c("ensembl_gene_id_version", "gene_biotype")) %>%
@@ -121,6 +121,21 @@ df_sub %>%
     kableExtra::kable_styling() %>%
     kableExtra::scroll_box(width = "100%", height = "600px")
 
+counts <- read_csv(snakemake@input[["counts"]]) %>% 
+    dplyr::select(-mgi_symbol, -description, -gene_biotype, -grouped_biotype) %>%
+    tidyr::gather("dataset", "counts", -ensembl_gene_id_version) %>% 
+    mutate(counts = 2^counts - 1) %>% 
+    mutate(dataset = if_else(dataset == "illumina", 
+        paste0("avgTpm_", dataset),
+        paste0("avgCounts_", dataset))) %>% 
+    tidyr::spread(dataset, counts)
+
+
 df_sub %>% 
+    rename_if(is.numeric, paste0, "_padj") %>% 
+    left_join(counts, by = "ensembl_gene_id_version") %>% 
+    dplyr::select(ensembl_gene_id_version, mgi_symbol, description,
+        gene_biotype, avgCounts_cdna, avgCounts_teloprime,
+        avgTpm_illumina, everything()) %>% 
     write_csv("res/comparisons/comparisons_dtu.csv")
 ```
