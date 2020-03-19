@@ -19,17 +19,15 @@
 !data/biotype_groups.csv
 !data/mm10_Gencode_vM20_gencode.bed
 
-# Don't ignore packrat
-!packrat/init.R
-!packrat/packrat.lock
-!packrat/packrat.opts
-!.Rprofile
-packrat/*lib
+# Don't ignore renv
+!renv/
 
 # Root directory
 !Snakefile
 !config.sh
 !README.md
+!LICENSE
+!renv.lock
 
 # Don't ignore sample info
 !sample_info/illumina_sample_id.txt

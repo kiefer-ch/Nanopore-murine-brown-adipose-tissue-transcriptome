@@ -1,9 +1,10 @@
 #!/usr/bin/Rscript --no-restore --no-environ --no-save
 
 source("packrat/init.R")
-suppressPackageStartupMessages(library("readr"))
-suppressPackageStartupMessages(library("dplyr"))
-suppressPackageStartupMessages(library("DESeq2"))
+library("readr")
+library("dplyr")
+library("DESeq2")
+library("apeglm")
 BPPARAM = BiocParallel::MulticoreParam(snakemake@threads[[1]])
 
 ################################################################################
