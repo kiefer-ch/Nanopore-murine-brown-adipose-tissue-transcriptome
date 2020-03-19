@@ -20,7 +20,8 @@
 !data/mm10_Gencode_vM20_gencode.bed
 
 # Don't ignore renv
-!renv/
+!renv/activate.R
+!renv/settings.dcf
 
 # Root directory
 !Snakefile
@@ -28,6 +29,7 @@
 !README.md
 !LICENSE
 !renv.lock
+!.renvignore
 
 # Don't ignore sample info
 !sample_info/illumina_sample_id.txt

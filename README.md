@@ -10,6 +10,8 @@ showing you all the jobs that need to be run in order to fulfill your command.
 
 ## Dependencies
 
+### General
+
 * pandoc
 * bedtools
 * mashmap
@@ -28,9 +30,18 @@ showing you all the jobs that need to be run in order to fulfill your command.
 * libcairo2-dev
 * libfontconfig1-dev
 
-R dependencies are handled by packrat. 
-I have to redo the packrat repository at some time though.
+### R dependencies 
 
+R dependencies are handled by renv. To install the dependencies, start R from the
+root folder of the project. If renv is not installed on your computer, it should
+install itself into a private library inside the project.
+
+Type the following to restore the library used when this analysis was done:
+
+```R
+renv::restore()
+```
+    
 # Results files
 
 ## Differential gene and transcript expression

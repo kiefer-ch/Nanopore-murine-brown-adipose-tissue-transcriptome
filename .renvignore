@@ -1,0 +1,16 @@
+annotation
+bam
+bw
+data
+fastq
+flair
+indices
+nanoporeibat_hub
+qc
+renv
+res
+salmon
+sample_info
+stringtie
+.git
+.snakemake

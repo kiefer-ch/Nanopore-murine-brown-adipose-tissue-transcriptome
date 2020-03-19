@@ -150,9 +150,15 @@
     },
     "GOSemSim": {
       "Package": "GOSemSim",
-      "Version": "2.10.0",
-      "Source": "Bioconductor",
-      "Hash": "9ce9c6ac7c7175a4f8579798c22bdfc0"
+      "Version": "2.13.1",
+      "Source": "GitHub",
+      "RemoteType": "github",
+      "RemoteHost": "api.github.com",
+      "RemoteRepo": "GOSemSim",
+      "RemoteUsername": "GuangchuangYu",
+      "RemoteRef": "master",
+      "RemoteSha": "0d9523611ddc88ed7a530bef2ca5d5f968303d70",
+      "Hash": "eaf5c81732824c646eef49b450a47342"
     },
     "GenomeInfoDb": {
       "Package": "GenomeInfoDb",
@@ -1065,13 +1071,6 @@
       "Version": "3.10.0",
       "Source": "Bioconductor",
       "Hash": "97c1a688b1dd53dc9469ab3122fa8161"
-    },
-    "packrat": {
-      "Package": "packrat",
-      "Version": "0.5.0",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Hash": "2ebd34a38f4248281096cc723535b66d"
     },
     "pheatmap": {
       "Package": "pheatmap",
