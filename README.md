@@ -27,12 +27,13 @@ showing you all the jobs that need to be run in order to fulfill your command.
 * pandas
 * HTSeq
 
-* libcairo2-dev
 * libfontconfig1-dev
 
-### R dependencies 
+### R dependencies
 
-R dependencies are handled by renv. To install the dependencies, start R from the
+R dependencies are handled by renv.
+
+To install the dependencies, start R from the
 root folder of the project. If renv is not installed on your computer, it should
 install itself into a private library inside the project.
 
@@ -41,7 +42,10 @@ Type the following to restore the library used when this analysis was done:
 ```R
 renv::restore()
 ```
-    
+
+If the systemfonts package fails to install, you might have to install libcairo2-dev by
+running `sudo apt-get libcairo2-dev` first.
+
 # Results files
 
 ## Differential gene and transcript expression
@@ -71,7 +75,7 @@ There are multiple countmatrices to be found in the res/deseq/method/geneOrTxLev
 * ntd: log2(x + 1) level, between sample normalised. For genes, that are not expressed in a condition, the rlog transformed
 values will not be 0, which might be confusing sometimes. Therfore I add this table.
 
-* tpm: between sample normalised and within sample (between genes) normalised. 
+* tpm: between sample normalised and within sample (between genes) normalised.
 (Only for illumina.)
 
 * cts: raw counts, count output from tximport as imported from salmon estimated
@@ -116,7 +120,7 @@ DEXSeq [https://bioconductor.org/packages/release/bioc/vignettes/DEXSeq/inst/doc
 perform a differential exon usage analysis. It compares the fold change of counts falling
 into one exon with the counts falling into the whole gene. Therefore it uses a metatranscript
 assembled from all transcripts of a gene fullfilling certain expression thresholds.
-As it is on exonlevel, it does not depend on correct transcript annotation, but 
+As it is on exonlevel, it does not depend on correct transcript annotation, but
 on correct exon annotation. (It cannot detect differential expression in non annotated
 exons.)
 
