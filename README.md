@@ -22,7 +22,7 @@ showing you all the jobs that need to be run in order to fulfill your command.
 * STAR
 * fastqc
 * snakemake &gt 5.5.4
-* R
+* R 3.6
 * samtools
 * pandas
 * HTSeq
@@ -46,9 +46,58 @@ renv::restore()
 If the systemfonts package fails to install, you might have to install libcairo2-dev by
 running `sudo apt-get libcairo2-dev` first.
 
-# Results files
+# Folder structure
+
+```
+|-- annotation
+|-- bam
+|-- bin
+|-- bw
+|-- data
+|-- fastq
+|-- flair
+|-- indices
+|-- nanoporeibat_hub
+|-- qc
+|-- renv
+|-- res
+|-- salmon
+|-- sample_info
+`-- stringtie
+```
+
+# Results 
+
+All results of any analysis are in the res folder 
+
+```
+res/
+|-- browser_plots
+|-- chip
+|-- christoph
+|-- comparisons
+|-- deseq
+|-- dexseq
+|-- drimseq
+|-- fig
+|-- jan
+`-- wien
+```
 
 ## Differential gene and transcript expression
+
+```
+res/deseq/
+|-- cdna
+|   |-- genelevel
+|   `-- txlevel
+|-- illumina
+|   |-- genelevel
+|   `-- txlevel
+`-- teloprime
+    |-- genelevel
+    `-- txlevel
+```
 
 ### Reports
 
@@ -116,8 +165,15 @@ dgl <- DGEList(counts = cts, samples = df)
 
 ### DEXSeq
 
+```
+res/dexseq/
+|-- cdna
+|-- illumina
+`-- teloprime
+```
+
 DEXSeq [https://bioconductor.org/packages/release/bioc/vignettes/DEXSeq/inst/doc/DEXSeq.html]
-perform a differential exon usage analysis. It compares the fold change of counts falling
+performs a differential exon usage analysis. It compares the fold change of counts falling
 into one exon with the counts falling into the whole gene. Therefore it uses a metatranscript
 assembled from all transcripts of a gene fullfilling certain expression thresholds.
 As it is on exonlevel, it does not depend on correct transcript annotation, but
@@ -134,6 +190,15 @@ showing the distribution of the significant exon in the metatranscript (..._heat
 
 ### DrimSeq
 
+```
+res/drimseq/
+|-- cdna
+|-- cdna_flair
+|-- illumina
+|-- teloprime
+`-- teloprime_flair
+```
+
 Drimseq [https://bioconductor.org/packages/release/workflows/vignettes/rnaseqDTU/inst/doc/rnaseqDTU.html]
 performs differential transcript usage analysis based on the salmon transcript level output.
 Therefore it depends on correct transcript annotation. It was run twice, once with the GENCODE
@@ -147,4 +212,4 @@ table with the full StageR output (..._drimSeqStageR.csv).
 ## Comparisons
 
 The output of all analysis doing some comparisons between the different methods
-are in the  res/comparisons folder.
+are in the res/comparisons folder.
