@@ -83,6 +83,7 @@ rule featureCounts_count_ont:
         "featureCounts --donotsort \
             -L \
             -f \
+            --fracOverlapFeature 0.5 \
             -O \
             -s 0 \
             -T {threads} \
