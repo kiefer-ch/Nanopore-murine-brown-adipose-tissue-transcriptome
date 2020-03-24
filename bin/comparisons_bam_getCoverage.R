@@ -2,7 +2,7 @@
 
 # set libpaths to packrat local library
 
-source("packrat/init.R")
+source(".Rprofile")
 suppressPackageStartupMessages(library("dplyr"))
 suppressPackageStartupMessages(library("GenomicAlignments"))
 

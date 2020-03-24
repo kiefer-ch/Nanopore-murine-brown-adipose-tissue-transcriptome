@@ -7,7 +7,7 @@
 #
 ################################################################################
 
-source("packrat/init.R")
+source(".Rprofile")
 library("dplyr")
 library("readr")
 library("RColorBrewer")

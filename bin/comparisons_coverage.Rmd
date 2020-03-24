@@ -2,7 +2,7 @@
 title: "Nanopore iBAT, Coverage"
 author: "Christoph Kiefer"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
-output: 
+output:
     html_document:
         toc: true
 editor_options:
@@ -19,7 +19,7 @@ dir.create(snakemake@params[["fig_folder"]],
 ```
 
 ```{r loadPackages}
-source("packrat/init.R")
+source(".Rprofile")
 library("dplyr")
 library("readr")
 library("purrr")
@@ -31,9 +31,9 @@ library("AnnotationDbi")
 ```
 
 ```{r}
-sample_info <- read_csv(snakemake@input[["sample_info"]]) %>% 
+sample_info <- read_csv(snakemake@input[["sample_info"]]) %>%
     filter(!is.na(ont)) %>%
-    mutate_at(vars(matches("condition")), as.factor) %>% 
+    mutate_at(vars(matches("condition")), as.factor) %>%
     dplyr::select(sample_id, illumina, ont, cdna)
 ```
 
@@ -41,47 +41,47 @@ sample_info <- read_csv(snakemake@input[["sample_info"]]) %>%
 
 ```{r dataImport_geneBodyCoverage}
 read_geneBodyCoverage <- function(file) {
-    file %>% 
+    file %>%
         read_tsv() %>%
-        tidyr::gather() %>% 
-        magrittr::set_colnames(.[1, ]) %>% 
-        `[`(-1, ) %>% 
+        tidyr::gather() %>%
+        magrittr::set_colnames(.[1, ]) %>%
+        `[`(-1, ) %>%
         mutate_all(as.integer)
 }
 
 prepare_dataset = function(files, name) {
-    files %>% 
-        map(read_geneBodyCoverage) %>% 
-        purrr::reduce(left_join, by = "Percentile") %>% 
-        tidyr::gather("sample", "n", -Percentile) %>% 
+    files %>%
+        map(read_geneBodyCoverage) %>%
+        purrr::reduce(left_join, by = "Percentile") %>%
+        tidyr::gather("sample", "n", -Percentile) %>%
         mutate(dataset = name)
 }
 
-illumina <- snakemake@input[["geneBodyCoverage_illumina"]] %>% 
-    prepare_dataset(name = "illumina") %>% 
-    mutate(sample = substr(sample, 2, 9)) %>% 
-    left_join(sample_info, by = c("sample" = "illumina")) %>% 
+illumina <- snakemake@input[["geneBodyCoverage_illumina"]] %>%
+    prepare_dataset(name = "illumina") %>%
+    mutate(sample = substr(sample, 2, 9)) %>%
+    left_join(sample_info, by = c("sample" = "illumina")) %>%
     dplyr::select(-sample, -ont)
-    
-teloprime <- snakemake@input[["geneBodyCoverage_teloprime"]] %>% 
-    prepare_dataset(name = "teloprime") %>% 
-    mutate(sample = substr(sample, 1, 9)) %>% 
-    left_join(sample_info, by = c("sample" = "ont")) %>% 
+
+teloprime <- snakemake@input[["geneBodyCoverage_teloprime"]] %>%
+    prepare_dataset(name = "teloprime") %>%
+    mutate(sample = substr(sample, 1, 9)) %>%
+    left_join(sample_info, by = c("sample" = "ont")) %>%
     dplyr::select(-sample, -illumina)
 
-cdna <- snakemake@input[["geneBodyCoverage_cdna"]] %>% 
-    prepare_dataset(name = "cdna") %>% 
-    mutate(sample = substr(sample, 1, 9)) %>% 
-    left_join(sample_info, by = c("sample" = "cdna")) %>% 
+cdna <- snakemake@input[["geneBodyCoverage_cdna"]] %>%
+    prepare_dataset(name = "cdna") %>%
+    mutate(sample = substr(sample, 1, 9)) %>%
+    left_join(sample_info, by = c("sample" = "cdna")) %>%
     dplyr::select(-sample, -illumina)
 ```
 
 ```{r plot_geneBodyCoverage}
-pl <- list(illumina, teloprime, cdna) %>% 
+pl <- list(illumina, teloprime, cdna) %>%
     bind_rows() %>%
-    group_by(dataset, sample_id) %>% 
-    mutate(p = n / max(n)) %>% 
-    ungroup() %>% 
+    group_by(dataset, sample_id) %>%
+    mutate(p = n / max(n)) %>%
+    ungroup() %>%
     ggplot(aes(Percentile, p)) +
         geom_line(aes(colour = dataset, lty = sample_id)) +
         theme_tufte() +
@@ -98,7 +98,7 @@ rm(list = c("illumina", "teloprime", "cdna"))
 # Coverage
 
 ```{r import_txdb}
-biomart <- snakemake@input[["biomaRt_tx"]] %>% 
+biomart <- snakemake@input[["biomaRt_tx"]] %>%
     read_rds()
 ```
 
@@ -109,33 +109,33 @@ get_map_type <- function(flag) {
 }
 
 prepare_dataset2 = function(files) {
-    files %>% 
-        as.list() %>% 
-        set_names(basename(files)) %>% 
-        map(read_rds) %>% 
-        map(mutate, type = get_map_type(flag)) %>% 
-        map(dplyr::select, -qname, -flag, -qwidth) %>% 
+    files %>%
+        as.list() %>%
+        set_names(basename(files)) %>%
+        map(read_rds) %>%
+        map(mutate, type = get_map_type(flag)) %>%
+        map(dplyr::select, -qname, -flag, -qwidth) %>%
         map(tidyr::separate, col = seqnames, into = "ensembl_transcript_id_version",
-            sep = "\\|", extra = "drop") %>% 
-        map(left_join, y = biomart, by = "ensembl_transcript_id_version") %>% 
-        bind_rows(.id = "sample") %>% 
+            sep = "\\|", extra = "drop") %>%
+        map(left_join, y = biomart, by = "ensembl_transcript_id_version") %>%
+        bind_rows(.id = "sample") %>%
         mutate(coverage = coverage / transcript_length)
 }
 
 df <- list(snakemake@input[["coverage_teloprime"]],
         snakemake@input[["coverage_cdna"]]) %>%
-    map(prepare_dataset2) %>% 
-    map(dplyr::select, coverage, transcript_length, type, ensembl_transcript_id_version) %>% 
-    map(filter, type == "primary") %>% 
-    set_names(c("teloprime", "cdna")) %>% 
-    bind_rows(.id = "dataset") %>% 
+    map(prepare_dataset2) %>%
+    map(dplyr::select, coverage, transcript_length, type, ensembl_transcript_id_version) %>%
+    map(filter, type == "primary") %>%
+    set_names(c("teloprime", "cdna")) %>%
+    bind_rows(.id = "dataset") %>%
     tidyr::drop_na()
 ```
 
 ```{r}
 pl <- df %>%
-    mutate(grouped_transcript_length = cut(transcript_length, 
-        breaks = c(0, 500, 1000, 1500, 2000, 2500, 3000, max(transcript_length)))) %>% 
+    mutate(grouped_transcript_length = cut(transcript_length,
+        breaks = c(0, 500, 1000, 1500, 2000, 2500, 3000, max(transcript_length)))) %>%
     ggplot(aes(grouped_transcript_length, coverage)) +
     geom_violin(aes(fill = dataset)) +
     xlab(NULL) +
@@ -152,13 +152,13 @@ saveRDS(pl,
 
 
 ```{r}
-df %>% 
-    mutate(is_fullLength = if_else(coverage > .9, TRUE, FALSE)) %>% 
-    group_by(dataset, ensembl_transcript_id_version) %>% 
+df %>%
+    mutate(is_fullLength = if_else(coverage > .9, TRUE, FALSE)) %>%
+    group_by(dataset, ensembl_transcript_id_version) %>%
     summarise(n = n(),
         n_fullLength = sum(is_fullLength),
-        transcript_length = unique(transcript_length)) %>% 
-    mutate(rate = n_fullLength / n) %>% 
+        transcript_length = unique(transcript_length)) %>%
+    mutate(rate = n_fullLength / n) %>%
     ggplot(aes(transcript_length, rate)) +
     geom_hex(aes(fill = ..density..), bins = 50) +
     geom_smooth(method = "lm", colour = "black", size = .5, se = FALSE) +
@@ -170,11 +170,11 @@ df %>%
     facet_wrap(~dataset) +
     scale_x_log10() +
     scale_y_continuous(trans = "logit",
-        breaks = c(0, .0001, .001, .01, .1, .25, .5, .75, .9, .99, 1), 
+        breaks = c(0, .0001, .001, .01, .1, .25, .5, .75, .9, .99, 1),
         labels = function(x) signif(x, 1)) +
     theme_tufte() +
     geom_rangeframe(sides = "bl") +
-    xlab("Transcript length") + 
+    xlab("Transcript length") +
     ylab("Fraction of full length reads") +
     scale_fill_viridis_c()
 ```

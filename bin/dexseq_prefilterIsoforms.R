@@ -1,6 +1,6 @@
 #!/usr/bin/Rscript --no-restore --no-environ --no-save
 
-source("packrat/init.R")
+source(".Rprofile")
 suppressPackageStartupMessages(library("readr"))
 suppressPackageStartupMessages(library("dplyr"))
 

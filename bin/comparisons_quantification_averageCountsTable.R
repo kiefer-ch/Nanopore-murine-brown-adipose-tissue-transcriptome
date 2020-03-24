@@ -1,8 +1,7 @@
 #!/usr/bin/Rscript --no-restore --no-environ --no-save
 
 # set libpaths to packrat local library
-source("packrat/init.R")
-source("packrat/init.R")
+source(".Rprofile")
 library("dplyr")
 library("readr")
 library("purrr")

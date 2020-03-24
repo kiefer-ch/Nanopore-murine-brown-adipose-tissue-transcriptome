@@ -2,7 +2,7 @@
 
 # set libpaths to packrat local library
 message("Load packages...")
-source("packrat/init.R")
+source(".Rprofile")
 
 suppressPackageStartupMessages(library("dplyr"))
 suppressPackageStartupMessages(library("purrr"))

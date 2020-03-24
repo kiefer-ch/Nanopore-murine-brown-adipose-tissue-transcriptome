@@ -2,7 +2,7 @@
 title: "Comparison of GO terms by illumina and ont, gene and tx level"
 author: "Christoph Kiefer"
 date: "20. September 2019"
-output: 
+output:
     html_document:
         toc: true
 editor_options:
@@ -14,6 +14,7 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = TR
 ```
 
 ```{r library, include=FALSE, cache=FALSE}
+source(".Rprofile")
 library("dplyr")
 library("readr")
 library("purrr")
@@ -31,15 +32,15 @@ library("ReactomePA")
 illumina_tx <- "../res/txlevel_ont/txlevel_ont_de.csv.gz"
 illumina_gene <- "../res/genelevel_ont/genelevel_ont_de.csv.gz"
 
-data <- c(illumina_tx, illumina_gene) %>% 
+data <- c(illumina_tx, illumina_gene) %>%
     map(read_csv)
 ```
 
 ```{r dataImport_ont}
 # read counts
 ont <- "../res/wien/6samples/ChrKiefer_6samples_raw_gene_counts.tsv"
-ont_df <- read_tsv(ont) %>% 
-    tidyr::separate(transcript, 
+ont_df <- read_tsv(ont) %>%
+    tidyr::separate(transcript,
         c("ensembl_transcript_id_version", "ensembl_gene_id_version"),
         sep = '\\|')
 
@@ -48,15 +49,15 @@ sample_info <- read_csv("../sample_info/sampleInfo.csv")
 
 lookup <- sample_info$illumina
 names(lookup) <- sample_info$ont
-    
+
 colnames(ont_df) <- lookup[colnames(ont_df)]
 colnames(ont_df)[c(1, 2)] <- c("ensembl_transcript_id_version", "ensembl_gene_id_version")
 
-# prepare colData 
-colData <- sample_info %>% 
-    mutate_all(as.factor) %>% 
-    filter(!is.na(ont)) %>% 
-    as.data.frame() %>% 
+# prepare colData
+colData <- sample_info %>%
+    mutate_all(as.factor) %>%
+    filter(!is.na(ont)) %>%
+    as.data.frame() %>%
     magrittr::set_rownames(.$illumina)
 ```
 
@@ -65,59 +66,59 @@ colData <- sample_info %>%
 ont_counts <- as.matrix(ont_df[, c(-1, -2)])
 row.names(ont_counts) <- ont_df$ensembl_transcript_id_version
 
-dds_tx <- DESeqDataSetFromMatrix(ont_counts, colData, design = ~ condition_temp) 
+dds_tx <- DESeqDataSetFromMatrix(ont_counts, colData, design = ~ condition_temp)
 
 colData(dds_tx)$condition_temp <- relevel(colData(dds_tx)$condition_temp, ref = "22")
 
 # filtering lowly expressed genes and fitting models
-dds_tx <- dds_tx[rowSums(counts(dds_tx)) > 10, ] %>% 
+dds_tx <- dds_tx[rowSums(counts(dds_tx)) > 10, ] %>%
     DESeq(., parallel = TRUE)
 
-resLFC_tx <- lfcShrink(dds_tx, 
+resLFC_tx <- lfcShrink(dds_tx,
     coef = "condition_temp_4_vs_22",
     lfcThreshold = 1,
     type = "apeglm",
     parallel = TRUE)
 
-resLFC_tx <- resLFC_tx %>% 
+resLFC_tx <- resLFC_tx %>%
     as_tibble(rownames = "ensembl_tx_id_version")
 
 lookup <- ont_df$ensembl_gene_id_version
 names(lookup) <- ont_df$ensembl_transcript_id_version
 
-resLFC_tx <- resLFC_tx %>% 
+resLFC_tx <- resLFC_tx %>%
     mutate(ensembl_gene_id_version = lookup[ensembl_tx_id_version])
 ```
 
 ```{r deseqGene}
 # dds tx level
-ont_counts <- ont_df %>% 
+ont_counts <- ont_df %>%
     tidyr::gather(key = "sample", value = "counts_ont",
-        -ensembl_transcript_id_version, -ensembl_gene_id_version) %>% 
-    group_by(ensembl_gene_id_version, sample) %>% 
-    summarise(counts_ont = sum(counts_ont)) %>% 
-    tidyr::spread(key = sample, value = counts_ont) %>% 
-    filter(!is.na(ensembl_gene_id_version)) %>% 
-    magrittr::set_rownames(.$ensembl_gene_id_version) %>% 
-    as.matrix() %>% 
+        -ensembl_transcript_id_version, -ensembl_gene_id_version) %>%
+    group_by(ensembl_gene_id_version, sample) %>%
+    summarise(counts_ont = sum(counts_ont)) %>%
+    tidyr::spread(key = sample, value = counts_ont) %>%
+    filter(!is.na(ensembl_gene_id_version)) %>%
+    magrittr::set_rownames(.$ensembl_gene_id_version) %>%
+    as.matrix() %>%
     `[`( ,-1)
 
 class(ont_counts) <- "numeric"
 
-dds_gene <- DESeqDataSetFromMatrix(ont_counts, colData, design = ~ condition_temp) 
+dds_gene <- DESeqDataSetFromMatrix(ont_counts, colData, design = ~ condition_temp)
 colData(dds_gene)$condition_temp <- relevel(colData(dds_gene)$condition_temp, ref = "22")
 
 # filtering lowly expressed genes and fitting models
-dds_gene <- dds_gene[rowSums(counts(dds_gene)) > 10, ] %>% 
+dds_gene <- dds_gene[rowSums(counts(dds_gene)) > 10, ] %>%
     DESeq(., parallel = TRUE)
 
-resLFC_gene <- lfcShrink(dds_gene, 
+resLFC_gene <- lfcShrink(dds_gene,
     coef = "condition_temp_4_vs_22",
     lfcThreshold = 1,
     type = "apeglm",
     parallel = TRUE)
 
-resLFC_gene <- resLFC_gene %>% 
+resLFC_gene <- resLFC_gene %>%
     as_tibble(rownames = "ensembl_gene_id_version")
 ```
 
@@ -126,7 +127,7 @@ resLFC_gene <- resLFC_gene %>%
 data[[4]] <- resLFC_gene
 data[[3]] <- resLFC_tx
 
-data <- data %>% 
+data <- data %>%
     set_names(c("illumina_tx", "illumina_gene", "ont_tx", "ont_gene"))
 ```
 
@@ -136,10 +137,10 @@ data <- data %>%
 # reference for the GO analysis are all expressed genes
 get.geneList <- function(df) {
     all_genes <- df$ensembl_gene_id_version
-    signif <- df %>% 
-        filter(svalue < .05) %>% 
+    signif <- df %>%
+        filter(svalue < .05) %>%
         pull(ensembl_gene_id_version)
-    
+
     gl <- as.factor(as.integer(all_genes %in% signif))
     names(gl) <- all_genes
     # remove version
@@ -170,19 +171,19 @@ get.results <- function(topGO) {
 
 ```{r runGOanalysis}
 # run the analysis
-df <- data %>% 
-    map(get.geneList) %>% 
-    tibble::enframe(name = "dataset", value = "genelist") %>% 
-    mutate(topGO = map2(genelist, dataset, make.topGO)) %>% 
+df <- data %>%
+    map(get.geneList) %>%
+    tibble::enframe(name = "dataset", value = "genelist") %>%
+    mutate(topGO = map2(genelist, dataset, make.topGO)) %>%
     mutate(res = map(topGO, get.results))
 
-df <- df %>% 
-    pull(res) %>% 
-    set_names(df$dataset) %>% 
-    map(select, c("GO.ID", "Term", 'p')) %>% 
-    purrr::reduce(.f = full_join, by = c("GO.ID", "Term")) %>% 
-    magrittr::set_colnames(c("GO.ID", "Term", paste0("p_", df$dataset))) %>% 
-    mutate_if(is.double, function(x) tidyr::replace_na(x, 1)) %>% 
+df <- df %>%
+    pull(res) %>%
+    set_names(df$dataset) %>%
+    map(select, c("GO.ID", "Term", 'p')) %>%
+    purrr::reduce(.f = full_join, by = c("GO.ID", "Term")) %>%
+    magrittr::set_colnames(c("GO.ID", "Term", paste0("p_", df$dataset))) %>%
+    mutate_if(is.double, function(x) tidyr::replace_na(x, 1)) %>%
     filter_if(~ all(is.double(.)), any_vars(. < .001))
 ```
 
@@ -190,9 +191,9 @@ df <- df %>%
 ```{r upset}
 df %>%
     mutate_if(is.double, function(x) as.integer(x < .001)) %>%
-    as.data.frame() %>% 
-    magrittr::set_rownames(.$GO.ID) %>% 
-    `[`(, c(-1, -2)) %>% 
+    as.data.frame() %>%
+    magrittr::set_rownames(.$GO.ID) %>%
+    `[`(, c(-1, -2)) %>%
     upset()
 ```
 
@@ -206,7 +207,7 @@ Die meisten der im ONT-Datensatz identifizierten GO-Terme wurde auch im Illumina
 Datensatz gefunden.
 
 ```{r tableGO}
-df %>% 
+df %>%
     arrange(p_illumina_gene) %>%
     knitr::kable(format = "html", format.args = list(digits = 3)) %>%
     kableExtra::kable_styling() %>%
@@ -215,8 +216,8 @@ df %>%
 
 ```{r heatmap, fig.width=14, fig.height=12}
 library("pheatmap")
-hclust_df <- df %>% 
-    mutate_if(is.numeric, function(x) -log10(x)) %>% 
+hclust_df <- df %>%
+    mutate_if(is.numeric, function(x) -log10(x)) %>%
     as.data.frame() %>%
     magrittr::set_rownames(.$Term) %>%
     dplyr::select(-GO.ID, -Term)
@@ -236,20 +237,20 @@ hclust <- pheatmap(hclust_df,
 hclust
 ```
 
-Die Terme, die nur von illumina_Tx gefunden werden, haben Muskulatur gemeinsam. 
+Die Terme, die nur von illumina_Tx gefunden werden, haben Muskulatur gemeinsam.
 
 # Reactome
 
 ```{r reactomeAnnotation}
 ensembl = biomaRt::useMart("ensembl",dataset="mmusculus_gene_ensembl")
-annotation <- data %>% 
-    purrr::reduce(.f = full_join, by = "ensembl_gene_id_version") %>% 
-    pull(ensembl_gene_id_version) %>% 
-    unique() %>%  
+annotation <- data %>%
+    purrr::reduce(.f = full_join, by = "ensembl_gene_id_version") %>%
+    pull(ensembl_gene_id_version) %>%
+    unique() %>%
     biomaRt::getBM(
-        attributes = c("entrezgene_id", "ensembl_gene_id_version"), 
-        filters = "ensembl_gene_id_version", 
-        values = ., 
+        attributes = c("entrezgene_id", "ensembl_gene_id_version"),
+        filters = "ensembl_gene_id_version",
+        values = .,
         mart = ensembl)
 ```
 
@@ -262,30 +263,30 @@ call_reactome <- function(sig, ref) {
         readable = TRUE)
 }
 
-df_reactome <- data %>% 
-    map(left_join, annotation, by = "ensembl_gene_id_version") %>% 
-    tibble::enframe(name = "dataset", value = "deseq_res") %>% 
-    mutate(ref_genes = map(deseq_res, pull, "entrezgene_id")) %>% 
-    mutate(ref_genes = map(ref_genes, as.character)) %>% 
-    mutate(deseq_res = map(deseq_res, select, "entrezgene_id", "log2FoldChange", "svalue")) %>% 
-    mutate(deseq_res = map(deseq_res, filter, svalue < .001)) %>% 
-    mutate(sig_genes = map(deseq_res, pull, "entrezgene_id")) %>% 
-    mutate(sig_genes = map(sig_genes, as.character)) %>% 
-    mutate(logFC = map(deseq_res, pull, "log2FoldChange")) %>% 
-    mutate(sig_genes = map(sig_genes, `names<-`, logFC)) %>% 
+df_reactome <- data %>%
+    map(left_join, annotation, by = "ensembl_gene_id_version") %>%
+    tibble::enframe(name = "dataset", value = "deseq_res") %>%
+    mutate(ref_genes = map(deseq_res, pull, "entrezgene_id")) %>%
+    mutate(ref_genes = map(ref_genes, as.character)) %>%
+    mutate(deseq_res = map(deseq_res, select, "entrezgene_id", "log2FoldChange", "svalue")) %>%
+    mutate(deseq_res = map(deseq_res, filter, svalue < .001)) %>%
+    mutate(sig_genes = map(deseq_res, pull, "entrezgene_id")) %>%
+    mutate(sig_genes = map(sig_genes, as.character)) %>%
+    mutate(logFC = map(deseq_res, pull, "log2FoldChange")) %>%
+    mutate(sig_genes = map(sig_genes, `names<-`, logFC)) %>%
     mutate(res =  map2(sig_genes, ref_genes, call_reactome))
 
-df_reactome <- df_reactome %>% 
-    pull(res) %>% 
-    set_names(df_reactome$dataset) %>% 
-    map(as_tibble) %>% 
-    map(select, c("ID", "Description", 'qvalue')) %>% 
-    purrr::reduce(.f = full_join, by = c("ID", "Description")) %>% 
-    magrittr::set_colnames(c("ID", "Description", paste0("q_", df_reactome$dataset))) %>% 
-    mutate_if(is.double, function(x) tidyr::replace_na(x, 1)) %>% 
+df_reactome <- df_reactome %>%
+    pull(res) %>%
+    set_names(df_reactome$dataset) %>%
+    map(as_tibble) %>%
+    map(select, c("ID", "Description", 'qvalue')) %>%
+    purrr::reduce(.f = full_join, by = c("ID", "Description")) %>%
+    magrittr::set_colnames(c("ID", "Description", paste0("q_", df_reactome$dataset))) %>%
+    mutate_if(is.double, function(x) tidyr::replace_na(x, 1)) %>%
     filter_if(~ all(is.double(.)), any_vars(. < .05))
 
-df_reactome %>% 
+df_reactome %>%
     knitr::kable(format = "html", format.args = list(digits = 3)) %>%
     kableExtra::kable_styling()
 ```

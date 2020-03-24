@@ -2,7 +2,7 @@
 title: "Nanopore iBAT, Feature detection"
 author: "Christoph Kiefer"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
-output: 
+output:
     html_document:
         toc: true
 editor_options:
@@ -14,7 +14,7 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = FA
 ```
 
 ```{r loadPackages}
-source("packrat/init.R")
+source(".Rprofile")
 library("dplyr")
 library("readr")
 library("ggplot2")
@@ -38,44 +38,44 @@ biomaRt_gene <- read_rds(snakemake@input[["biomaRt_gene"]])
 biotype_groups <- read_csv(snakemake@input[["biotype_groups"]])
 
 # sample info
-sample_info <- read_csv(snakemake@input[["sample_info"]]) %>% 
+sample_info <- read_csv(snakemake@input[["sample_info"]]) %>%
     mutate_at(vars(matches("condition")), as.factor)
 
 # gene level
-df_gene <- snakemake@input[["gene_counts"]] %>% 
-    set_names(basename(.)) %>% 
+df_gene <- snakemake@input[["gene_counts"]] %>%
+    set_names(basename(.)) %>%
     map(read_csv) %>%
-    map(select, -mgi_symbol, -description, -gene_biotype) %>% 
-    map(tidyr::gather, key = "sample_id", value = "counts", -ensembl_gene_id_version) %>% 
-    bind_rows(.id = "dataset") %>% 
+    map(select, -mgi_symbol, -description, -gene_biotype) %>%
+    map(tidyr::gather, key = "sample_id", value = "counts", -ensembl_gene_id_version) %>%
+    bind_rows(.id = "dataset") %>%
     tidyr::separate(dataset, "dataset", extra = "drop")
 
-df_gene_sum <- df_gene %>% 
-    group_by(dataset, ensembl_gene_id_version) %>% 
-    summarise(sum_counts = sum(counts)) %>% 
-    left_join(biomaRt_gene, by = "ensembl_gene_id_version") %>% 
+df_gene_sum <- df_gene %>%
+    group_by(dataset, ensembl_gene_id_version) %>%
+    summarise(sum_counts = sum(counts)) %>%
+    left_join(biomaRt_gene, by = "ensembl_gene_id_version") %>%
     left_join(biotype_groups, by = c("gene_biotype" = "transcript_biotype"))
 
-gene_tpm <- read_csv(snakemake@input[["gene_tpm"]]) %>% 
-    select(-mgi_symbol, -description, - gene_biotype) %>% 
-    tidyr::gather(key = "sample_id", value = "counts", -ensembl_gene_id_version) %>% 
-    group_by(ensembl_gene_id_version) %>% 
+gene_tpm <- read_csv(snakemake@input[["gene_tpm"]]) %>%
+    select(-mgi_symbol, -description, - gene_biotype) %>%
+    tidyr::gather(key = "sample_id", value = "counts", -ensembl_gene_id_version) %>%
+    group_by(ensembl_gene_id_version) %>%
     summarise(average_tpm = mean(counts))
 
 # tx level
-df_tx <- snakemake@input[["tx_counts"]] %>% 
-    set_names(basename(.)) %>% 
+df_tx <- snakemake@input[["tx_counts"]] %>%
+    set_names(basename(.)) %>%
     map(read_csv) %>%
-    map(select, -mgi_symbol, -description, -gene_biotype, -transcript_biotype, -transcript_length) %>% 
-    map(tidyr::gather, key = "sample_id", value = "counts", 
-        -ensembl_gene_id_version, -ensembl_transcript_id_version) %>% 
-    bind_rows(.id = "dataset") %>% 
+    map(select, -mgi_symbol, -description, -gene_biotype, -transcript_biotype, -transcript_length) %>%
+    map(tidyr::gather, key = "sample_id", value = "counts",
+        -ensembl_gene_id_version, -ensembl_transcript_id_version) %>%
+    bind_rows(.id = "dataset") %>%
     tidyr::separate(dataset, "dataset", extra = "drop")
 
-df_tx_sum <- df_tx %>% 
-    group_by(dataset, ensembl_transcript_id_version) %>% 
-    summarise(sum_counts = sum(counts)) %>% 
-    left_join(biomaRt_tx, by = "ensembl_transcript_id_version") %>% 
+df_tx_sum <- df_tx %>%
+    group_by(dataset, ensembl_transcript_id_version) %>%
+    summarise(sum_counts = sum(counts)) %>%
+    left_join(biomaRt_tx, by = "ensembl_transcript_id_version") %>%
     left_join(biotype_groups, by = "transcript_biotype")
 ```
 
@@ -84,11 +84,11 @@ df_tx_sum <- df_tx %>%
 The counts are taken from the DESeq raw count files.
 
 ```{r mappedReads}
-df_gene %>% 
-    group_by(dataset, sample_id) %>% 
-    summarise(tot_counts = sum(counts)) %>% 
+df_gene %>%
+    group_by(dataset, sample_id) %>%
+    summarise(tot_counts = sum(counts)) %>%
     left_join(sample_info %>% select(sample_id, condition_temp),
-        by = "sample_id") %>% 
+        by = "sample_id") %>%
     ggplot(aes(dataset, tot_counts)) +
     geom_jitter(aes(colour = condition_temp), size = 2, width = .1, height = 0) +
     stat_summary(geom = "crossbar", width = .5, lwd = .25) +
@@ -99,12 +99,12 @@ df_gene %>%
     ylab("Total counts") +
     scale_color_colorblind()
 
-df_gene %>% 
-    group_by(dataset, sample_id) %>% 
-    summarise(tot_counts = sum(counts - 1)) %>% 
+df_gene %>%
+    group_by(dataset, sample_id) %>%
+    summarise(tot_counts = sum(counts - 1)) %>%
     left_join(sample_info %>% select(sample_id, condition_temp),
-        by = "sample_id") %>% 
-    tidyr::spread(dataset, tot_counts) %>% 
+        by = "sample_id") %>%
+    tidyr::spread(dataset, tot_counts) %>%
     knitr::kable(format = "html") %>%
     kableExtra::kable_styling()
 ```
@@ -112,17 +112,17 @@ df_gene %>%
 Sophia reported the difference in the library size between the two conditions in
 teloprime dataset before.
 
-Comparing to the read numbers from teloprime, it seems, there are more counts 
+Comparing to the read numbers from teloprime, it seems, there are more counts
 then reads. This is probably caused by supplementary mappings.
 
 # Saturation curve
 
 ```{r}
 get_numberDetectedFeatures <- function(cm, prop, cutoff = 1) {
-    cm %>% 
-        DropletUtils::downsampleMatrix(prop = prop, bycol = TRUE) %>% 
-        rowSums() %>% 
-        (function(x) x >= cutoff) %>% 
+    cm %>%
+        DropletUtils::downsampleMatrix(prop = prop, bycol = TRUE) %>%
+        rowSums() %>%
+        (function(x) x >= cutoff) %>%
         sum()
 }
 ```
@@ -131,28 +131,28 @@ Cutoff is 1 read in any of the librarys per method. (Maybe it should be redone
 taking replicates, condition etc. into account)
 
 ```{r saturationCurve}
-fractions <- c(seq(0, .01, by = .001), 
+fractions <- c(seq(0, .01, by = .001),
         seq(.015, .1, by = .01),
         seq(.1, .25, by = .05),
         seq(.3, 1, by = .1))
 
-cm_gene <- snakemake@input[["gene_counts"]] %>% 
-    set_names(basename(.)) %>% 
+cm_gene <- snakemake@input[["gene_counts"]] %>%
+    set_names(basename(.)) %>%
     map(read_csv) %>%
-    map(select, -mgi_symbol, -description, -gene_biotype) %>% 
-    map(tibble::column_to_rownames, "ensembl_gene_id_version") %>% 
+    map(select, -mgi_symbol, -description, -gene_biotype) %>%
+    map(tibble::column_to_rownames, "ensembl_gene_id_version") %>%
     map(data.matrix)
 
-cm_tx <- snakemake@input[["tx_counts"]] %>% 
-    set_names(basename(.)) %>% 
+cm_tx <- snakemake@input[["tx_counts"]] %>%
+    set_names(basename(.)) %>%
     map(read_csv) %>%
     map(select, -mgi_symbol, -description, -gene_biotype,
-        -ensembl_gene_id_version, -transcript_biotype, -transcript_length) %>% 
-    map(tibble::column_to_rownames, "ensembl_transcript_id_version") %>% 
+        -ensembl_gene_id_version, -transcript_biotype, -transcript_length) %>%
+    map(tibble::column_to_rownames, "ensembl_transcript_id_version") %>%
     map(data.matrix)
 
-df_features <- tibble(fraction = fractions) %>% 
-    rowwise() %>% 
+df_features <- tibble(fraction = fractions) %>%
+    rowwise() %>%
     mutate(teloprime_tx = get_numberDetectedFeatures(cm_tx$teloprime_txlevel_cm_cts.csv.gz, prop = fraction),
         illumina_tx = get_numberDetectedFeatures(cm_tx$illumina_txlevel_cm_cts.csv.gz, prop = fraction),
         cdna_tx = get_numberDetectedFeatures(cm_tx$cdna_txlevel_cm_cts.csv.gz, prop = fraction),
@@ -160,21 +160,21 @@ df_features <- tibble(fraction = fractions) %>%
         illumina_gene = get_numberDetectedFeatures(cm_gene$illumina_genelevel_cm_cts.csv.gz, prop = fraction),
         cdna_gene = get_numberDetectedFeatures(cm_gene$cdna_genelevel_cm_cts.csv.gz, prop = fraction))
 
-tot_counts <- list(df_gene, df_tx) %>% 
-    set_names("gene", "tx") %>% 
-    bind_rows(.id = "level") %>%  
-    group_by(level, dataset) %>% 
-    summarise(tot_counts = sum(counts)) %>% 
+tot_counts <- list(df_gene, df_tx) %>%
+    set_names("gene", "tx") %>%
+    bind_rows(.id = "level") %>%
+    group_by(level, dataset) %>%
+    summarise(tot_counts = sum(counts)) %>%
     tidyr::unite(library, dataset, level)
 
 
-df_features <- df_features %>%          
-    tidyr::gather(key = "library", value = "features", -fraction) %>% 
-    left_join(tot_counts, by = "library") %>% 
-    mutate(reads = fraction * tot_counts) %>% 
+df_features <- df_features %>%
+    tidyr::gather(key = "library", value = "features", -fraction) %>%
+    left_join(tot_counts, by = "library") %>%
+    mutate(reads = fraction * tot_counts) %>%
     tidyr::separate(library, c("method", "feature_type"))
 
-pl <- df_features %>% 
+pl <- df_features %>%
     ggplot(aes(reads, features)) +
     geom_point(aes(colour = method)) +
     geom_path(aes(colour = method)) +
@@ -198,22 +198,22 @@ yet. In addition, the teloprime curves seem to plateau out at smaller values.
 ## Overview
 
 ```{r}
-df <- df_tx_sum %>% 
-    tidyr::drop_na() %>% 
-    mutate(grouped_transcript_length = cut(transcript_length, 
+df <- df_tx_sum %>%
+    tidyr::drop_na() %>%
+    mutate(grouped_transcript_length = cut(transcript_length,
         breaks = c(0, 500, 1000, 1500, 2000, 2500, 3000,
-            3500, 4000, 4500, 5000, 7500, 123179))) %>% 
-    mutate(detected = if_else(sum_counts > 1, TRUE, FALSE)) %>% 
-    group_by(dataset, grouped_transcript_length) %>% 
+            3500, 4000, 4500, 5000, 7500, 123179))) %>%
+    mutate(detected = if_else(sum_counts > 1, TRUE, FALSE)) %>%
+    group_by(dataset, grouped_transcript_length) %>%
     summarise(n = n(),
-        detected = sum(detected)) %>% 
+        detected = sum(detected)) %>%
     mutate(rate = detected / n)
 
-df %>% 
+df %>%
     knitr::kable(format = "html") %>%
     kableExtra::kable_styling()
 
-df %>%      
+df %>%
     ggplot(aes(grouped_transcript_length, rate)) +
     geom_bar(stat = "identity") +
     facet_wrap(~dataset) +
@@ -229,17 +229,17 @@ df %>%
 ## By transcript biotype
 
 ```{r}
-df_tx_sum %>% 
-    tidyr::drop_na() %>% 
-    mutate(grouped_transcript_length = cut(transcript_length, 
+df_tx_sum %>%
+    tidyr::drop_na() %>%
+    mutate(grouped_transcript_length = cut(transcript_length,
         breaks = c(0, 500, 1000, 1500, 2000, 2500, 3000,
-            3500, 4000, 4500, 5000, 7500, 123179))) %>% 
-    mutate(detected = if_else(sum_counts > 1, TRUE, FALSE)) %>% 
-    group_by(dataset, grouped_transcript_length, grouped_biotype) %>% 
+            3500, 4000, 4500, 5000, 7500, 123179))) %>%
+    mutate(detected = if_else(sum_counts > 1, TRUE, FALSE)) %>%
+    group_by(dataset, grouped_transcript_length, grouped_biotype) %>%
     summarise(n = n(),
-        detected = sum(detected)) %>% 
-    mutate(rate = detected / n) %>% 
-    filter(grouped_biotype != "small ncRNA") %>% 
+        detected = sum(detected)) %>%
+    mutate(rate = detected / n) %>%
+    filter(grouped_biotype != "small ncRNA") %>%
     ggplot(aes(grouped_transcript_length, rate)) +
     geom_bar(aes(fill = dataset),
         stat = "identity",
@@ -260,14 +260,14 @@ df_tx_sum %>%
 ## Genes
 
 ```{r}
-df_gene_sum %>% 
-    mutate(detected = if_else(sum_counts > 1, TRUE, FALSE)) %>% 
-    select(dataset, ensembl_gene_id_version, detected) %>% 
-    mutate(detected = as.integer(detected)) %>% 
-    tidyr::spread(dataset, detected) %>% 
-    tidyr::drop_na() %>% 
+df_gene_sum %>%
+    mutate(detected = if_else(sum_counts > 1, TRUE, FALSE)) %>%
+    select(dataset, ensembl_gene_id_version, detected) %>%
+    mutate(detected = as.integer(detected)) %>%
+    tidyr::spread(dataset, detected) %>%
+    tidyr::drop_na() %>%
     as.data.frame() %>%
-    tibble::column_to_rownames("ensembl_gene_id_version") %>% 
+    tibble::column_to_rownames("ensembl_gene_id_version") %>%
     upset(nsets = 3, keep.order = TRUE,
         order.by = "freq")
 ```
@@ -275,14 +275,14 @@ df_gene_sum %>%
 ## Transcripts
 
 ```{r}
-df_tx_sum %>% 
-    mutate(detected = if_else(sum_counts > 1, TRUE, FALSE)) %>% 
-    select(dataset, ensembl_transcript_id_version, detected) %>% 
-    mutate(detected = as.integer(detected)) %>% 
-    tidyr::spread(dataset, detected) %>% 
-    tidyr::drop_na() %>% 
+df_tx_sum %>%
+    mutate(detected = if_else(sum_counts > 1, TRUE, FALSE)) %>%
+    select(dataset, ensembl_transcript_id_version, detected) %>%
+    mutate(detected = as.integer(detected)) %>%
+    tidyr::spread(dataset, detected) %>%
+    tidyr::drop_na() %>%
     as.data.frame() %>%
-    tibble::column_to_rownames("ensembl_transcript_id_version") %>% 
+    tibble::column_to_rownames("ensembl_transcript_id_version") %>%
     upset(nsets = 3, keep.order = TRUE,
         order.by = "freq")
 ```
@@ -293,21 +293,21 @@ df_tx_sum %>%
 mylog10_trans <- function (base = 10) {
   trans <- function(x) log(x + 1, base)
   inv <- function(x) base^x - 1
-  trans_new(paste0("log-", format(base)), trans, inv, log_breaks(base = base), 
+  trans_new(paste0("log-", format(base)), trans, inv, log_breaks(base = base),
             domain = c(1e-100, Inf))
 }
 
-df_gene_sum %>% 
-    mutate(detected = if_else(sum_counts > 1, TRUE, FALSE)) %>% 
-    select(dataset, ensembl_gene_id_version, detected) %>% 
+df_gene_sum %>%
+    mutate(detected = if_else(sum_counts > 1, TRUE, FALSE)) %>%
+    select(dataset, ensembl_gene_id_version, detected) %>%
     tidyr::spread(dataset, detected) %>%
-    filter(illumina) %>% 
-    left_join(gene_tpm, by = "ensembl_gene_id_version") %>% 
-    left_join(biomaRt_gene, by = "ensembl_gene_id_version") %>% 
-    left_join(biotype_groups, by = c("gene_biotype" = "transcript_biotype")) %>% 
-    filter(!grouped_biotype == c("small ncRNA")) %>% 
-    tidyr::drop_na() %>% 
-    mutate(teloprime = factor(teloprime, levels = c(TRUE, FALSE))) %>% 
+    filter(illumina) %>%
+    left_join(gene_tpm, by = "ensembl_gene_id_version") %>%
+    left_join(biomaRt_gene, by = "ensembl_gene_id_version") %>%
+    left_join(biotype_groups, by = c("gene_biotype" = "transcript_biotype")) %>%
+    filter(!grouped_biotype == c("small ncRNA")) %>%
+    tidyr::drop_na() %>%
+    mutate(teloprime = factor(teloprime, levels = c(TRUE, FALSE))) %>%
     ggplot(aes(grouped_biotype, average_tpm)) +
     geom_violin(aes(fill = teloprime)) +
     scale_y_continuous(

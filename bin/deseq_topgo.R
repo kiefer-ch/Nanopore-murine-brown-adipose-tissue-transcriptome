@@ -1,6 +1,6 @@
 #!/usr/bin/Rscript --no-restore --no-environ --no-save
 
-source("packrat/init.R")
+source(".Rprofile")
 library("readr")
 library("dplyr")
 library("purrr")
