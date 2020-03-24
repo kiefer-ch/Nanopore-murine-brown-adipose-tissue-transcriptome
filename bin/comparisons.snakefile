@@ -136,7 +136,7 @@ rule coverage:
         "comparisons_coverage.Rmd"
 
 
-rule compare_dtu:
+rule compare_dtu_1:
     input:
         drimseq = expand("res/drimseq/{dataset}/{dataset}_drimSeqStageR.csv",
                          dataset=["illumina", "cdna", "teloprime", "cdna_flair", "teloprime_flair"]),
@@ -144,6 +144,16 @@ rule compare_dtu:
                         dataset=["illumina", "cdna", "teloprime"]),
         biomaRt_gene = "annotation/biomaRt_gene.rds",
         counts = "res/comparisons/comparisons_meanCounts_gene.csv.gz"
+    output:
+        signif = "res/comparisons/comparisons_dtu_significant.csv",
+        all = "res/comparisons/comparisons_dtu_all.rds"
+    script:
+        "comparisons_dtu.R"
+
+rule compare_dtu_2:
+    input:
+        signif = "res/comparisons/comparisons_dtu_significant.csv",
+        all = "res/comparisons/comparisons_dtu_all.rds"
     output:
         "res/comparisons/comparisons_dtu.html"
     script:

@@ -44,7 +44,9 @@ renv::restore()
 ```
 
 If the systemfonts package fails to install, you might have to install libcairo2-dev by
-running `sudo apt-get libcairo2-dev` first.
+running `sudo apt-get install libcairo2-dev` first.
+
+Pandoc must be installed to compile the R markdown files. `sudo apt-get install pandoc`
 
 # Folder structure
 
