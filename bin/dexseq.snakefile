@@ -74,7 +74,7 @@ rule featureCounts_count_ont:
         files = get_bam_ont,
         annotation = "indices/dexseq/annotation_{dataset}_flat.gtf",
     threads:
-        20
+        1
     output:
         "res/dexseq/{dataset}/{dataset}_featureCounts.out"
     wildcard_constraints:
@@ -83,7 +83,8 @@ rule featureCounts_count_ont:
         "featureCounts --donotsort \
             -L \
             -f \
-            --fracOverlapFeature 0.5 \
+            --fracOverlapFeature 0.75 \
+            --minOverlap 25 \
             -O \
             -s 0 \
             -T {threads} \
