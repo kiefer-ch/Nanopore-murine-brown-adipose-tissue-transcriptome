@@ -19,6 +19,7 @@ library("dplyr")
 library("readr")
 library("DRIMSeq")
 library("ggplot2")
+library("ggthemes")
 ```
 
 ```{r importData}
@@ -93,6 +94,55 @@ res_stageR %>%
     kableExtra::kable_styling() %>%
     kableExtra::scroll_box(width = "100%", height = "600px")
 ```
+
+
+# Plots
+
+The cross is the proportion estimated by DRIMSeq.
+
+```{r}
+gene_ids <- res_stageR %>%
+    filter(gene < .05 | transcript < .05) %>% 
+    pull(ensembl_gene_id_version) %>% 
+    unique()
+
+for (gene in gene_ids) {
+    
+    print(gene)
+  
+    df <- proportions(dmds) %>% 
+        filter(gene_id == gene) %>%
+        select(-gene_id) %>% 
+        tidyr::gather("sample_id", "estimated_proportion", -feature_id) %>% 
+        mutate(sample_id = substr(sample_id, 2, nchar(sample_id)))
+    
+    df2 <- counts(dmds) %>% 
+        filter(gene_id == gene) %>%
+        select(-gene_id) %>% 
+        mutate_if(is.numeric, function(x) x / sum(x)) %>% 
+        tidyr::gather("sample_id", "proportion", -feature_id) %>% 
+        mutate(sample_id = substr(sample_id, 2, nchar(sample_id))) %>% 
+        left_join(df, by = c("feature_id", "sample_id")) %>% 
+        left_join(DRIMSeq::samples(dmds), by = "sample_id")
+    
+    
+   pl <- df2 %>% 
+        ggplot(aes(condition_temp, proportion)) +
+        geom_point(aes(colour = feature_id), position = position_dodge(width = .5)) +
+        stat_summary(aes(colour = feature_id), geom = "crossbar",
+            width = .5, lwd = .25,
+            position = position_dodge(width = .5)) +
+        geom_point(aes(y = estimated_proportion, colour = feature_id),
+            position = position_dodge(width = .5),
+            shape = 3, size = 3) +
+        scale_color_colorblind() +
+        theme_tufte() +
+        geom_rangeframe(sides = "l")
+   
+   print(pl)
+}
+```
+
 
 # Session info
 
