@@ -47,12 +47,10 @@ res_gene <- DRIMSeq::results(dmds)
 res_tx <- DRIMSeq::results(dmds, level = "feature")
 
 # exchangeNAfor1
-no.na <- function(x) if_else(is.na(x), 1, x)
+res_gene$pvalue <- tidyr::replace_na(res_gene$pvalue, 1)
+res_tx$pvalue <- tidyr::replace_na(res_tx$pvalue, 1)
 
-res_gene$pvalue <- no.na(res_gene$pvalue)
-res_tx$pvalue <- no.na(res_tx$pvalue)
-
-# DrimSeq does not allow ':' in the names :-(
+# stageR does not allow ':' in the names :-(
 pScreen <- res_gene$pvalue
 names(pScreen) <- sub(':', '_', res_gene$gene_id)
 
