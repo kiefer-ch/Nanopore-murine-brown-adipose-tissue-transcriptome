@@ -26,6 +26,7 @@ SAMPLE_INFO_ont = SAMPLE_INFO[SAMPLE_INFO["ont"].notnull()]
 SAMPLES_ont = SAMPLE_INFO_ont["illumina"].tolist()
 BARCODES = SAMPLE_INFO_illumina[SAMPLE_INFO_illumina["ont"].notnull()]["ont"].tolist()
 
+
 # target rules
 rule all:
     input:
@@ -41,6 +42,7 @@ rule all:
         "res/dtu/dtu_ont/ont_dtu.html",
         "res/comparisons/feature_detection.html",
         "res/comparisons/quantification_correlation.html"
+
 
 rule illumina_align:
     input:
@@ -71,6 +73,7 @@ rule illumina_align:
             -o qc \
             -n multiqc_aligned"
 
+
 rule illumina_trimm:
     input:
         expand("fastq/illumina/trimmed/{sample}_R1_001_trimmed.fastq.gz", sample=SAMPLES),
@@ -95,6 +98,29 @@ rule dexseq_all:
             dataset=["illumina", "teloprime", "cdna"]),
         expand("res/dexseq/illumina/illumina_dexseq_results.csv.gz",
             dataset=["illumina", "teloprime", "cdna"])
+
+
+rule drimseq_all:
+    input:
+        expand("res/drimseq/{dataset}/{dataset}_drimSeqStageR.html",
+            dataset=["illumina", "teloprime", "cdna", "cdna_flair", "teloprime_flair"]),
+        expand("res/drimseq/{dataset}/{dataset}_drimSeqStageR.csv",
+            dataset=["illumina", "teloprime", "cdna", "cdna_flair", "teloprime_flair"])
+
+
+rule comparisons_all
+    input:
+        "res/comparisons/comparisons_quantification_correlation.html",
+        "res/comparisons/comparisons_countsPCA.html",
+        "res/comparisons/comparisons_feature_detection.html",
+        "res/comparisons/comparisons_coverage.html",
+        "res/comparisons/comparisons_dtu.html",
+        "res/comparisons/comparisons_readLengths_fastq.html",
+        "res/comparisons/comparisons_readLengths_bam.html",
+        "res/comparisons/comparisons_dgeDte.html",
+        "res/comparisons/comparisons_reannotation.html",
+        "res/comparisons/go.html"
+
 
 # Include other rules
 include: "bin/annotation.snakefile"
