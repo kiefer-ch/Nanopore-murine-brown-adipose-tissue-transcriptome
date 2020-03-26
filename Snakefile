@@ -108,7 +108,7 @@ rule drimseq_all:
             dataset=["illumina", "teloprime", "cdna", "cdna_flair", "teloprime_flair"])
 
 
-rule comparisons_all
+rule comparisons_all:
     input:
         "res/comparisons/comparisons_quantification_correlation.html",
         "res/comparisons/comparisons_countsPCA.html",

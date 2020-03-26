@@ -16,6 +16,7 @@ rule quantification_averageCounts_tables:
     script:
         "comparisons_quantification_averageCountsTable.R"
 
+
 rule quantification_correlation:
     input:
         gene = "res/comparisons/comparisons_meanCounts_gene.csv.gz",
