@@ -62,40 +62,27 @@ rule drimseq_dtu:
         "drimseq_dtu.R"
 
 
+def get_txdb(wildcards):
+    if wildcards.dataset in ["teloprime", "illumina", "cdna"]:
+        txdb = "annotation/annotation_txdb.sqlite"
+    elif wildcards.dataset == "teloprime_flair":
+        txdb = "flair/teloprime/flair.collapse.isoforms_txdb.sqlite"
+    elif wildcards.dataset == "cdna_flair":
+        txdb = "flair/cdna/flair.collapse.isoforms_txdb.sqlite"
+    return txdb
+
+
 rule drimseq_report:
     input:
-        dmds = "{file}_dmds_dtu.rds",
-        res = "{file}_drimSeqStageR.csv",
+        dmds = "res/drimseq/{dataset}/{file}_dmds_dtu.rds",
+        res = "res/drimseq/{dataset}/{file}_drimSeqStageR.csv",
         biomaRt_gene = "annotation/biomaRt_gene.rds",
-        biomaRt_tx = "annotation/biomaRt_tx.rds"
+        biomaRt_tx = "annotation/biomaRt_tx.rds",
+        genome = "annotation/genome.fa",
+        txdb = get_txdb
     output:
-        "{file}_drimSeqStageR.html"
+        "res/drimseq/{dataset}/{file}_drimSeqStageR.html"
+    wildcard_constraints:
+        dataset = "teloprime|cdna|illumina|cdna_flair|teloprime_flair"
     script:
         "drimseq_stagerAnalysis.Rmd"
-
-
-rule drimseq_browserPlots:
-    params:
-        out_folder = "res/drimseq/teloprime/browser_plots"
-    input:
-        genome = "annotation/genome.fa",
-        bw_warm = "bw/teloprime/barcode01.bw",
-        bw_cold = "bw/teloprime/barcode02.bw",
-        txdb = "annotation/annotation_txdb.sqlite",
-        biomaRt_tx = "annotation/biomaRt_tx.rds",
-        stageR_results = "res/drimseq/teloprime/teloprime_drimSeqStageR.csv"
-    script:
-        "drimseq_browserPlots.R"
-
-
-rule drimseq_browserPlots_flair:
-    params:
-        out_folder = "res/drimseq/teloprime_flair/browser_plots"
-    input:
-        genome = "annotation/genome.fa",
-        bw_warm = "bw/teloprime/barcode01.bw",
-        bw_cold = "bw/teloprime/barcode02.bw",
-        txdb = "flair/teloprime/flair.collapse.isoforms_txdb.sqlite",
-        stageR_results = "res/drimseq/teloprime_flair/teloprime_flair_drimSeqStageR.csv"
-    script:
-        "drimseq_browserPlots_flair.R"

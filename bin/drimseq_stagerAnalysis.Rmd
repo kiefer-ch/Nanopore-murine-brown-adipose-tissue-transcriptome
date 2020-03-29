@@ -14,12 +14,16 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = FA
 ```
 
 ```{r library, include=FALSE}
+save.image()
 source(".Rprofile")
 library("dplyr")
 library("readr")
 library("DRIMSeq")
 library("ggplot2")
 library("ggthemes")
+library("Gviz")
+library("AnnotationDbi")
+select <- dplyr::select
 ```
 
 ```{r importData}
@@ -98,26 +102,98 @@ res_stageR %>%
 
 # Plots
 
-The cross is the proportion estimated by DRIMSeq.
+The cross is the proportion estimated by DRIMSeq. The red transcripts are significantly changed.
+Note that sometimes there is an indication of significant DTU at the genelevel, but no 
+single transcript changes significantly.
 
 ```{r}
 gene_ids <- res_stageR %>%
-    filter(gene < .05 | transcript < .05) %>% 
+    filter(gene < .05 | transcript < .05) %>%
+    filter(substr(ensembl_gene_id_version, 1, 3) == "ENS") %>% 
     pull(ensembl_gene_id_version) %>% 
     unique()
 
-for (gene in gene_ids) {
+txdb <- loadDb(snakemake@input[["txdb"]])
+txdb_dump <- as.list(txdb)
+
+plot.transcripts <- function(gene_id) {
+    gene_info <- AnnotationDbi::select(txdb, keys = gene_id,
+            keytype = "GENEID",
+            columns = c("TXCHROM", "TXSTART", "TXEND")) %>%
+        as_tibble() %>%
+        group_by(GENEID) %>%
+        summarise(TXCHROM = unique(TXCHROM),
+            TXSTART = min(TXSTART),
+            TXEND = max(TXEND))
     
-    print(gene)
-  
+    # filter significant transcripts
+    sig_tx <- res_stageR %>%
+        filter(ensembl_gene_id_version == gene_id) %>%
+        filter(transcript < .05) %>%
+        pull(ensembl_transcript_id_version)
+    
+    # subset txdb
+    all_tx <- res_stageR %>%
+        filter(ensembl_gene_id_version == gene_id) %>%
+        pull(ensembl_transcript_id_version)
+    
+    all_tx_ids <- txdb_dump[[1]] %>%
+        as_tibble() %>% 
+        filter(tx_name %in% all_tx) %>% 
+        pull(tx_id)
+
+    new_txdb_dump <- vector("list", 4)
+    new_txdb_dump[1:3] <- txdb_dump[1:3] %>%
+        purrr::map(filter, tx_id %in% all_tx_ids)
+    new_txdb_dump[4] <- txdb_dump[4]
+    
+    new_txdb <- do.call(makeTxDb, new_txdb_dump)
+
+    # annotation track
+    atrack <- GeneRegionTrack(new_txdb, chromosome = gene_info$TXCHROM,
+        from = gene_info$TXSTART, to = gene_info$TXEND,
+        name = "GENCODE M23")
+    symbol(atrack) <- symbol(atrack) %>%
+        tibble::enframe() %>%
+        dplyr::select(ensembl_transcript_id_version = "value") %>%
+        left_join(biomart_tx, by = "ensembl_transcript_id_version") %>%
+        pull(mgi_symbol)
+    
+    # set colour of significant transcripts
+    feature(atrack) <- if_else(transcript(atrack) %in% sig_tx, "bad", "good")
+    interestcolor <- list("bad" = "red", "good" = "#FFD58A")
+    displayPars(atrack) <- interestcolor
+    
+    gtrack <- GenomeAxisTrack()
+    
+    options(ucscChromosomeNames = FALSE)
+    
+    plotTracks(list(gtrack, atrack),
+        just.group = "above",
+        transcriptAnnotation = "transcript",
+        from = gene_info$TXSTART,
+        to = gene_info$TXEND,
+        extend.left = 250,
+        extend.right = 250,
+        background.title = "darkblue",
+        fontsize = 15, cex.axis = .4,
+        min.height = 0, coverageHeight = 0.08, minCoverageHeight = 0)
+}
+
+for (ens_gene_id in gene_ids) {
+    
+    print(ens_gene_id)
+
+    plot.transcripts(ens_gene_id)
+
     df <- proportions(dmds) %>% 
-        filter(gene_id == gene) %>%
+        filter(gene_id == ens_gene_id) %>%
         select(-gene_id) %>% 
         tidyr::gather("sample_id", "estimated_proportion", -feature_id) %>% 
         mutate(sample_id = substr(sample_id, 2, nchar(sample_id)))
     
     df2 <- counts(dmds) %>% 
-        filter(gene_id == gene) %>%
+        filter(gene_id == ens_gene_id) %>%
         select(-gene_id) %>% 
         mutate_if(is.numeric, function(x) x / sum(x)) %>% 
         tidyr::gather("sample_id", "proportion", -feature_id) %>% 
@@ -125,8 +201,7 @@ for (gene in gene_ids) {
         left_join(df, by = c("feature_id", "sample_id")) %>% 
         left_join(DRIMSeq::samples(dmds), by = "sample_id")
     
-    
-   pl <- df2 %>% 
+    pl <- df2 %>% 
         ggplot(aes(condition_temp, proportion)) +
         geom_point(aes(colour = feature_id), position = position_dodge(width = .5)) +
         stat_summary(aes(colour = feature_id), geom = "crossbar",
@@ -139,7 +214,8 @@ for (gene in gene_ids) {
         theme_tufte() +
         geom_rangeframe(sides = "l")
    
-   print(pl)
+    print(pl)
+    
 }
 ```
 
