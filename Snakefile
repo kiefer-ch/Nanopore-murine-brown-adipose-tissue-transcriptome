@@ -96,7 +96,7 @@ rule dexseq_all:
     input:
         expand("res/dexseq/{dataset}/{dataset}_heatmap.html",
                dataset=["illumina", "teloprime", "cdna"]),
-        expand("res/dexseq/illumina/illumina_dexseq_results.csv.gz",
+        expand("res/dexseq/{dataset}/{dataset}_dexseq_results.csv.gz",
                dataset=["illumina", "teloprime", "cdna"])
 
 
@@ -116,8 +116,7 @@ rule comparisons_all:
         "res/comparisons/comparisons_readLengths_fastq.html",
         "res/comparisons/comparisons_readLengths_bam.html",
         "res/comparisons/comparisons_dgeDte.html",
-        "res/comparisons/comparisons_reannotation.html",
-        "res/comparisons/go.html"
+        "res/comparisons/comparisons_reannotation.html"
 
 
 # Include other rules

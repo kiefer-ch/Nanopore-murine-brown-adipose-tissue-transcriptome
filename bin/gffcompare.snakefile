@@ -1,14 +1,17 @@
 rule gffcompare:
     input:
         gtfs = ["stringtie/illumina/stringtie_illumina_merged.gtf",
-            "flair/teloprime/flair.collapse.isoforms.gtf",
-            "flair/cdna/flair.collapse.isoforms.gtf"],
+                "flair/teloprime/flair.collapse.isoforms.gtf",
+                "flair/cdna/flair.collapse.isoforms.gtf"],
         reference = "annotation/annotation.gtf"
     output:
         "res/comparisons/gffcompare/all_gffcompare.loci",
         "res/comparisons/gffcompare/all_gffcompare.stats",
         "res/comparisons/gffcompare/all_gffcompare.combined.gtf",
-        "res/comparisons/gffcompare/all_gffcompare.tracking"
+        "res/comparisons/gffcompare/all_gffcompare.tracking",
+        "stringtie/illumina/all_gffcompare.stringtie_illumina_merged.gtf.tmap",
+        "flair/cdna/all_gffcompare.flair.collapse.isoforms.gtf.refmap",
+        "flair/teloprime/all_gffcompare.flair.collapse.isoforms.gtf.refmap"
     params:
         out_prefix = "res/comparisons/gffcompare/all_gffcompare"
     shell:
