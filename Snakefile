@@ -30,7 +30,7 @@ BARCODES = SAMPLE_INFO_illumina[SAMPLE_INFO_illumina["ont"].notnull()]["ont"].to
 # target rules
 rule all:
     input:
-        expand("BW/bw_ont/{barcode}.bw", barcode = BARCODES),
+        expand("BW/bw_ont/{barcode}.bw", barcode=BARCODES),
         expand("BW/{sample}_fw.bw", sample=SAMPLES),
         expand("BW/{sample}_rv.bw", sample=SAMPLES),
         "qc/multiqc_aligned.html",
@@ -95,17 +95,15 @@ rule illumina_trimm:
 rule dexseq_all:
     input:
         expand("res/dexseq/{dataset}/{dataset}_heatmap.html",
-            dataset=["illumina", "teloprime", "cdna"]),
+               dataset=["illumina", "teloprime", "cdna"]),
         expand("res/dexseq/illumina/illumina_dexseq_results.csv.gz",
-            dataset=["illumina", "teloprime", "cdna"])
+               dataset=["illumina", "teloprime", "cdna"])
 
 
 rule drimseq_all:
     input:
         expand("res/drimseq/{dataset}/{dataset}_drimSeqStageR.html",
-            dataset=["illumina", "teloprime", "cdna", "cdna_flair", "teloprime_flair"]),
-        expand("res/drimseq/{dataset}/{dataset}_drimSeqStageR.csv",
-            dataset=["illumina", "teloprime", "cdna", "cdna_flair", "teloprime_flair"])
+               dataset=["illumina", "teloprime", "cdna", "cdna_flair", "teloprime_flair"])
 
 
 rule comparisons_all:

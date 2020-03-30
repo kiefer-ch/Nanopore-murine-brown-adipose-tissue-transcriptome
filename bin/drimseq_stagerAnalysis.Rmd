@@ -109,7 +109,6 @@ single transcript changes significantly.
 ```{r}
 gene_ids <- res_stageR %>%
     filter(gene < .05 | transcript < .05) %>%
-    filter(substr(ensembl_gene_id_version, 1, 3) == "ENS") %>% 
     pull(ensembl_gene_id_version) %>% 
     unique()
 
