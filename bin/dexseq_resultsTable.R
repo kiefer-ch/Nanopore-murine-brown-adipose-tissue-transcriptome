@@ -1,7 +1,6 @@
 #!/usr/bin/Rscript --no-restore --no-environ --no-save
 
 # set libpaths to packrat local library
-save.image()
 source(".Rprofile")
 library("dplyr")
 library("DEXSeq")
