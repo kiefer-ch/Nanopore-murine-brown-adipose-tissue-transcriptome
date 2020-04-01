@@ -72,6 +72,14 @@ def get_txdb(wildcards):
     return txdb
 
 
+def get_axis(wildcards):
+    if wildcards.dataset == "illumina":
+        axis = "illumina"
+    else:
+        axis = "ont"
+    return axis
+
+
 rule drimseq_report:
     input:
         dmds = "res/drimseq/{dataset}/{file}_dmds_dtu.rds",
@@ -82,6 +90,8 @@ rule drimseq_report:
         txdb = get_txdb
     output:
         "res/drimseq/{dataset}/{file}_drimSeqStageR.html"
+    params:
+        axis = get_axis
     wildcard_constraints:
         dataset = "teloprime|cdna|illumina|cdna_flair|teloprime_flair"
     script:

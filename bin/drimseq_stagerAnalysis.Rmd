@@ -14,12 +14,14 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = FA
 ```
 
 ```{r library, include=FALSE}
+save.image()
 source(".Rprofile")
 library("dplyr")
 library("readr")
 library("DRIMSeq")
 library("ggplot2")
 library("ggthemes")
+library("cowplot")
 library("Gviz")
 library("AnnotationDbi")
 select <- dplyr::select
@@ -186,7 +188,7 @@ for (ens_gene_id in gene_ids) {
 
     df <- proportions(dmds) %>% 
         filter(gene_id == ens_gene_id) %>%
-        select(-gene_id) %>% 
+        dplyr::select(-gene_id) %>% 
         tidyr::gather("sample_id", "estimated_proportion", -feature_id) %>% 
         mutate(sample_id = substr(sample_id, 2, nchar(sample_id)))
     
@@ -199,7 +201,7 @@ for (ens_gene_id in gene_ids) {
         left_join(df, by = c("feature_id", "sample_id")) %>% 
         left_join(DRIMSeq::samples(dmds), by = "sample_id")
     
-    pl <- df2 %>% 
+    pl1 <- df2 %>% 
         ggplot(aes(condition_temp, proportion)) +
         geom_point(aes(colour = feature_id), position = position_dodge(width = .5)) +
         stat_summary(aes(colour = feature_id), geom = "crossbar",
@@ -210,10 +212,45 @@ for (ens_gene_id in gene_ids) {
             shape = 3, size = 3) +
         scale_color_colorblind() +
         theme_tufte() +
-        geom_rangeframe(sides = "l")
-   
-    print(pl)
+        geom_rangeframe(sides = "l") +
+        xlab("T [°C]")
     
+    if (snakemake@params[["axis"]] == "illumina") {
+        pl1 <- pl1 +
+            ylab("Proportion of scaled TPM")
+    } else {
+        pl1<- pl1 +
+            ylab("Proportion of counts")
+    }
+   
+    pl2 <- counts(dmds) %>% 
+        filter(gene_id == ens_gene_id) %>%
+        select(-gene_id) %>% 
+        tidyr::gather("sample_id", "count", -feature_id) %>%
+        mutate(sample_id = substr(sample_id, 2, nchar(sample_id))) %>% 
+        left_join(DRIMSeq::samples(dmds), by = "sample_id") %>% 
+        ggplot(aes(condition_temp, count)) +
+        geom_point(aes(colour = feature_id), position = position_dodge(width = .5)) +
+        stat_summary(aes(colour = feature_id), geom = "crossbar",
+            width = .5, lwd = .25,
+            position = position_dodge(width = .5)) +
+        scale_color_colorblind() +
+        theme_tufte() +
+        geom_rangeframe(sides = "l") +
+        xlab("T [°C]")
+    
+    if (snakemake@params[["axis"]] == "illumina") {
+        pl2 <- pl2 +
+            ylab("scaled TPM")
+    } else {
+        pl2 <- pl2 +
+            ylab("Counts")
+    }
+    
+    plot_grid(pl1 + theme(legend.position="none"),
+        pl2 + theme(legend.position="none"),
+        get_legend(pl1),
+        nrow = 1, rel_widths = c(1, 1, .55))
 }
 ```
 
