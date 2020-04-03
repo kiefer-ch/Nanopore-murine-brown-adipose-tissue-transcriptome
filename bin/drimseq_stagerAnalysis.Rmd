@@ -246,10 +246,12 @@ for (ens_gene_id in gene_ids) {
             ylab("Counts")
     }
     
-    plot_grid(pl1 + theme(legend.position="none"),
+    pl_gr <- plot_grid(pl1 + theme(legend.position="none"),
         pl2 + theme(legend.position="none"),
         get_legend(pl1),
         nrow = 1, rel_widths = c(1, 1, .55))
+    
+    print(pl_gr)
 }
 ```
 
