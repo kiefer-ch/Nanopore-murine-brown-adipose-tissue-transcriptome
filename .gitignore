@@ -30,6 +30,7 @@
 !LICENSE
 !renv.lock
 !.renvignore
+!.Rprofile
 
 # Don't ignore sample info
 !sample_info/illumina_sample_id.txt
