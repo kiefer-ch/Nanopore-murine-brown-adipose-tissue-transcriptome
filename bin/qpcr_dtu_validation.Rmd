@@ -1,0 +1,281 @@
+---
+title: "qPCR dtu validation"
+author: "Christoph Kiefer"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+    html_document:
+        toc: true
+        toc_float: true
+        toc_depth: 2
+        fig_caption: false
+        dev: "svg"
+editor_options:
+    chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = FALSE)
+```
+
+```{r library, include=FALSE}
+save.image()
+source(".Rprofile")
+library("dplyr")
+library("readr")
+library("ggplot2")
+library("ggthemes")
+library("purrr")
+library("ggrepel")
+```
+
+```{r config}
+genes1 <- c("Gtf2b", "Hprt", "Cars2_long", "Cars2_short", "Scp2_5p", "Scp2_3p",
+    "Ergic1_long", "Ergic1_short", "Smyd4_all", "Smyd4_long", "Adtrp_long",
+    "Adtrp_all")
+genes2 <- c("Pex6_long", "Pex6_all", "Mlxipl_long", "Mlxipl_short", 
+    "Dipk1b_short", "Dipk1b_long", "Acsl5_short", "Acsl5_long", "Gnas_long", 
+    "Gnas_short", "Aldoa_long", "Aldoa_short")
+hkp <- c("Gtf2b", "Hprt")
+notPass <- c()
+```
+
+
+```{r importData}
+sample_info <- read_csv(snakemake@input[["sample_info"]]) %>%
+    mutate_at(vars(matches("condition")), as.factor) %>% 
+    select_at(vars(matches("sample_id|condition")))
+
+get.pipettingScheme <- function(genes, sampleInfo, rep_qpcr = 2, nrow = 16) {
+
+    n_samples <- nrow(sampleInfo)
+    n_genes <- length(genes)
+
+    length_gene <- n_samples * rep_qpcr
+    cols_per_gene <- ((length_gene - 1) %/% nrow) + 1
+
+    samples_per_column <- rep(c(rep(nrow, (length_gene %/% nrow)),
+        length_gene %% nrow)[c(rep(nrow, (length_gene %/% nrow)),
+        length_gene %% nrow) != 0], n_genes)
+
+    sampleInfo <- sampleInfo %>%
+        tidyr::uncount(rep_qpcr) %>%
+        replicate(n_genes, ., simplify = FALSE) %>%
+        bind_rows()
+
+    tibble(gene = rep(genes, each = length_gene),
+            col = rep(1:(cols_per_gene * n_genes), samples_per_column),
+            row = rep(1:length_gene %% nrow, n_genes)) %>%
+        mutate(row = LETTERS[if_else(row == 0, nrow, row)]) %>%
+        mutate(pos = paste0(row, col)) %>%
+        bind_cols(., sampleInfo) %>%
+        select(-col, -row, gene)
+}
+
+import.LCcq <- function(pipettingScheme, file, decimal_mark = '.', maxCq = 40) {
+
+     df <- read_tsv(file, locale = locale(decimal_mark = decimal_mark),
+            skip = 1,
+            col_types = cols(
+                Include = col_character(),
+                Color = col_integer(),
+                Pos = col_character(),
+                Name = col_character(),
+                Cp = col_double(),
+                Concentration = col_character(),
+                Standard = col_integer(),
+                Status = col_character())) %>%
+        dplyr::select(cq = Cp, pos = Pos) %>%
+        mutate(cq = if_else(cq < maxCq, cq, NA_real_))
+     pipettingScheme %>%
+        left_join(df, by = "pos")
+}
+
+df1 <- get.pipettingScheme(
+        genes = genes1,
+        sampleInfo = sample_info,
+        nrow = 16) %>%
+    import.LCcq(file = snakemake@input[["cq1"]],
+        decimal_mark = '.') %>%
+    mutate(cq = if_else(pos %in% notPass, NA_real_, cq))
+
+df2 <- get.pipettingScheme(
+        genes = genes2,
+        sampleInfo = sample_info,
+        nrow = 16) %>%
+    import.LCcq(file = snakemake@input[["cq2"]],
+        decimal_mark = '.') %>%
+    mutate(cq = if_else(pos %in% notPass, NA_real_, cq))
+
+df <- list(df1, df2)
+```
+
+```{r detectOutliers, warning=FALSE}
+detect.outliers <- function(df, cutoff = 1) {
+    out <- df %>%
+        group_by_at(vars(matches("sample_id|gene"))) %>%
+        mutate(error = max(cq, na.rm = TRUE) - min(cq, na.rm = TRUE)) %>%
+        ungroup() %>%
+        mutate(high_var = if_else(error > cutoff, TRUE, FALSE)) %>%
+        select(-error)
+
+    if(any(out$high_var, na.rm = TRUE)) {
+        cat(sprintf("%i samples set to NA due to high variance in qPCR
+                replicates.\n",
+            sum(out$high_var, na.rm = TRUE) / 2))
+    } else {
+        cat("No samples with high variance detected.\n")
+    }
+
+    return(out)
+}
+
+df <- df %>%
+    map(detect.outliers, cutoff = 1)
+```
+
+
+# Cq values
+
+## Plate 1
+
+```{r plotCq1}
+df[[1]] %>% 
+    ggplot(aes(paste(sample_id, condition_temp), -cq)) +
+    geom_point(aes(colour = high_var)) +
+    geom_text_repel(aes(label = pos),
+        family = "serif", size = 2) +
+    facet_wrap(~gene) +
+    theme_tufte(base_size = 8) +
+    geom_rangeframe() +
+    ylab("cq") +
+    xlab(NULL) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    scale_color_colorblind()
+```
+
+## Plate 2
+
+```{r plotCq2}
+df[[2]] %>% 
+    ggplot(aes(paste(sample_id, condition_temp), -cq)) +
+    geom_point(aes(colour = high_var)) +
+    geom_text_repel(aes(label = pos),
+        family = "serif", size = 2) +
+    facet_wrap(~gene) +
+    theme_tufte(base_size = 8) +
+    geom_rangeframe() +
+    ylab("cq") +
+    xlab(NULL) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    scale_color_colorblind()
+```
+
+
+# \(\Delta\)Cq
+
+Normalised to Gtf2b/Hprt
+
+```{r average_cq}
+get.averageCq <- function(df) {
+    df %>%
+        mutate(cq = if_else(high_var, NA_real_, cq)) %>%
+        group_by_at(vars(matches("sample_id|condition|gene"))) %>% 
+        summarise(cq = mean(cq, na.rm = TRUE)) %>% 
+        ungroup()
+}
+
+df <- df %>%
+    bind_rows() %>% 
+    get.averageCq()
+```
+
+```{r dcq}
+get.dCq <- function(df, hkp) {
+    ref <- df %>%
+        filter(gene %in% hkp) %>%
+        group_by_at(vars(matches("sample_id"))) %>% 
+        summarise(housekeeper = mean(cq)) %>%
+        ungroup()
+
+    df %>%
+        filter(!gene %in% hkp) %>% 
+        left_join(ref, by = colnames(df)[grep("sample_id", colnames(df))]) %>%
+        mutate(dcq = cq - housekeeper) %>%
+        select(-cq, -housekeeper)
+}
+
+df <- df %>% 
+    get.dCq(hkp = hkp)
+```
+
+```{r}
+get.averageDCq <- function(df) {
+    df %>%
+        group_by_at(vars(matches("condition|gene|sample_id"))) %>%
+        summarise(dcq = mean(dcq, na.rm = TRUE)) %>% 
+        ungroup()
+}
+
+df <- df %>% 
+    get.averageDCq()
+```
+
+```{r}
+df %>% 
+    mutate(condition_temp = relevel(condition_temp, "22")) %>% 
+    tidyr::separate(gene, c("gene", "isoform"), sep = '_') %>% 
+    tidyr::drop_na() %>% 
+    ggplot(aes(condition_temp, 2^-dcq, colour = isoform)) +
+    geom_point(size = 1, 
+        position = position_dodge(width = .5)) +
+    stat_summary(geom = "crossbar",
+        fun.data = mean_se,
+        width = .25, lwd = .25,
+        position = position_dodge(width = .5)) +
+    facet_wrap(~gene, scales = "free_y") +
+    scale_y_log10(labels = function(x) x) +
+    theme_tufte(base_size = 8) +
+    geom_rangeframe(colour = "black") +
+    ylab("rel. expr. vs. Gtf2b/Hprt") +
+    xlab("temperature") +
+    scale_color_colorblind()
+```
+
+# Statistics
+
+Interaction terms from linear models.
+
+```{r}
+pvalues <- df %>% 
+    select(gene, condition_temp, dcq) %>% 
+    tidyr::separate(gene, c("gene", "isoform"), sep = '_') %>% 
+    tidyr::drop_na() %>% 
+    split(.$gene) %>% 
+    map(lm, formula = dcq ~ isoform * condition_temp) %>% 
+    map(summary.lm) %>% 
+    map(function(x) x$coefficients[16]) %>% 
+    unlist() %>% 
+    tibble::enframe(name = "mgi_symbol", value = "qpcr_p") %>% 
+    mutate(qpcr_padj = p.adjust(qpcr_p)) %>% 
+    mutate(sign = symnum(qpcr_padj,
+        cutpoints = c(0, .001, .01, .05, .1, 1),
+        symbols = c("***", "**", "*", ".", " ")))
+
+pvalues %>% 
+    knitr::kable(format = "html") %>%
+    kableExtra::kable_styling()
+```
+
+```{r}
+dtu <- read_csv(snakemake@input[["signif"]])
+
+pvalues %>% 
+    select(-qpcr_p, -sign) %>% 
+    left_join(dtu, by = "mgi_symbol") %>% 
+    select(mgi_symbol, ensembl_gene_id_version, description, gene_biotype, everything()) %>% 
+    select_at(vars(-matches("avg"))) %>% 
+    knitr::kable(format = "html") %>%
+    kableExtra::kable_styling() %>%
+    kableExtra::scroll_box(width = "100%", height = "600px")
+```
+
