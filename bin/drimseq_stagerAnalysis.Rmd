@@ -201,6 +201,7 @@ for (ens_gene_id in gene_ids) {
         left_join(DRIMSeq::samples(dmds), by = "sample_id")
     
     pl1 <- df2 %>% 
+        mutate(condition_temp = relevel(condition_temp, "22")) %>% 
         ggplot(aes(condition_temp, proportion)) +
         geom_point(aes(colour = feature_id), position = position_dodge(width = .5)) +
         stat_summary(aes(colour = feature_id), geom = "crossbar",
@@ -228,6 +229,7 @@ for (ens_gene_id in gene_ids) {
         tidyr::gather("sample_id", "count", -feature_id) %>%
         mutate(sample_id = substr(sample_id, 2, nchar(sample_id))) %>% 
         left_join(DRIMSeq::samples(dmds), by = "sample_id") %>% 
+        mutate(condition_temp = relevel(condition_temp, "22")) %>% 
         ggplot(aes(condition_temp, count)) +
         geom_point(aes(colour = feature_id), position = position_dodge(width = .5)) +
         stat_summary(aes(colour = feature_id), geom = "crossbar",
