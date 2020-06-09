@@ -26,6 +26,9 @@ library("ggplot2")
 library("ggthemes")
 library("purrr")
 library("ggrepel")
+library("UpSetR")
+library("Gviz")
+library("AnnotationDbi")
 ```
 
 ```{r config}
@@ -68,7 +71,7 @@ get.pipettingScheme <- function(genes, sampleInfo, rep_qpcr = 2, nrow = 16) {
         mutate(row = LETTERS[if_else(row == 0, nrow, row)]) %>%
         mutate(pos = paste0(row, col)) %>%
         bind_cols(., sampleInfo) %>%
-        select(-col, -row, gene)
+        dplyr::select(-col, -row, gene)
 }
 
 import.LCcq <- function(pipettingScheme, file, decimal_mark = '.', maxCq = 40) {
@@ -116,7 +119,7 @@ detect.outliers <- function(df, cutoff = 1) {
         mutate(error = max(cq, na.rm = TRUE) - min(cq, na.rm = TRUE)) %>%
         ungroup() %>%
         mutate(high_var = if_else(error > cutoff, TRUE, FALSE)) %>%
-        select(-error)
+        dplyr::select(-error)
 
     if(any(out$high_var, na.rm = TRUE)) {
         cat(sprintf("%i samples set to NA due to high variance in qPCR
@@ -201,7 +204,7 @@ get.dCq <- function(df, hkp) {
         filter(!gene %in% hkp) %>% 
         left_join(ref, by = colnames(df)[grep("sample_id", colnames(df))]) %>%
         mutate(dcq = cq - housekeeper) %>%
-        select(-cq, -housekeeper)
+        dplyr::select(-cq, -housekeeper)
 }
 
 df <- df %>% 
@@ -243,11 +246,13 @@ df %>%
 
 # Statistics
 
+## Gene level
+
 Interaction terms from linear models.
 
 ```{r}
 pvalues <- df %>% 
-    select(gene, condition_temp, dcq) %>% 
+    dplyr::select(gene, condition_temp, dcq) %>% 
     tidyr::separate(gene, c("gene", "isoform"), sep = '_') %>% 
     tidyr::drop_na() %>% 
     split(.$gene) %>% 
@@ -266,16 +271,170 @@ pvalues %>%
     kableExtra::kable_styling()
 ```
 
+## Isoform level
+
+t-test
+
+```{r}
+df %>% 
+    dplyr::select(gene, condition_temp, dcq) %>% 
+    tidyr::separate(gene, c("gene", "isoform"), sep = '_') %>% 
+    tidyr::drop_na() %>% 
+    group_by(gene, isoform) %>% 
+    summarise(log2fc = t.test(dcq ~ condition_temp)$estimate["mean in group 22"] - 
+                  t.test(dcq ~ condition_temp)$estimate["mean in group 4"],
+              p = t.test(dcq ~ condition_temp)$p.value) %>% 
+    mutate(padj = p.adjust(p)) %>% 
+    mutate(sign = symnum(padj,
+        cutpoints = c(0, .001, .01, .05, .1, 1),
+        symbols = c("***", "**", "*", ".", " "))) %>% 
+    knitr::kable(format = "html") %>% 
+    kableExtra::kable_styling()
+```
+
+# Compared to sequencing data sets
+
+## Overview of p-values in seq datasets
+
 ```{r}
 dtu <- read_csv(snakemake@input[["signif"]])
 
-pvalues %>% 
-    select(-qpcr_p, -sign) %>% 
+pvalues <- pvalues %>% 
+    dplyr::select(-qpcr_p, -sign) %>% 
     left_join(dtu, by = "mgi_symbol") %>% 
-    select(mgi_symbol, ensembl_gene_id_version, description, gene_biotype, everything()) %>% 
-    select_at(vars(-matches("avg"))) %>% 
+    dplyr::select(mgi_symbol, ensembl_gene_id_version, description, gene_biotype, everything()) %>% 
+    select_at(vars(-matches("avg")))
+
+pvalues %>% 
     knitr::kable(format = "html") %>%
     kableExtra::kable_styling() %>%
     kableExtra::scroll_box(width = "100%", height = "600px")
+```
+
+## Upset
+
+```{r upset}
+pvalues %>% 
+    select_at(vars(matches("ensembl|padj"))) %>% 
+    mutate_if(is.numeric, function(x) as.integer(x < .05)) %>%
+    tidyr::drop_na(ensembl_gene_id_version) %>%
+    as.data.frame() %>%
+    tibble::column_to_rownames("ensembl_gene_id_version") %>%
+    upset(nsets = 6, keep.order = TRUE,
+        nintersects = 15,
+        order.by = "freq")
+```
+
+## Individual genes
+
+```{r}
+txdb <- loadDb(snakemake@input[["txdb"]])
+txdb_dump <- as.list(txdb)
+
+plot.transcripts <- function(gene_id) {
+    gene_info <- AnnotationDbi::select(txdb, keys = gene_id,
+            keytype = "GENEID",
+            columns = c("TXCHROM", "TXSTART", "TXEND")) %>%
+        as_tibble() %>%
+        group_by(GENEID) %>%
+        summarise(TXCHROM = unique(TXCHROM),
+            TXSTART = min(TXSTART),
+            TXEND = max(TXEND))
+    
+    # subset txdb
+    all_tx <- AnnotationDbi::select(txdb, gene_id, 
+        c("GENEID", "TXNAME"),
+        "GENEID") %>% 
+        pull(TXNAME)
+    
+    all_tx_ids <- txdb_dump[[1]] %>%
+        as_tibble() %>% 
+        filter(tx_name %in% all_tx) %>% 
+        pull(tx_id)
+
+    new_txdb_dump <- vector("list", 4)
+    new_txdb_dump[1:3] <- txdb_dump[1:3] %>%
+        purrr::map(filter, tx_id %in% all_tx_ids)
+    new_txdb_dump[4] <- txdb_dump[4]
+    
+    new_txdb <- do.call(makeTxDb, new_txdb_dump)
+
+    # annotation track
+    atrack <- GeneRegionTrack(new_txdb, chromosome = gene_info$TXCHROM,
+        from = gene_info$TXSTART, to = gene_info$TXEND,
+        name = "GENCODE M23")
+
+    gtrack <- GenomeAxisTrack()
+    
+    sTrack <- SequenceTrack(snakemake@input[["genome"]],
+        genome = "mm10", chromosome = gene_info$TXCHROM)
+
+    # bam files
+    teloprime_warm <- AlignmentsTrack(snakemake@input[["teloprime_warm"]],
+        isPaired = FALSE,
+        genome = "mm10",
+        name = "Teloprime 22°C",
+        chromosome = gene_info$TXCHROM,
+        start = gene_info$TXSTART,
+        end = gene_info$TXEND)
+
+    teloprime_cold <- AlignmentsTrack(snakemake@input[["teloprime_cold"]],
+        isPaired = FALSE,
+        genome = "mm10",
+        name = "Teloprime 4°C",
+        chromosome = gene_info$TXCHROM,
+        start = gene_info$TXSTART,
+        end = gene_info$TXEND)
+    
+    cdna_warm <- AlignmentsTrack(snakemake@input[["cdna_warm"]],
+        isPaired = FALSE,
+        genome = "mm10",
+        name = "cDNA 22°C",
+        chromosome = gene_info$TXCHROM,
+        start = gene_info$TXSTART,
+        end = gene_info$TXEND)
+
+    cdna_cold <- AlignmentsTrack(snakemake@input[["cdna_cold"]],
+        isPaired = FALSE,
+        genome = "mm10",
+        name = "cDNA 4°C",
+        chromosome = gene_info$TXCHROM,
+        start = gene_info$TXSTART,
+        end = gene_info$TXEND)
+    
+    illumina_warm <- AlignmentsTrack(snakemake@input[["illumina_warm"]],
+        isPaired = TRUE,
+        genome = "mm10",
+        name = "Illumina 22°C",
+        chromosome = gene_info$TXCHROM,
+        start = gene_info$TXSTART,
+        end = gene_info$TXEND)
+
+    illumina_cold <- AlignmentsTrack(snakemake@input[["illumina_cold"]],
+        isPaired = TRUE,
+        genome = "mm10",
+        name = "Illumina 4°C",
+        chromosome = gene_info$TXCHROM,
+        start = gene_info$TXSTART,
+        end = gene_info$TXEND)
+
+    options(ucscChromosomeNames = FALSE)
+    
+    plotTracks(list(gtrack, illumina_warm, illumina_cold, teloprime_warm, teloprime_cold, cdna_warm, cdna_cold, atrack),
+        just.group = "above",
+        transcriptAnnotation = "transcript",
+        from = gene_info$TXSTART,
+        to = gene_info$TXEND,
+        type = c("coverage", "sashimi"),
+        extend.left = 250,
+        extend.right = 250,
+        background.title = "darkblue",
+        fontsize = 12, cex.axis = .4,
+        min.height = 0, coverageHeight = 0.08, minCoverageHeight = 0)
+}
+```
+
+```{r}
+plot.transcripts(pvalues$ensembl_gene_id_version[[1]])
 ```
 

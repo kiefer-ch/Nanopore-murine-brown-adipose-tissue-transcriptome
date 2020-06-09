@@ -236,6 +236,7 @@ for (ens_gene_id in gene_ids) {
             width = .5, lwd = .25,
             position = position_dodge(width = .5)) +
         scale_color_colorblind() +
+        scale_y_log10() +
         theme_tufte() +
         geom_rangeframe(sides = "l") +
         xlab("T [°C]")

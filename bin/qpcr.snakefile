@@ -12,7 +12,15 @@ rule qpcr_dtu_validation:
         cq1 = "data/qpcr/200514/200514_bl6_dtu_1.txt",
         cq2 = "data/qpcr/200514/200514_bl6_dtu_2.txt",
         sample_info = "sample_info/sampleInfo.csv",
-        signif = "res/comparisons/comparisons_dtu_significant.csv"
+        signif = "res/comparisons/comparisons_dtu_significant.csv",
+        txdb = "annotation/annotation_txdb.sqlite",
+        illumina_cold = "bam/illumina/5034_S33_Aligned.sortedByCoord.out.bam",
+        illumina_warm = "bam/illumina/5035_S34_Aligned.sortedByCoord.out.bam",
+        teloprime_cold = "bam/teloprime/barcode01_genome.bam",
+        teloprime_warm = "bam/teloprime/barcode02_genome.bam",
+        cdna_cold = "bam/cdna/barcode07_genome.bam",
+        cdna_warm = "bam/cdna/barcode08_genome.bam",
+        genome = "annotation/genome.fa"
     output:
         "res/qpcr/qpcr_dtu_validation.html"
     script:
