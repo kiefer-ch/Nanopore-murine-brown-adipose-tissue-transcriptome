@@ -366,9 +366,6 @@ plot.transcripts <- function(gene_id) {
 
     gtrack <- GenomeAxisTrack()
     
-    sTrack <- SequenceTrack(snakemake@input[["genome"]],
-        genome = "mm10", chromosome = gene_info$TXCHROM)
-
     # bam files
     teloprime_warm <- AlignmentsTrack(snakemake@input[["teloprime_warm"]],
         isPaired = FALSE,
@@ -420,8 +417,11 @@ plot.transcripts <- function(gene_id) {
 
     options(ucscChromosomeNames = FALSE)
     
-    plotTracks(list(gtrack, illumina_warm, illumina_cold, teloprime_warm, teloprime_cold, cdna_warm, cdna_cold, atrack),
-        just.group = "above",
+    plotTracks(list(gtrack, 
+            illumina_warm, illumina_cold, 
+            #teloprime_warm, teloprime_cold, 
+            #cdna_warm, cdna_cold, 
+            atrack),
         transcriptAnnotation = "transcript",
         from = gene_info$TXSTART,
         to = gene_info$TXEND,
