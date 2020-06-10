@@ -328,26 +328,18 @@ pvalues %>%
 ## Individual genes
 
 ```{r browserPlotDefinition}
-txdb <- loadDb(snakemake@input[["txdb"]])
-txdb_dump <- as.list(txdb)
+txdb_gencode <- loadDb(snakemake@input[["txdb"]])
+txdb_gencode_dump <- as.list(txdb_gencode)
+
+txdb_flair <- loadDb(snakemake@input[["txdb_flair"]])
+txdb_flair_dump <- as.list(txdb_gencode)
 
 primer_stats <- read_csv(snakemake@input[["primer_stats"]])
 
-plot.transcripts <- function(gene_id) {
-    
-    gene_info <- AnnotationDbi::select(txdb, keys = gene_id,
-            keytype = "GENEID",
-            columns = c("TXCHROM", "TXSTART", "TXEND")) %>%
-        as_tibble() %>%
-        group_by(GENEID) %>%
-        summarise(TXCHROM = unique(TXCHROM),
-            TXSTART = min(TXSTART),
-            TXEND = max(TXEND))
+subset.txdb <- function(txdb, txdb_dump, gene_id) {
 
-    # subset txdb
     all_tx <- AnnotationDbi::select(txdb, gene_id,
-        c("GENEID", "TXNAME"),
-        "GENEID") %>%
+            c("GENEID", "TXNAME"), "GENEID") %>%
         pull(TXNAME)
 
     all_tx_ids <- txdb_dump[[1]] %>%
@@ -360,10 +352,30 @@ plot.transcripts <- function(gene_id) {
         purrr::map(filter, tx_id %in% all_tx_ids)
     new_txdb_dump[4] <- txdb_dump[4]
 
-    new_txdb <- do.call(makeTxDb, new_txdb_dump)
+    do.call(makeTxDb, new_txdb_dump)
+}
+
+plot.transcripts <- function(gene_id) {
+    
+    gene_info <- AnnotationDbi::select(txdb_gencode, keys = gene_id,
+            keytype = "GENEID",
+            columns = c("TXCHROM", "TXSTART", "TXEND")) %>%
+        as_tibble() %>%
+        group_by(GENEID) %>%
+        summarise(TXCHROM = unique(TXCHROM),
+            TXSTART = min(TXSTART),
+            TXEND = max(TXEND))
 
     # annotation track
-    atrack <- GeneRegionTrack(new_txdb, chromosome = gene_info$TXCHROM,
+    txdb_gencode_sub <- subset.txdb(txdb_gencode, txdb_gencode_dump, gene_id)
+    
+    atrack_gencode <- GeneRegionTrack(txdb_gencode_sub, chromosome = gene_info$TXCHROM,
+        from = gene_info$TXSTART, to = gene_info$TXEND,
+        name = "GENCODE M23")
+    
+    txdb_flair_sub <- subset.txdb(txdb_flair, txdb_flair_dump, gene_id)
+    
+    atrack_flair <- GeneRegionTrack(txdb_flair_sub, chromosome = gene_info$TXCHROM,
         from = gene_info$TXSTART, to = gene_info$TXEND,
         name = "GENCODE M23")
 
@@ -448,7 +460,7 @@ plot.transcripts <- function(gene_id) {
             illumina_warm, illumina_cold,
             teloprime_warm, teloprime_cold,
             cdna_warm, cdna_cold,
-            atrack, primerTrack),
+            atrack_gencode, atrack_flair, primerTrack),
         transcriptAnnotation = "transcript",
         from = gene_info$TXSTART,
         to = gene_info$TXEND,
@@ -459,11 +471,41 @@ plot.transcripts <- function(gene_id) {
         fontsize = 12, cex.axis = .4,
         min.height = 0,
         sashimiScore = 5,
-        sizes = c(.5, rep(1, 6), 1, .5))
+        sizes = c(.5, rep(1, 6), rep(1, 2), .5))
 }
 ```
 
 ```{r}
-plot.transcripts("ENSMUSG00000029167.13")
+for (gene in pvalues$ensembl_gene_id_version) {
+    
+    gene_p <- pvalues %>% 
+        filter(ensembl_gene_id_version == gene)
+    
+    print(gene_p$mgi_symbol)
+    
+    plot.transcripts(gene)
+    
+    pl <- df %>%
+        filter(grepl(gene_p$mgi_symbol, gene)) %>% 
+        mutate(condition_temp = relevel(condition_temp, "22")) %>%
+        tidyr::separate(gene, c("gene", "isoform"), sep = '_') %>%
+        tidyr::drop_na() %>%
+        ggplot(aes(condition_temp, 2^-dcq, colour = isoform)) +
+        geom_point(size = 1,
+            position = position_dodge(width = .5)) +
+        stat_summary(geom = "crossbar",
+            fun.data = mean_se,
+            width = .25, lwd = .25,
+            position = position_dodge(width = .5)) +
+        scale_y_log10(labels = function(x) x) +
+        theme_tufte(base_size = 8) +
+        geom_rangeframe(colour = "black") +
+        ylab("rel. expr. vs. Gtf2b/Hprt") +
+        xlab("temperature") +
+        scale_color_colorblind()
+    
+    print(pl)
+}
+
 ```
 
