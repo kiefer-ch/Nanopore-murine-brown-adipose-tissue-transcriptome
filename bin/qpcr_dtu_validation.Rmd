@@ -367,7 +367,9 @@ plot.transcripts <- function(gene_id) {
         from = gene_info$TXSTART, to = gene_info$TXEND,
         name = "GENCODE M23")
 
-    gtrack <- GenomeAxisTrack()
+    gtrack <- GenomeAxisTrack(from = gene_info$TXSTART, 
+        to = gene_info$TXEND,
+        scale = 0.5)
 
     # bam files
     teloprime_warm <- AlignmentsTrack(snakemake@input[["teloprime_warm"]],
