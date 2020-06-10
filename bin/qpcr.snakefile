@@ -20,7 +20,8 @@ rule qpcr_dtu_validation:
         teloprime_warm = "bam/teloprime/barcode02_genome.bam",
         cdna_cold = "bam/cdna/barcode07_genome.bam",
         cdna_warm = "bam/cdna/barcode08_genome.bam",
-        genome = "annotation/genome.fa"
+        genome = "annotation/genome.fa",
+        primer_stats = "res/christoph/primer_design/200331_primer.csv"
     output:
         "res/qpcr/qpcr_dtu_validation.html"
     script:
