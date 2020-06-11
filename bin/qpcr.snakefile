@@ -15,12 +15,12 @@ rule qpcr_dtu_validation:
         signif = "res/comparisons/comparisons_dtu_significant.csv",
         txdb = "annotation/annotation_txdb.sqlite",
         txdb_flair = "flair/cdna/flair.collapse.isoforms_txdb.sqlite",
-        illumina_cold = "bam/illumina/5034_S33_Aligned.sortedByCoord.out.bam",
-        illumina_warm = "bam/illumina/5035_S34_Aligned.sortedByCoord.out.bam",
-        teloprime_cold = "bam/teloprime/barcode01_genome.bam",
-        teloprime_warm = "bam/teloprime/barcode02_genome.bam",
-        cdna_cold = "bam/cdna/barcode07_genome.bam",
-        cdna_warm = "bam/cdna/barcode08_genome.bam",
+        illumina_warm = "bam/illumina/5034_S33_Aligned.sortedByCoord.out.bam",
+        illumina_cold = "bam/illumina/5035_S34_Aligned.sortedByCoord.out.bam",
+        teloprime_warm = "bam/teloprime/barcode01_genome.bam",
+        teloprime_cold = "bam/teloprime/barcode02_genome.bam",
+        cdna_warm = "bam/cdna/barcode07_genome.bam",
+        cdna_cold = "bam/cdna/barcode08_genome.bam",
         genome = "annotation/genome.fa",
         primer_stats = "res/christoph/primer_design/200331_primer.csv"
     output:
