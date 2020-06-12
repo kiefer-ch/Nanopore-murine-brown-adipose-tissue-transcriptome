@@ -13,7 +13,7 @@ rule qpcr_dtu_validation:
         cq2 = "data/qpcr/200514/200514_bl6_dtu_2.txt",
         cq3 = "data/qpcr/200611/200611_bl6_dtu_3.txt",
         sample_info = "sample_info/sampleInfo.csv",
-        signif = "res/comparisons/comparisons_dtu_significant.csv",
+        signif = "res/comparisons/comparisons_dtu_all.rds",
         txdb = "annotation/annotation_txdb.sqlite",
         txdb_flair = "flair/cdna/flair.collapse.isoforms_txdb.sqlite",
         illumina_warm = "bam/illumina/5034_S33_Aligned.sortedByCoord.out.bam",

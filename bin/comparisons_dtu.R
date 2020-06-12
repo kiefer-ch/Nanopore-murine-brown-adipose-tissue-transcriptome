@@ -46,10 +46,14 @@ df <- list(drimseq, dexseq) %>%
     reduce(full_join, by = c("ensembl_gene_id_version", "gene_biotype")) %>%
     mutate_if(is.numeric, function(x) tidyr::replace_na(x, 1))
 
-df %>%
-    saveRDS(snakemake@output[["all"]])
 
 biomart <- read_rds(snakemake@input[["biomaRt_gene"]])
+
+df %>%
+    select(-gene_biotype) %>%
+    left_join(biomart, by = "ensembl_gene_id_version") %>%
+    select(ensembl_gene_id_version, mgi_symbol, description, gene_biotype, everything()) %>%
+    saveRDS(snakemake@output[["all"]])
 
 df_sub <- df %>%
     select(-gene_biotype) %>%

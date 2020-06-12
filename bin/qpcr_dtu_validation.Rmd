@@ -18,6 +18,7 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = FA
 ```
 
 ```{r library, include=FALSE}
+save.image()
 source(".Rprofile")
 library("dplyr")
 library("readr")
@@ -323,7 +324,7 @@ df %>%
 ## Overview of p-values in seq datasets
 
 ```{r}
-dtu <- read_csv(snakemake@input[["signif"]])
+dtu <- read_rds(snakemake@input[["signif"]])
 
 pvalues <- pvalues %>%
     dplyr::select(-qpcr_p, -sign) %>%
@@ -360,7 +361,12 @@ txdb_gencode_dump <- as.list(txdb_gencode)
 txdb_flair <- loadDb(snakemake@input[["txdb_flair"]])
 txdb_flair_dump <- as.list(txdb_flair)
 
-primer_stats <- read_csv(snakemake@input[["primer_stats"]])
+primer_stats <- read_csv(snakemake@input[["primer_stats"]]) %>% 
+    dplyr::select(mgi_symbol, ensembl_gene_id_version, primer_name, amplified_region) %>% 
+    tidyr::separate(amplified_region, c("chr", "start", "end")) %>% 
+    mutate_at(vars(matches("start|end")), as.integer) %>% 
+    dplyr::select(-chr)    
+
 
 subset.txdb <- function(txdb, txdb_dump, gene_id) {
 
@@ -391,6 +397,9 @@ plot.transcripts <- function(gene_id) {
         summarise(TXCHROM = unique(TXCHROM),
             TXSTART = min(TXSTART),
             TXEND = max(TXEND))
+    
+    primer_info <- primer_stats %>% 
+        filter(ensembl_gene_id_version == gene_id)
 
     # annotation track
     txdb_gencode_sub <- subset.txdb(txdb_gencode, txdb_gencode_dump, gene_id)
@@ -460,14 +469,7 @@ plot.transcripts <- function(gene_id) {
         start = gene_info$TXSTART,
         end = gene_info$TXEND)
     
-    # primer track
-    primer_info <- primer_stats %>% 
-        filter(ensembl_gene_id_version == gene_id) %>% 
-        dplyr::select(mgi_symbol, primer_name, amplified_region) %>% 
-        tidyr::separate(amplified_region, c("chr", "start", "end")) %>% 
-        mutate_at(vars(matches("start|end")), as.integer)
-    
-    primerTrack <- AnnotationTrack(
+   primerTrack <- AnnotationTrack(
         start = c(primer_info[1, ]$start, primer_info[1, ]$end - 20, 
             primer_info[2, ]$start, primer_info[2, ]$end - 20), 
         width = rep(20, 4),
@@ -504,35 +506,38 @@ plot.transcripts <- function(gene_id) {
 ```
 
 ```{r}
-for (gene in pvalues$ensembl_gene_id_version[[1]]) {
+for (gene in pvalues$ensembl_gene_id_version) {
     
     gene_p <- pvalues %>% 
         filter(ensembl_gene_id_version == gene)
     
     print(gene_p$mgi_symbol)
     
-    plot.transcripts(gene)
+    primer_info <- primer_stats %>% 
+        filter(ensembl_gene_id_version == gene_id)
     
-    pl <- df %>%
-        filter(grepl(gene_p$mgi_symbol, gene)) %>% 
-        mutate(condition_temp = relevel(condition_temp, "22")) %>%
-        tidyr::separate(gene, c("gene", "isoform"), sep = '_') %>%
-        tidyr::drop_na() %>%
-        ggplot(aes(condition_temp, 2^-dcq, colour = isoform)) +
-        geom_point(size = 1,
-            position = position_dodge(width = .5)) +
-        stat_summary(geom = "crossbar",
-            fun.data = mean_se,
-            width = .25, lwd = .25,
-            position = position_dodge(width = .5)) +
-        scale_y_log10(labels = function(x) x) +
-        theme_tufte(base_size = 8) +
-        geom_rangeframe(colour = "black") +
-        ylab("rel. expr. vs. Gtf2b/Hprt") +
-        xlab("temperature") +
-        scale_color_colorblind()
-    
-    print(pl)
+    # plot.transcripts(gene)
+    # 
+    # pl <- df %>%
+    #     filter(grepl(gene_p$mgi_symbol, gene)) %>% 
+    #     mutate(condition_temp = relevel(condition_temp, "22")) %>%
+    #     tidyr::separate(gene, c("gene", "isoform"), sep = '_') %>%
+    #     tidyr::drop_na() %>%
+    #     ggplot(aes(condition_temp, 2^-dcq, colour = isoform)) +
+    #     geom_point(size = 1,
+    #         position = position_dodge(width = .5)) +
+    #     stat_summary(geom = "crossbar",
+    #         fun.data = mean_se,
+    #         width = .25, lwd = .25,
+    #         position = position_dodge(width = .5)) +
+    #     scale_y_log10(labels = function(x) x) +
+    #     theme_tufte(base_size = 8) +
+    #     geom_rangeframe(colour = "black") +
+    #     ylab("rel. expr. vs. Gtf2b/Hprt") +
+    #     xlab("temperature") +
+    #     scale_color_colorblind()
+    # 
+    # print(pl)
 }
 
 ```
