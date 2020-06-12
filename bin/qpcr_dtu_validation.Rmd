@@ -417,7 +417,7 @@ plot.transcripts <- function(gene_id) {
 
     gtrack <- GenomeAxisTrack(from = gene_info$TXSTART, 
         to = gene_info$TXEND,
-        scale = 0.5)
+        scale = 0.25)
 
     # bam files
     teloprime_warm <- AlignmentsTrack(snakemake@input[["teloprime_warm"]],
@@ -499,10 +499,8 @@ plot.transcripts <- function(gene_id) {
         background.title = "darkblue",
         cex.axis = .4,
         min.height = 0,
-        sashimiScore = 5)
-#        sizes = c(.5, 
- #           #rep(1, 6),
-  #          rep(1, 2), .5))
+        sashimiScore = 5,
+        sizes = c(.25, rep(1, 6), rep(1, 2), .25))
 }
 ```
 
