@@ -407,14 +407,12 @@ plot.transcripts <- function(gene_id) {
     
     atrack_gencode <- GeneRegionTrack(txdb_gencode_sub, chromosome = gene_info$TXCHROM,
         from = gene_info$TXSTART, to = gene_info$TXEND,
-        just.group = "above",
         name = "GENCODE M23")
     
     txdb_flair_sub <- subset.txdb(txdb_flair, txdb_flair_dump, gene_id)
     
     atrack_flair <- GeneRegionTrack(txdb_flair_sub, chromosome = gene_info$TXCHROM,
         from = gene_info$TXSTART, to = gene_info$TXEND,
-        just.group = "above",
         name = "flair cDNA")
 
     gtrack <- GenomeAxisTrack(from = gene_info$TXSTART, 
@@ -474,16 +472,14 @@ plot.transcripts <- function(gene_id) {
         start = c(primer_info[1, ]$start, primer_info[1, ]$end - 20, 
             primer_info[2, ]$start, primer_info[2, ]$end - 20), 
         width = rep(20, 4),
-        strand = c('+', '-','+', '-'),
         group = rep(c(paste(primer_info[1, ]$mgi_symbol, primer_info[1, ]$primer_name), 
                 paste(primer_info[2, ]$mgi_symbol, primer_info[2, ]$primer_name)),
             each = 2),
         genome = "mm10",
-        chromosome = gene_info$TXCHROM, 
+        chromosome = gene_info$TXCHROM,
         name = "RT-qPCR",
         shape = "box",
-        groupAnnotation = "group", 
-        just.group = "above")
+        groupAnnotation = "group")
     
     options(ucscChromosomeNames = FALSE)
 
@@ -491,7 +487,9 @@ plot.transcripts <- function(gene_id) {
             illumina_warm, illumina_cold,
             teloprime_warm, teloprime_cold,
             cdna_warm, cdna_cold,
-            atrack_gencode, atrack_flair, primerTrack),
+            atrack_gencode,
+            atrack_flair,
+            primerTrack),
         transcriptAnnotation = "transcript",
         from = gene_info$TXSTART,
         to = gene_info$TXEND,
@@ -501,8 +499,10 @@ plot.transcripts <- function(gene_id) {
         background.title = "darkblue",
         cex.axis = .4,
         min.height = 0,
-        sashimiScore = 5,
-        sizes = c(.5, rep(1, 6), rep(1, 2), .5))
+        sashimiScore = 5)
+#        sizes = c(.5, 
+ #           #rep(1, 6),
+  #          rep(1, 2), .5))
 }
 ```
 
@@ -514,10 +514,8 @@ for (gene in pvalues$ensembl_gene_id_version) {
     
     print(gene_p$mgi_symbol)
     
-    primer_info <- primer_stats %>% 
-        filter(ensembl_gene_id_version == gene_id)
+    plot.transcripts(gene)
     
-    # plot.transcripts(gene)
     # 
     # pl <- df %>%
     #     filter(grepl(gene_p$mgi_symbol, gene)) %>% 
