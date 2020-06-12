@@ -11,6 +11,7 @@ rule qpcr_dtu_validation:
     input:
         cq1 = "data/qpcr/200514/200514_bl6_dtu_1.txt",
         cq2 = "data/qpcr/200514/200514_bl6_dtu_2.txt",
+        cq3 = "data/qpcr/200611/200611_bl6_dtu_3.txt",
         sample_info = "sample_info/sampleInfo.csv",
         signif = "res/comparisons/comparisons_dtu_significant.csv",
         txdb = "annotation/annotation_txdb.sqlite",

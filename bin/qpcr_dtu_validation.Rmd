@@ -18,7 +18,6 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = FA
 ```
 
 ```{r library, include=FALSE}
-save.image()
 source(".Rprofile")
 library("dplyr")
 library("readr")
@@ -38,6 +37,8 @@ genes1 <- c("Gtf2b", "Hprt", "Cars2_long", "Cars2_short", "Scp2_5p", "Scp2_3p",
 genes2 <- c("Pex6_long", "Pex6_all", "Mlxipl_long", "Mlxipl_short",
     "Dipk1b_short", "Dipk1b_long", "Acsl5_short", "Acsl5_long", "Gnas_long",
     "Gnas_short", "Aldoa_long", "Aldoa_short")
+genes3 <- c("Adcy3_long", "Adcy3_short", "Lipe_long", "Lipe_short",
+    "Ppargc1a_long", "Ppargc1a_short", "Pde4d_long", "Pde4d_short")
 hkp <- c("Gtf2b", "Hprt")
 notPass <- c()
 ```
@@ -109,7 +110,16 @@ df2 <- get.pipettingScheme(
         decimal_mark = '.') %>%
     mutate(cq = if_else(pos %in% notPass, NA_real_, cq))
 
-df <- list(df1, df2)
+df3 <- get.pipettingScheme(
+        genes = genes3,
+        sampleInfo = sample_info,
+        nrow = 16) %>%
+    import.LCcq(file = snakemake@input[["cq3"]],
+        decimal_mark = '.') %>%
+    mutate(cq = if_else(pos %in% notPass, NA_real_, cq)) %>% 
+    filter(sample_id != "190220_5_iBAT") # there was not enough cDNA left
+
+df <- list(df1, df2, df3)
 ```
 
 ```{r detectOutliers, warning=FALSE}
@@ -173,6 +183,22 @@ df[[2]] %>%
     scale_color_colorblind()
 ```
 
+## Plate 3
+
+```{r plotCq3}
+df[[3]] %>%
+    ggplot(aes(paste(sample_id, condition_temp), -cq)) +
+    geom_point(aes(colour = high_var)) +
+    geom_text_repel(aes(label = pos),
+        family = "serif", size = 2) +
+    facet_wrap(~gene) +
+    theme_tufte(base_size = 8) +
+    geom_rangeframe() +
+    ylab("cq") +
+    xlab(NULL) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    scale_color_colorblind()
+```
 
 # \(\Delta\)Cq
 
@@ -378,6 +404,7 @@ plot.transcripts <- function(gene_id) {
     
     atrack_flair <- GeneRegionTrack(txdb_flair_sub, chromosome = gene_info$TXCHROM,
         from = gene_info$TXSTART, to = gene_info$TXEND,
+        just.group = "above",
         name = "flair cDNA")
 
     gtrack <- GenomeAxisTrack(from = gene_info$TXSTART, 
@@ -477,7 +504,7 @@ plot.transcripts <- function(gene_id) {
 ```
 
 ```{r}
-for (gene in pvalues$ensembl_gene_id_version) {
+for (gene in pvalues$ensembl_gene_id_version[[1]]) {
     
     gene_p <- pvalues %>% 
         filter(ensembl_gene_id_version == gene)
