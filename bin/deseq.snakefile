@@ -152,7 +152,8 @@ rule deseq_exportCm_ont:
     params:
         tpm = 0,
         level = "{level}",
-        vst = 0
+        vst = 0,
+        repl = 1
     wildcard_constraints:
         dataset = "teloprime|cdna",
         level = "genelevel|txlevel",

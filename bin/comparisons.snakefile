@@ -30,9 +30,9 @@ rule quantification_correlation:
 rule counts_pca:
     input:
         tx_counts = expand("res/deseq/{dataset}/txlevel/{dataset}_txlevel_cm_cts.csv.gz",
-                           dataset=["cdna", "teloprime", "illumina"]),
+                           dataset=["cdna", "teloprime", "illumina", "rna"]),
         gene_counts = expand("res/deseq/{dataset}/genelevel/{dataset}_genelevel_cm_cts.csv.gz",
-                             dataset=["cdna", "teloprime", "illumina"]),
+                             dataset=["cdna", "teloprime", "illumina", "rna"]),
         sample_info = "sample_info/sampleInfo.csv"
     output:
         "res/comparisons/comparisons_countsPCA.html"
