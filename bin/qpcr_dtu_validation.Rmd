@@ -275,7 +275,8 @@ df %>%
 
 ## Gene level
 
-Interaction terms from linear models.
+This section contains the p value from the interaction terms from linear models.
+It corresponds to the differential transcript usage.
 
 ```{r}
 pvalues <- df %>%
@@ -300,7 +301,8 @@ pvalues %>%
 
 ## Isoform level
 
-t-test
+This section contains t-tests on isoform level. It corresponds to differential
+transcript expression in the sequencing datasets.
 
 ```{r}
 df %>%
@@ -405,13 +407,15 @@ plot.transcripts <- function(gene_id) {
     # annotation track
     txdb_gencode_sub <- subset.txdb(txdb_gencode, txdb_gencode_dump, gene_id)
     
-    atrack_gencode <- GeneRegionTrack(txdb_gencode_sub, chromosome = gene_info$TXCHROM,
+    atrack_gencode <- GeneRegionTrack(txdb_gencode_sub,
+        chromosome = gene_info$TXCHROM,
         from = gene_info$TXSTART, to = gene_info$TXEND,
         name = "GENCODE M23")
     
     txdb_flair_sub <- subset.txdb(txdb_flair, txdb_flair_dump, gene_id)
     
-    atrack_flair <- GeneRegionTrack(txdb_flair_sub, chromosome = gene_info$TXCHROM,
+    atrack_flair <- GeneRegionTrack(txdb_flair_sub,
+        chromosome = gene_info$TXCHROM,
         from = gene_info$TXSTART, to = gene_info$TXEND,
         name = "flair cDNA")
 
@@ -479,7 +483,8 @@ plot.transcripts <- function(gene_id) {
         chromosome = gene_info$TXCHROM,
         name = "RT-qPCR",
         shape = "box",
-        groupAnnotation = "group")
+        groupAnnotation = "group",
+        just.group = "above")
     
     options(ucscChromosomeNames = FALSE)
 
@@ -490,7 +495,6 @@ plot.transcripts <- function(gene_id) {
             atrack_gencode,
             atrack_flair,
             primerTrack),
-        transcriptAnnotation = "transcript",
         from = gene_info$TXSTART,
         to = gene_info$TXEND,
         type = c("coverage", "sashimi"),
@@ -500,41 +504,54 @@ plot.transcripts <- function(gene_id) {
         cex.axis = .4,
         min.height = 0,
         sashimiScore = 5,
-        sizes = c(.25, rep(1, 6), rep(1, 2), .25))
+        sizes = c(.25, rep(1, 6), rep(1, 2), .5))
 }
 ```
 
-```{r}
+```{r loop, results="asis"}
 for (gene in pvalues$ensembl_gene_id_version) {
     
     gene_p <- pvalues %>% 
         filter(ensembl_gene_id_version == gene)
     
-    print(gene_p$mgi_symbol)
+    gene_p %>% 
+        dplyr::select(mgi_symbol, ensembl_gene_id_version) %>% 
+        knitr::kable(format = "html") %>%
+        kableExtra::kable_styling() %>% 
+        print()
+    
+    gene_p %>% 
+        dplyr::select_at(vars(matches("padj"))) %>% 
+        tidyr::gather("dataset", "padj") %>% 
+        mutate(sign = symnum(padj,
+        cutpoints = c(0, .001, .01, .05, .1, 1),
+        symbols = c("***", "**", "*", ".", " "))) %>% 
+        knitr::kable(format = "html") %>%
+        kableExtra::kable_styling() %>% 
+        print()
     
     plot.transcripts(gene)
-    
-    # 
-    # pl <- df %>%
-    #     filter(grepl(gene_p$mgi_symbol, gene)) %>% 
-    #     mutate(condition_temp = relevel(condition_temp, "22")) %>%
-    #     tidyr::separate(gene, c("gene", "isoform"), sep = '_') %>%
-    #     tidyr::drop_na() %>%
-    #     ggplot(aes(condition_temp, 2^-dcq, colour = isoform)) +
-    #     geom_point(size = 1,
-    #         position = position_dodge(width = .5)) +
-    #     stat_summary(geom = "crossbar",
-    #         fun.data = mean_se,
-    #         width = .25, lwd = .25,
-    #         position = position_dodge(width = .5)) +
-    #     scale_y_log10(labels = function(x) x) +
-    #     theme_tufte(base_size = 8) +
-    #     geom_rangeframe(colour = "black") +
-    #     ylab("rel. expr. vs. Gtf2b/Hprt") +
-    #     xlab("temperature") +
-    #     scale_color_colorblind()
-    # 
-    # print(pl)
+
+    pl <- df %>%
+        filter(grepl(gene_p$mgi_symbol, gene)) %>%
+        mutate(condition_temp = relevel(condition_temp, "22")) %>%
+        tidyr::separate(gene, c("gene", "isoform"), sep = '_') %>%
+        tidyr::drop_na() %>%
+        ggplot(aes(condition_temp, 2^-dcq, colour = isoform)) +
+        geom_point(size = 1,
+            position = position_dodge(width = .5)) +
+        stat_summary(geom = "crossbar",
+            fun.data = mean_se,
+            width = .25, lwd = .25,
+            position = position_dodge(width = .5)) +
+        scale_y_log10(labels = function(x) x) +
+        theme_tufte(base_size = 8) +
+        geom_rangeframe(colour = "black") +
+        ylab("rel. expr. vs. Gtf2b/Hprt") +
+        xlab("temperature") +
+        scale_color_colorblind()
+
+    print(pl)
 }
 
 ```
