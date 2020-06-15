@@ -81,6 +81,32 @@ rule import_deseq_cdna_tx:
         "deseq_cDNA.R"
 
 
+rule import_deseq_rna_gene:
+    input:
+        counts = expand("res/wien/direct_RNA/ChrKiefer_20200306/counts_per_transcript/transcriptome_{temp}_q7_counts.tsv.gz",
+            temp=["cool", "rt"])
+    params:
+        txOut = 0,
+        design = "~condition_temp"
+    output:
+        dds = "res/deseq/rna/genelevel/rna_genelevel_dds.rds"
+    script:
+        "deseq_rna.R"
+
+
+rule import_deseq_rna_tx:
+    input:
+        counts = expand("res/wien/direct_RNA/ChrKiefer_20200306/counts_per_transcript/transcriptome_{temp}_q7_counts.tsv.gz",
+            temp=["cool", "rt"])
+    params:
+        txOut = 1,
+        design = "~condition_temp"
+    output:
+        dds = "res/deseq/rna/txlevel/rna_txlevel_dds.rds"
+    script:
+        "deseq_rna.R"
+
+
 # qc
 rule deseq_qc:
     input:
