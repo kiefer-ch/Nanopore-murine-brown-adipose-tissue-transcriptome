@@ -261,11 +261,12 @@ rule compare_reannotation:
 
 rule render_GOcomp:
     input:
-        "res/txlevel_ont/txlevel_ont_de.csv.gz",
-        "res/genelevel_ont/genelevel_ont_de.csv.gz",
-        "res/wien/6samples/ChrKiefer_6samples_raw_gene_counts.tsv",
-        "sample_info/sampleInfo.csv"
+        go = expand("res/deseq/{dataset}/{level}/{dataset}_{level}_apeglm_topgo.rds",
+            dataset=["illumina", "cdna", "teloprime"],
+            level=["txlevel", "genelevel"])
+    params:
+        cutoff = .01
     output:
-        "res/comparisons/go.html"
+        "res/comparisons/comparisons_go.html"
     script:
-        "bin/comparions_go_ont.Rmd"
+        "comparisons_go.Rmd"

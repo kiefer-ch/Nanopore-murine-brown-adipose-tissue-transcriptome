@@ -5,6 +5,7 @@ library("readr")
 library("dplyr")
 library("purrr")
 library("topGO")
+library("org.Mm.eg.db")
 
 ################################################################################
 #
@@ -57,7 +58,7 @@ make.topGO <- function(geneList, description) {
 # conveniance function to get results from topGO
 get.results <- function(topGO) {
     topGOres <- runTest(topGO, algorithm = "parentchild", statistic = "fisher")
-    GenTable(topGO, p = topGOres, orderBy = "p", ranksOf = "p", topNodes = 10) %>%
+    GenTable(topGO, p = topGOres, orderBy = "p", ranksOf = "p", topNodes = 100) %>%
         as_tibble() %>%
         mutate(p = as.double(p))
 }
