@@ -23,31 +23,34 @@ if (snakemake@params[["level"]] == "txlevel") {
 dds <- readRDS(snakemake@input[["dds"]])
 biomart <- readRDS(snakemake@input[["biomart"]])
 
-# prepare countmatrices
-if (snakemake@params[["vst"]] == 1) {
-    rld <- vst(dds, blind = FALSE)
-} else {
-    rld <- rlog(dds, blind = FALSE)
-}
-
+# simple log2(x+1) + median gene normalisation
 ntd <- normTransform(dds)
 
-
-# with variance shrinking
-assay(rld) %>%
-    as_tibble(rownames = id) %>%
-    left_join(biomart, by = id) %>%
-    dplyr::select(starts_with("ensembl_"), mgi_symbol, description,
-        gene_biotype, everything()) %>%
-    write_csv(snakemake@output[["rld"]])
-
-# without
 assay(ntd) %>%
     as_tibble(rownames = id) %>%
     left_join(biomart, by = id) %>%
     dplyr::select(starts_with("ensembl_"), mgi_symbol, description,
         gene_biotype, everything()) %>%
     write_csv(snakemake@output[["ntd"]])
+
+# rlog normalisation
+if (snakemake@params[["repl"]] == 1) {
+
+    # prepare countmatrices
+    if (snakemake@params[["vst"]] == 1) {
+        rld <- vst(dds, blind = FALSE)
+    } else {
+        rld <- rlog(dds, blind = FALSE)
+    }
+
+    # write to disc
+    assay(rld) %>%
+        as_tibble(rownames = id) %>%
+        left_join(biomart, by = id) %>%
+        dplyr::select(starts_with("ensembl_"), mgi_symbol, description,
+            gene_biotype, everything()) %>%
+        write_csv(snakemake@output[["rld"]])
+}
 
 # tpm
 # https://haroldpimentel.wordpress.com/2014/05/08/what-the-fpkm-a-review-rna-seq-expression-units/

@@ -132,7 +132,8 @@ rule deseq_exportCm_illumina:
     params:
         tpm = 1,
         level = "{level}",
-        vst = 0
+        vst = 0,
+        repl = 1
     output:
         cts = "{file_path}/illumina_{level}_cm_cts.csv.gz",
         ntd = "{file_path}/illumina_{level}_cm_ntd.csv.gz",
@@ -154,11 +155,30 @@ rule deseq_exportCm_ont:
         vst = 0
     wildcard_constraints:
         dataset = "teloprime|cdna",
-        level = "genelevel|txlevel"
+        level = "genelevel|txlevel",
+        repl = 1
     output:
         cts = "{file_path}/{dataset}_{level}_cm_cts.csv.gz",
         ntd = "{file_path}/{dataset}_{level}_cm_ntd.csv.gz",
         rld = "{file_path}/{dataset}_{level}_cm_rld.csv.gz"
+    script:
+        "deseq_exportCm.R"
+
+rule deseq_exportCm_rna:
+    input:
+        dds = "{file_path}/{dataset}_{level}_dds.rds",
+        biomart = get_biomart
+    params:
+        tpm = 0,
+        level = "{level}",
+        vst = 0,
+        repl = 0
+    wildcard_constraints:
+        dataset = "rna",
+        level = "genelevel|txlevel"
+    output:
+        cts = "{file_path}/{dataset}_{level}_cm_cts.csv.gz",
+        ntd = "{file_path}/{dataset}_{level}_cm_ntd.csv.gz"
     script:
         "deseq_exportCm.R"
 
