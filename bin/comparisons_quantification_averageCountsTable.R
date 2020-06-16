@@ -27,16 +27,21 @@ df_gene <- c(snakemake@input[["gene_counts"]], snakemake@input[["gene_tpm"]]) %>
     bind_rows(.id = "dataset") %>%
     tidyr::separate(dataset, "dataset", extra = "drop")
 
-df_gene_average <- df_gene %>%
+df_gene %>%
+    left_join(biomaRt_gene, by = "ensembl_gene_id_version") %>%
+    left_join(biotype_groups, by = c("gene_biotype" = "transcript_biotype")) %>%
+    tidyr::spread(dataset, counts) %>%
+    mutate_if(is.numeric, tidyr::replace_na, 0) %>%
+    write_csv(snakemake@output[["gene"]])
+
+df_gene %>%
     group_by(dataset, ensembl_gene_id_version) %>%
     summarise(average_counts = mean(counts)) %>%
     left_join(biomaRt_gene, by = "ensembl_gene_id_version") %>%
-    left_join(biotype_groups, by = c("gene_biotype" = "transcript_biotype"))
-
-df_gene_average %>%
+    left_join(biotype_groups, by = c("gene_biotype" = "transcript_biotype")) %>%
     ungroup() %>%
     tidyr::spread(dataset, average_counts) %>%
-    write_csv(snakemake@output[["gene"]])
+    write_csv(snakemake@output[["gene_avg"]])
 
 # tx level
 df_tx <- c(snakemake@input[["tx_counts"]], snakemake@input[["tx_tpm"]]) %>%
@@ -48,13 +53,18 @@ df_tx <- c(snakemake@input[["tx_counts"]], snakemake@input[["tx_tpm"]]) %>%
     bind_rows(.id = "dataset") %>%
     tidyr::separate(dataset, "dataset", extra = "drop")
 
-df_tx_average <- df_tx %>%
+df_tx %>%
+    left_join(biomaRt_tx, by = "ensembl_transcript_id_version") %>%
+    left_join(biotype_groups, by = c("transcript_biotype")) %>%
+    tidyr::spread(dataset, counts) %>%
+    mutate_if(is.numeric, tidyr::replace_na, 0) %>%
+    write_csv(snakemake@output[["tx"]])
+
+df_tx %>%
     group_by(dataset, ensembl_transcript_id_version) %>%
     summarise(average_counts = mean(counts)) %>%
     left_join(biomaRt_tx, by = "ensembl_transcript_id_version") %>%
-    left_join(biotype_groups, by = "transcript_biotype")
-
-df_tx_average %>%
+    left_join(biotype_groups, by = "transcript_biotype") %>%
     ungroup() %>%
     tidyr::spread(dataset, average_counts) %>%
-    write_csv(snakemake@output[["tx"]])
+    write_csv(snakemake@output[["tx_avg"]])

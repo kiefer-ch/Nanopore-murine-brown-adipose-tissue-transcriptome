@@ -2,25 +2,29 @@
 rule quantification_averageCounts_tables:
     input:
         tx_counts = expand("res/deseq/{dataset}/txlevel/{dataset}_txlevel_cm_ntd.csv.gz",
-                           dataset=["cdna", "teloprime"]),
+                           dataset=["cdna", "teloprime", "rna"]),
         tx_tpm = "res/deseq/illumina/txlevel/illumina_txlevel_cm_ntd.csv.gz",
         gene_counts = expand("res/deseq/{dataset}/genelevel/{dataset}_genelevel_cm_ntd.csv.gz",
-                             dataset=["cdna", "teloprime"]),
+                             dataset=["cdna", "teloprime", "rna"]),
         gene_tpm = "res/deseq/illumina/genelevel/illumina_genelevel_cm_ntd.csv.gz",
         biomaRt_gene = "annotation/biomaRt_gene.rds",
         biomaRt_tx = "annotation/biomaRt_tx.rds",
         biotype_groups = "data/biotype_groups.csv"
     output:
-        gene = "res/comparisons/comparisons_meanCounts_gene.csv.gz",
-        tx = "res/comparisons/comparisons_meanCounts_tx.csv.gz"
+        gene_avg = "res/comparisons/comparisons_meanCounts_gene.csv.gz",
+        tx_avg = "res/comparisons/comparisons_meanCounts_tx.csv.gz",
+        gene = "res/comparisons/comparisons_counts_gene.csv.gz",
+        tx = "res/comparisons/comparisons_counts_tx.csv.gz"
     script:
         "comparisons_quantification_averageCountsTable.R"
 
 
 rule quantification_correlation:
     input:
-        gene = "res/comparisons/comparisons_meanCounts_gene.csv.gz",
-        tx = "res/comparisons/comparisons_meanCounts_tx.csv.gz"
+        gene_avg = "res/comparisons/comparisons_meanCounts_gene.csv.gz",
+        tx_avg = "res/comparisons/comparisons_meanCounts_tx.csv.gz",
+        gene = "res/comparisons/comparisons_counts_gene.csv.gz",
+        tx = "res/comparisons/comparisons_counts_tx.csv.gz"
     output:
         "res/comparisons/comparisons_quantification_correlation.html"
     script:
