@@ -47,9 +47,9 @@ rule counts_pca:
 rule feature_detection:
     input:
         tx_counts = expand("res/deseq/{dataset}/txlevel/{dataset}_txlevel_cm_cts.csv.gz",
-                           dataset=["cdna", "teloprime", "illumina"]),
+                           dataset=["cdna", "teloprime", "illumina", "rna"]),
         gene_counts = expand("res/deseq/{dataset}/genelevel/{dataset}_genelevel_cm_cts.csv.gz",
-                             dataset=["cdna", "teloprime", "illumina"]),
+                             dataset=["cdna", "teloprime", "illumina", "rna"]),
         gene_tpm = "res/deseq/illumina/genelevel/illumina_genelevel_cm_ntd.csv.gz",
         biomaRt_gene = "annotation/biomaRt_gene.rds",
         biomaRt_tx = "annotation/biomaRt_tx.rds",

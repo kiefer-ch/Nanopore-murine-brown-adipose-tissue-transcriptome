@@ -148,6 +148,13 @@
       "Repository": "CRAN",
       "Hash": "0537b6f1f38ea1fd514089192724bb6e"
     },
+    "GGally": {
+      "Package": "GGally",
+      "Version": "1.5.0",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "1335c0dabfe138c8a0155e3c0a36787c"
+    },
     "GO.db": {
       "Package": "GO.db",
       "Version": "3.10.0",
@@ -1264,6 +1271,13 @@
       "Source": "Repository",
       "Repository": "CRAN",
       "Hash": "c1a367437d8a8a44bec4b9d4974cb20c"
+    },
+    "reshape": {
+      "Package": "reshape",
+      "Version": "0.8.8",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "0f4d941129e00ed34a7d192b1da7ccef"
     },
     "reshape2": {
       "Package": "reshape2",
