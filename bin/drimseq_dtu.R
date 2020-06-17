@@ -77,6 +77,26 @@ res_stageR <- drim.padj %>%
 res_stageR <- res_stageR %>%
     mutate(ensembl_gene_id_version = sub('_', ':', ensembl_gene_id_version))
 
+# Add proportions
+sample_info <- read_csv(snakemake@input[["sample_info"]]) %>%
+    filter(!is.na(ont)) %>%
+    mutate_at(vars(matches("condition")), as.factor)
+
+props <- proportions(dmds) %>%
+    tidyr::gather("sample_id", "proportion", -gene_id, -feature_id) %>%
+    mutate(sample_id = substr(sample_id, 2, nchar(sample_id))) %>%
+    left_join(sample_info %>% select(sample_id, condition_temp), by = "sample_id") %>%
+    group_by(gene_id, feature_id, condition_temp) %>%
+    summarise(proportion = mean(proportion)) %>%
+    ungroup() %>%
+    mutate(condition_temp = paste0("proportion_", condition_temp)) %>%
+    tidyr::spread(condition_temp, proportion) %>%
+    dplyr::rename(ensembl_gene_id_version = "gene_id",
+        ensembl_transcript_id_version = "feature_id")
+
 # export
 res_stageR %>%
+    left_join(props, by = c("ensembl_gene_id_version", "ensembl_transcript_id_version")) %>%
+    dplyr::select("ensembl_gene_id_version", "ensembl_transcript_id_version",
+        "mgi_symbol", "description", "gene_biotype", everything()) %>%
     write_csv(snakemake@output[["res"]])
