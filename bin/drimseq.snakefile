@@ -96,3 +96,18 @@ rule drimseq_report:
         dataset = "teloprime|cdna|illumina|cdna_flair|teloprime_flair"
     script:
         "drimseq_stagerAnalysis.Rmd"
+
+
+rule isoformswitchanalyser_importData:
+    input:
+        counts = "res/deseq/{dataset}/txlevel/{dataset}_txlevel_cm_cts.csv.gz",
+        sample_info = "sample_info/sampleInfo.csv",
+        gtf = "annotation/annotation.gtf",
+        transcripts = "annotation/transcripts.fa",
+        test = "res/drimseq/{dataset}/{dataset}_drimSeqStageR.csv"
+    output:
+        "res/drimseq/{dataset}/{dataset}_sal.rds"
+    wildcard_constraints:
+        dataset = "cdna"
+    script:
+        "drimseq_isoformswitchanalyser_importData.R"
