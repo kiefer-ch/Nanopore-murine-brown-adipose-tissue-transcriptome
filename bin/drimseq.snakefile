@@ -69,14 +69,36 @@ rule isoformswitchanalyser_importData:
         gtf = "annotation/annotation.gtf",
         transcripts = "annotation/transcripts.fa",
         test = "res/drimseq/{dataset}/{dataset}_drimSeqStageR.csv"
-    params:
-        dataset = "{dataset}"
     output:
         "res/drimseq/{dataset}/{dataset}_sal.rds"
     wildcard_constraints:
         dataset = "cdna|teloprime|illumina"
     script:
         "drimseq_isoformswitchanalyser_importData.R"
+
+
+rule clean_fasta_ids:
+    input:
+        "{file}.fa"
+    output:
+        temp("{file}_clean.fa")
+    shell:
+        "sed 's/_[^_]*$//' {input} > {output}"
+
+
+rule isoformswitchanalyser_importData_flair:
+    input:
+        counts = "flair/{dataset}/flair_{dataset}_counts_matrix.tsv",
+        sample_info = "sample_info/sampleInfo.csv",
+        gtf = "flair/{dataset}/flair.collapse.isoforms.gtf",
+        transcripts = "flair/{dataset}/flair.collapse.isoforms_clean.fa",
+        test = "res/drimseq/{dataset}_flair/{dataset}_flair_drimSeqStageR.csv"
+    output:
+        "res/drimseq/{dataset}_flair/{dataset}_flair_sal.rds"
+    wildcard_constraints:
+        dataset = "cdna|teloprime"
+    script:
+        "drimseq_isoformswitchanalyser_importData_flair.R"
 
 
 def get_txdb(wildcards):
