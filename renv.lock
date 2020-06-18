@@ -228,6 +228,12 @@
       "Source": "Bioconductor",
       "Hash": "148fe882b25f679b03afc45da15e760c"
     },
+    "IsoformSwitchAnalyzeR": {
+      "Package": "IsoformSwitchAnalyzeR",
+      "Version": "1.8.0",
+      "Source": "Bioconductor",
+      "Hash": "06a1fe43190a506083551674d2f22448"
+    },
     "MASS": {
       "Package": "MASS",
       "Version": "7.3-51.5",
@@ -393,6 +399,13 @@
       "Version": "1.32.0",
       "Source": "Bioconductor",
       "Hash": "51930eaf6f901255d96407681e4007ab"
+    },
+    "VennDiagram": {
+      "Package": "VennDiagram",
+      "Version": "1.6.20",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "ffff3996100ae22360096dd6a3436b0d"
     },
     "XML": {
       "Package": "XML",

@@ -1,6 +1,5 @@
 #!/usr/bin/Rscript --no-restore --no-environ --no-save
 
-save.image()
 source(".Rprofile")
 library("readr")
 library("dplyr")
@@ -49,5 +48,18 @@ names(tx_lookup) <- test$ensembl_transcript_id_version
 
 switchList$isoformFeatures$gene_switch_q_value <- gene_lookup[switchList$isoformFeatures$gene_id]
 switchList$isoformFeatures$isoform_switch_q_value <- tx_lookup[switchList$isoformFeatures$isoform_id]
+
+# add aa sequence
+switchList <- extractSequence(switchList,
+    extractNTseq = FALSE,
+    writeToFile = FALSE)
+
+# predict alternative splicing and intron retention
+switchList <- analyzeAlternativeSplicing(switchList)
+switchList <- analyzeIntronRetention(switchList)
+
+# orf seq similarity
+switchList <- analyzeSwitchConsequences(switchList,
+    c("tss", "tts", "intron_retention", "ORF_seq_similarity", "NMD_status"))
 
 saveRDS(switchList, snakemake@output[[1]])
