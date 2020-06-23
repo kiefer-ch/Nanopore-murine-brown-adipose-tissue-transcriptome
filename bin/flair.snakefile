@@ -97,6 +97,20 @@ rule bedtools_combineWarmColdH3k4:
         bedtools merge -i $TDIR/cat.sorted.bed > {output}"
 
 
+rule bedtools_combine_h3k4me3_cage:
+    input:
+        combined = "data/chip/k4me3/combined_broad.bed",
+        # from FANTOM
+        cage = "data/chip/cage/mm10.cage_peak_phase1and2combined_coord.bed"
+    output:
+        "data/chip/h3k4_cage_combined.bed"
+    shell:
+        "TDIR=$(mktemp -d data/chip/tmp.XXXXXXXXX) && \
+        awk '{printf ("%s\t%s\t%s\n", $1, $2, $3)}' > $TDIR/cat.bed < {input.cage}
+        cat {input.combined}  >> $TDIR/cat.bed && \
+        sort -k1,1 -k2,2n $TDIR/cat.bed > $TDIR/cat.sorted.bed && \
+        bedtools merge -i $TDIR/cat.sorted.bed > {output}"
+
 def get_flair_fastqnames(wildcards):
     files = list()
     if wildcards.dataset == "teloprime":
