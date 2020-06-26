@@ -105,11 +105,11 @@ rule bedtools_combine_h3k4me3_cage:
     output:
         "data/chip/h3k4_cage_combined.bed"
     shell:
-        "TDIR=$(mktemp -d data/chip/tmp.XXXXXXXXX) && \
-        awk '{printf ("%s\t%s\t%s\n", $1, $2, $3)}' > $TDIR/cat.bed < {input.cage}
-        cat {input.combined}  >> $TDIR/cat.bed && \
-        sort -k1,1 -k2,2n $TDIR/cat.bed > $TDIR/cat.sorted.bed && \
-        bedtools merge -i $TDIR/cat.sorted.bed > {output}"
+        "TDIR=$(mktemp -d data/chip/tmp.XXXXXXXXX) && "
+        "awk '{printf(\"%s\t%s\t%s\n\", $1, $2, $3)}' > $TDIR/cat.bed < {input.cage} && "
+        "cat {input.combined}  >> $TDIR/cat.bed && "
+        "sort -k1,1 -k2,2n $TDIR/cat.bed > $TDIR/cat.sorted.bed && "
+        "bedtools merge -i $TDIR/cat.sorted.bed > {output}"
 
 def get_flair_fastqnames(wildcards):
     files = list()
@@ -132,7 +132,7 @@ rule flair_collapse:
         genome = "annotation/genome.fa",
         annotation = "annotation/annotation.gtf",
         psl = "flair/{dataset}/bed/corrected/concatenated_all_corrected.psl",
-        promoters = "data/chip/k4me3/combined_broad.bed"
+        promoters = "data/chip/h3k4_cage_combined.bed"
     output:
         "flair/{dataset}/flair.collapse.isoforms.fa",
         "flair/{dataset}/flair.collapse.isoforms.gtf",
