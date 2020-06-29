@@ -126,6 +126,7 @@ rule drimseq_report:
         biomaRt_gene = "annotation/biomaRt_gene.rds",
         biomaRt_tx = "annotation/biomaRt_tx.rds",
         genome = "annotation/genome.fa",
+        switchList = "res/drimseq/{dataset}/{dataset}_sal.rds",
         txdb = get_txdb
     output:
         "res/drimseq/{dataset}/{file}_drimSeqStageR.html"
