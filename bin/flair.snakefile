@@ -7,7 +7,7 @@ rule flair_convert_bed12:
     output:
         "flair/{dataset}/bed/raw/{barcode}.bed"
     shell:
-        "python2 ~/src/flair/bin/bam2Bed12.py -i {input.bam} \
+        "python2 ~/src/flair-1.5/bin/bam2Bed12.py -i {input.bam} \
             > {output}"
 
 
@@ -55,7 +55,7 @@ rule flair_correct:
     threads:
         4
     shell:
-        "python2 ~/src/flair/flair.py correct \
+        "python2 ~/src/flair-1.5/flair.py correct \
             -q {input.bed} \
             -g {input.genome} \
             -j {input.junctions} \
@@ -144,7 +144,7 @@ rule flair_collapse:
     threads:
         40
     shell:
-        "python2 ~/src/flair/flair.py collapse \
+        "python2 ~/src/flair-1.5/flair.py collapse \
             -g {input.genome} \
             -f {input.annotation} \
             -r {input.fastq} \
@@ -188,7 +188,7 @@ rule flair_quantify:
     threads:
         40
     shell:
-        "python2 ~/src/flair/flair.py quantify \
+        "python2 ~/src/flair-1.5/flair.py quantify \
             -r {input.reads_manifest} \
             -i {input.isoforms_fasta} \
             -o {output} \
