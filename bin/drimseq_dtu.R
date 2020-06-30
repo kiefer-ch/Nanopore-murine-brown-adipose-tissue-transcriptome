@@ -5,6 +5,7 @@ library("dplyr")
 library("readr")
 library("DRIMSeq")
 library("stageR")
+library("logger")
 BPPARAM = BiocParallel::MulticoreParam(snakemake@threads[[1]])
 
 ################################################################################
@@ -15,9 +16,14 @@ BPPARAM = BiocParallel::MulticoreParam(snakemake@threads[[1]])
 ################################################################################
 
 # import data
+log_info("Importing data...")
 dmds <- read_rds(snakemake@input[["dmds"]])
 biomart_gene <- read_rds(snakemake@input[["biomaRt_gene"]])
+sample_info <- read_csv(snakemake@input[["sample_info"]]) %>%
+    filter(!is.na(ont)) %>%
+    mutate_at(vars(matches("condition")), as.factor)
 
+log_info("Filtering lowly expressed transcripts...")
 # total number of samples
 n <- 6
 # number of samples in the smallest group
@@ -30,6 +36,7 @@ dmds <- dmFilter(dmds,
     min_samps_gene_expr = n, min_gene_expr = 10)
 
 # fitAndTestModels
+log_info("Fitting and testing models...")
 design_full <- model.matrix(~condition_temp,
     data = DRIMSeq::samples(dmds) %>%
         mutate(condition_temp = relevel(condition_temp, "22")))
@@ -40,9 +47,11 @@ dmds <- dmFit(dmds, design = design_full)
 dmds <- dmTest(dmds, coef = "condition_temp4")
 
 # export
+log_info("Writing dmds to disc...")
 saveRDS(dmds, snakemake@output[["dmds"]])
 
 # build results tables
+log_info("Building results table...")
 res_gene <- DRIMSeq::results(dmds)
 res_tx <- DRIMSeq::results(dmds, level = "feature")
 
@@ -78,10 +87,6 @@ res_stageR <- res_stageR %>%
     mutate(ensembl_gene_id_version = sub('_', ':', ensembl_gene_id_version))
 
 # Add proportions
-sample_info <- read_csv(snakemake@input[["sample_info"]]) %>%
-    filter(!is.na(ont)) %>%
-    mutate_at(vars(matches("condition")), as.factor)
-
 props <- proportions(dmds) %>%
     tidyr::gather("sample_id", "proportion", -gene_id, -feature_id) %>%
     mutate(sample_id = substr(sample_id, 2, nchar(sample_id))) %>%
@@ -95,8 +100,11 @@ props <- proportions(dmds) %>%
         ensembl_transcript_id_version = "feature_id")
 
 # export
+log_info("Writing results table to disc...")
 res_stageR %>%
     left_join(props, by = c("ensembl_gene_id_version", "ensembl_transcript_id_version")) %>%
     dplyr::select("ensembl_gene_id_version", "ensembl_transcript_id_version",
         "mgi_symbol", "description", "gene_biotype", everything()) %>%
     write_csv(snakemake@output[["res"]])
+
+log_success("Done")

@@ -51,11 +51,12 @@ rule drimseq_dmdsFromCountMatrix:
 # common
 rule drimseq_dtu:
     input:
-        dmds = "{file}_dmds.rds",
+        sample_info = "sample_info/sampleInfo.csv",
+        dmds = "res/drimseq/{dataset}/{dataset}_dmds.rds",
         biomaRt_gene = "annotation/biomaRt_gene.rds"
     output:
-        dmds = "{file}_dmds_dtu.rds",
-        res = "{file}_drimSeqStageR.csv"
+        dmds = "res/drimseq/{dataset}/{dataset}_dmds_dtu.rds",
+        res = "res/drimseq/{dataset}/{dataset}_drimSeqStageR.csv"
     threads:
         4
     script:

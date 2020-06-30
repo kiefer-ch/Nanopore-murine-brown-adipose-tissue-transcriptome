@@ -1036,6 +1036,13 @@
       "Repository": "CRAN",
       "Hash": "b1b5023b4a396be5315e8c15902f4ae8"
     },
+    "logger": {
+      "Package": "logger",
+      "Version": "0.1",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "f665a0b29be7b65e077a181263ee450e"
+    },
     "lubridate": {
       "Package": "lubridate",
       "Version": "1.7.4",
