@@ -123,6 +123,15 @@ df2 %>%
     scale_y_continuous(labels = scales::percent)
 
 df2 %>% 
+    ggplot(aes(dataset)) +
+    geom_bar(aes(fill = structural_category)) +
+    scale_fill_colorblind() +
+    theme_tufte() +
+    geom_rangeframe(sides = 'l') +
+    ylab(NULL) +
+    xlab(NULL)
+
+df2 %>% 
     ggplot(aes(structural_category, length)) +
     geom_boxplot() +
     facet_wrap(~dataset) +
