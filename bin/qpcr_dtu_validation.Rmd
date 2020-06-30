@@ -47,7 +47,8 @@ notPass <- c()
 ```{r importData}
 sample_info <- read_csv(snakemake@input[["sample_info"]]) %>%
     mutate_at(vars(matches("condition")), as.factor) %>%
-    select_at(vars(matches("sample_id|condition")))
+    select_at(vars(matches("sample_id|condition"))) %>% 
+    filter(!sample_id %in% c("rt", "cool"))
 
 get.pipettingScheme <- function(genes, sampleInfo, rep_qpcr = 2, nrow = 16) {
 
@@ -338,6 +339,16 @@ pvalues %>%
     knitr::kable(format = "html") %>%
     kableExtra::kable_styling() %>%
     kableExtra::scroll_box(width = "100%", height = "600px")
+
+pvalues %>% 
+    dplyr::select(-ensembl_gene_id_version, -description, -gene_biotype) %>% 
+    tidyr::gather("dataset", "padj", -mgi_symbol) %>%  
+    ggplot(aes(dataset, mgi_symbol)) +
+        geom_tile(aes(fill = padj)) +
+        scale_fill_viridis_c(direction = -1) +
+        theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    xlab(NULL) + 
+    ylab(NULL)
 ```
 
 ## Upset
