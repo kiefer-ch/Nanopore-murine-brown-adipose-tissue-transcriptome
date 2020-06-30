@@ -37,9 +37,18 @@ rule rseqc_genebodyCoverage:
             -o {params.outputDir}"
 
 
+def get_input_gbc(wildcards):
+    if wildcards.dataset in ["teloprime", "cdna"]:
+        file_name = "bam/{}/{}_genome.bam".format(
+            wildcards.dataset, wildcards.barcode)
+    elif wildcards.dataset == "rna":
+        file_name = "bam/rna/genome_{}_q7_sort.bam".format(wildcards.barcode)
+    return file_name
+
+
 rule rseqc_genebodyCoverage_ont:
     input:
-        bam = "bam/{dataset}/{barcode}_genome.bam",
+        bam = get_input_gbc,
         bed = "data/mm10_Gencode_vM20_gencode.bed"
     output:
         "res/comparisons/geneBody_coverage/{dataset}/{barcode}.geneBodyCoverage.curves.pdf",
@@ -48,7 +57,7 @@ rule rseqc_genebodyCoverage_ont:
     params:
         outputDir = "res/comparisons/geneBody_coverage/{dataset}/{barcode}"
     wildcard_constraints:
-        dataset = "teloprime|cdna"
+        dataset = "teloprime|cdna|rna"
     shell:
         "geneBody_coverage.py \
             -r {input.bed} \
