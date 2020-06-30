@@ -9,7 +9,7 @@ rule stringtie:
     params:
         label = "{sample}"
     shell:
-        "stringtie \
+        "/data/bin/stringtie/stringtie-2.0.Linux_x86_64/stringtie \
             {input.bam} \
             --rf \
             -p {threads} \
@@ -29,7 +29,7 @@ rule stringtie_merge:
     threads:
         8
     shell:
-        "stringtie --merge \
+        "/data/bin/stringtie/stringtie-2.0.Linux_x86_64/stringtie --merge \
             -p {threads} \
             -l 'stringtie_merge' \
             -o {output} \
