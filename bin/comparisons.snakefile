@@ -76,6 +76,18 @@ rule bam_getAlignedLength:
         "comparisons_bam_getAlignedLength.R"
 
 
+rule bam_getAlignedLength_rna:
+    input:
+        "bam/rna/{type}_{temp}_q7_sort.bam",
+        "bam/rna/{type}_{temp}_q7_sort.bam.bai"
+    wildcard_constraints:
+        type = "genome|transcriptome"
+    output:
+        "res/comparisons/countReads/rna_{temp}_bam_{type}.rds"
+    script:
+        "comparisons_bam_getAlignedLength.R"
+
+
 def get_bamnames(wildcards):
     files = list()
     if wildcards.dataset == "teloprime":
@@ -93,16 +105,22 @@ def get_bamnames(wildcards):
                     filename = "bam/{}/{}/20200108_{}_{}_{}_q7_sort.bam".format(
                         wildcards.dataset, pool, pool, type, barcode)
                     files.append(filename)
+    elif wildcards.dataset == "rna":
+        for temperature in ["cool", "rt"]:
+            for type in ["transcriptome", "genome"]:
+                filename = "bam/rna/{}_{}_q7_sort.bam".format(
+                    type, temperature)
+                files.append(filename)
     return files
 
 
-rule bam_getFlagStats_cdna:
+rule bam_getFlagStats_ont:
     input:
         get_bamnames
     output:
         "res/comparisons/countReads/{dataset}_flagstats.csv"
     wildcard_constraints:
-        dataset = "teloprime|cdna"
+        dataset = "teloprime|cdna|rna"
     script:
         "comparisons_bam_countFlags.py"
 
@@ -184,6 +202,12 @@ def get_fastqnames(wildcards):
             for flowcell in ["X1_flowcell", "X3_flowcell"]:
                 filename = "fastq/{}/{}/{}_q7.fastq.gz".format(
                     wildcards.dataset, flowcell, barcode)
+                files.append(filename)
+    elif wildcards.dataset == "cdna":
+        for barcode in SAMPLE_INFO_ont["cdna"]:
+            for pool in ["pool1", "pool2"]:
+                filename = "fastq/{}/{}/{}_q7.fastq.gz".format(
+                    wildcards.dataset, pool, barcode)
                 files.append(filename)
     elif wildcards.dataset == "cdna":
         for barcode in SAMPLE_INFO_ont["cdna"]:
