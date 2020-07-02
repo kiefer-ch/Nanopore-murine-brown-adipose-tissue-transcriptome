@@ -209,12 +209,11 @@ def get_fastqnames(wildcards):
                 filename = "fastq/{}/{}/{}_q7.fastq.gz".format(
                     wildcards.dataset, pool, barcode)
                 files.append(filename)
-    elif wildcards.dataset == "cdna":
-        for barcode in SAMPLE_INFO_ont["cdna"]:
-            for pool in ["pool1", "pool2"]:
-                filename = "fastq/{}/{}/{}_q7.fastq.gz".format(
-                    wildcards.dataset, pool, barcode)
-                files.append(filename)
+    elif wildcards.dataset == "rna":
+        for temperature in ["rt", "cool"]:
+            filename = "fastq/{}/{}_q7.fastq.gz".format(
+                wildcards.dataset, temperature)
+            files.append(filename)
     return files
 
 
