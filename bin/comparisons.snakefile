@@ -113,13 +113,12 @@ def get_input_bam_coverage(wildcards):
             wildcards.dataset, wildcards.barcode)
     elif wildcards.dataset == "rna":
         file_name = "bam/rna/transcriptome_{}_q7_sort.bam".format(wildcards.barcode)
-    return file_name
+    return [file_name, file_name + ".bai"]
 
 
 rule bam_getCoverage:
     input:
-        "bam/{dataset}/{barcode}_transcriptome.bam",
-        "bam/{dataset}/{barcode}_transcriptome.bam.bai"
+        get_input_bam_coverage
     wildcard_constraints:
         dataset = "teloprime|cdna|rna"
     output:
