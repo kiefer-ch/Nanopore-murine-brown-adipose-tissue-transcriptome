@@ -5,20 +5,20 @@ date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
     html_document:
         toc: true
+        toc_float: true
+        toc_depth: 2
+        fig_caption: false
+        dev: "svg"
 editor_options:
-  chunk_output_type: console
+    chunk_output_type: console
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = FALSE)
 ```
 
-```{r}
-dir.create(snakemake@params[["fig_folder"]],
-    recursive = TRUE, showWarnings = FALSE)
-```
-
 ```{r loadPackages}
+save.image()
 source(".Rprofile")
 library("dplyr")
 library("readr")
@@ -74,10 +74,15 @@ cdna <- snakemake@input[["geneBodyCoverage_cdna"]] %>%
     mutate(sample = substr(sample, 1, 9)) %>%
     left_join(sample_info, by = c("sample" = "cdna")) %>%
     dplyr::select(-sample, -illumina)
+
+rna <- snakemake@input[["geneBodyCoverage_rna"]] %>%
+    prepare_dataset(name = "rna") %>% 
+    tidyr::separate(sample, c("waste", "sample_id"), extra = "drop") %>% 
+    dplyr::select(-waste)
 ```
 
 ```{r plot_geneBodyCoverage}
-pl <- list(illumina, teloprime, cdna) %>%
+list(illumina, teloprime, cdna, rna) %>%
     bind_rows() %>%
     group_by(dataset, sample_id) %>%
     mutate(p = n / max(n)) %>%
@@ -89,10 +94,6 @@ pl <- list(illumina, teloprime, cdna) %>%
         xlab("Gene body percentile (5' -> 3')") +
         ylab("Coverage") +
         scale_colour_colorblind()
-pl
-saveRDS(pl,
-    file.path(snakemake@params[["fig_folder"]], "geneBodyCoverage.rds"))
-rm(list = c("illumina", "teloprime", "cdna"))
 ```
 
 # Coverage
@@ -123,17 +124,18 @@ prepare_dataset2 = function(files) {
 }
 
 df <- list(snakemake@input[["coverage_teloprime"]],
-        snakemake@input[["coverage_cdna"]]) %>%
-    map(prepare_dataset2) %>%
+        snakemake@input[["coverage_cdna"]],
+        snakemake@input[["coverage_rna"]]) %>%
+    map(prepare_dataset2) %>% 
     map(dplyr::select, coverage, transcript_length, type, ensembl_transcript_id_version) %>%
     map(filter, type == "primary") %>%
-    set_names(c("teloprime", "cdna")) %>%
+    set_names(c("teloprime", "cdna", "rna")) %>%
     bind_rows(.id = "dataset") %>%
     tidyr::drop_na()
 ```
 
 ```{r}
-pl <- df %>%
+df %>%
     mutate(grouped_transcript_length = cut(transcript_length,
         breaks = c(0, 500, 1000, 1500, 2000, 2500, 3000, max(transcript_length)))) %>%
     ggplot(aes(grouped_transcript_length, coverage)) +
@@ -144,10 +146,6 @@ pl <- df %>%
     geom_rangeframe(sides = 'l') +
     scale_fill_colorblind() +
     theme(axis.text.x = element_text(angle = 90, hjust = 1))
-
-pl
-saveRDS(pl,
-    file.path(snakemake@params[["fig_folder"]], "coverage_by_transcriptLength.rds"))
 ```
 
 

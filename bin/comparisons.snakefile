@@ -107,14 +107,23 @@ rule bam_getFlagStats_cdna:
         "comparisons_bam_countFlags.py"
 
 
+def get_input_bam_coverage(wildcards):
+    if wildcards.dataset in ["teloprime", "cdna"]:
+        file_name = "bam/{}/{}_transcriptome.bam".format(
+            wildcards.dataset, wildcards.barcode)
+    elif wildcards.dataset == "rna":
+        file_name = "bam/rna/transcriptome_{}_q7_sort.bam".format(wildcards.barcode)
+    return file_name
+
+
 rule bam_getCoverage:
     input:
-        "bam/{dataset}/{file}_transcriptome.bam",
-        "bam/{dataset}/{file}_transcriptome.bam.bai"
+        "bam/{dataset}/{barcode}_transcriptome.bam",
+        "bam/{dataset}/{barcode}_transcriptome.bam.bai"
     wildcard_constraints:
-        dataset = "teloprime|cdna"
+        dataset = "teloprime|cdna|rna"
     output:
-        "res/comparisons/coverage/{dataset}/{file}.rds"
+        "res/comparisons/coverage/{dataset}/{barcode}.rds"
     script:
         "comparisons_bam_getCoverage.R"
 
@@ -127,10 +136,14 @@ rule coverage:
                                        barcode=SAMPLE_INFO_ont["cdna"]),
         geneBodyCoverage_illumina = expand("qc/RSeQC/geneBody_coverage/{sample}.geneBodyCoverage.txt",
                                            sample=SAMPLES_ont),
+        geneBodyCoverage_rna = expand("res/comparisons/geneBody_coverage/rna/{barcode}.geneBodyCoverage.txt",
+                                       barcode=["rt", "cool"]),
         coverage_teloprime = expand("res/comparisons/coverage/teloprime/{barcode}.rds",
                                     barcode=SAMPLE_INFO_ont["ont"]),
         coverage_cdna = expand("res/comparisons/coverage/cdna/{barcode}.rds",
                                barcode=SAMPLE_INFO_ont["cdna"]),
+        coverage_rna = expand("res/comparisons/coverage/rna/{barcode}.rds",
+                               barcode=["rt", "cool"]),
         sample_info = "sample_info/sampleInfo.csv",
         biomaRt_tx = "annotation/biomaRt_tx.rds"
     params:
