@@ -18,6 +18,7 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = FA
 ```
 
 ```{r loadPackages}
+save.image()
 source(".Rprofile")
 library("dplyr")
 library("readr")
@@ -29,6 +30,8 @@ library("ggthemes")
 # Length of reads per sample and flowcell 
 
 These plots are based on the fastq files. 
+
+The illumina values are based on the tpm values.
 
 ```{r}
 sample_info <- read_csv(snakemake@input[["sample_info"]]) %>% 
@@ -59,7 +62,6 @@ separate_variables <- function(df, method) {
     return(df)
 }
 
-
 df <- snakemake@input[["readLengths"]] %>% 
     map(read_csv) %>%
     map(tidyr::gather, "sample", "counts", -read_length) %>% 
@@ -77,12 +79,24 @@ df <- snakemake@input[["readLengths"]] %>%
 Read lengths from fastq files
 
 ```{r}
+tpm <- snakemake@input[["avg_counts"]] %>% 
+    read_csv() %>% 
+    select(transcript_length, illumina) %>% 
+    rename(read_length = "transcript_length") %>%
+    tidyr::drop_na() %>% 
+    mutate(illumina = 2^illumina - 1) %>% 
+    group_by(read_length) %>% 
+    summarise(counts = sum(illumina, na.rm = TRUE)) %>% 
+    mutate(method = "illumina")
+
+
 df %>% 
     group_by(method, read_length) %>% 
     summarise(counts = sum(counts)) %>% 
+    bind_rows(., tpm) %>% 
     ggplot(aes(read_length, counts)) +
         geom_freqpoly(stat = "identity") +
-        facet_wrap(~method, ncol = 1) +
+        facet_wrap(~method, ncol = 1, scales = "free_y") +
         scale_x_log10() +
         ylab("Reads") + 
         xlab("Read length") +
@@ -144,16 +158,18 @@ df %>%
 
 ```{r dataImport_referenceTxLengths}
 referenceTxLengths <- read_csv(snakemake@input[["annotation_txLengths"]]) %>% 
-    mutate(method = "gencode")
+    mutate(method = "gencode") %>% 
+    rename(counts = "n")
 ```
 
 ```{r}
 df %>% 
     group_by(method, read_length) %>% 
-    summarise(n = sum(counts)) %>%
-    bind_rows(referenceTxLengths) %>%
+    summarise(counts = sum(counts)) %>%
+    bind_rows(referenceTxLengths) %>% 
+    bind_rows(tpm) %>% 
     group_by(method) %>% 
-    mutate(weight = n / sum(n)) %>% 
+    mutate(weight = counts / sum(counts)) %>% 
     ungroup() %>% 
     ggplot(aes(method, read_length, weight = weight)) +
     geom_violin() +
