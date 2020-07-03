@@ -226,21 +226,11 @@ rule fastq_readLengthHistogram:
         "comparisons_fastq_readLengthHistogram.py"
 
 
-rule fasta_readLengthHistogram:
-    input:
-        "annotation/transcripts.fa"
-    output:
-        "annotation/annotation_transcript_lengths.csv"
-    script:
-        "comparisons_fasta_readLengthHistogram.py"
-
-
 rule read_lengths_fastq:
     input:
         readLengths = expand("res/comparisons/readLengthDistribution/{dataset}_fastqReadLengths.csv",
                              dataset=["teloprime", "cdna", "rna"]),
         avg_counts = "res/comparisons/comparisons_meanCounts_tx.csv.gz",
-        annotation_txLengths = "annotation/annotation_transcript_lengths.csv",
         sample_info = "sample_info/sampleInfo.csv"
     params:
         fig_folder = "res/fig/read_lengths"

@@ -18,7 +18,6 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = FA
 ```
 
 ```{r loadPackages}
-save.image()
 source(".Rprofile")
 library("dplyr")
 library("readr")
@@ -27,11 +26,12 @@ library("ggplot2")
 library("ggthemes")
 ```
 
-# Length of reads per sample and flowcell 
+# Length of reads by method
 
-These plots are based on the fastq files. 
+These plots are based on the fastq files from the ont data. 
 
-The illumina values are based on the tpm values.
+The illumina values are estimated based on the tpm values from salmon. They are
+somewhat a reference, but not actual read lengths.
 
 ```{r}
 sample_info <- read_csv(snakemake@input[["sample_info"]]) %>% 
@@ -76,8 +76,6 @@ df <- snakemake@input[["readLengths"]] %>%
     filter(counts != 0)
 ```
 
-Read lengths from fastq files
-
 ```{r}
 tpm <- snakemake@input[["avg_counts"]] %>% 
     read_csv() %>% 
@@ -101,23 +99,26 @@ df %>%
         ylab("Reads") + 
         xlab("Read length") +
         theme_tufte() +
-        geom_rangeframe(sides = "lb")
+        geom_rangeframe(sides = "lb") 
 ```
 
-```{r readLength_Violin}
+```{r}
 df %>% 
-    group_by(method, flowcell, sample_id) %>% 
+    group_by(method, read_length) %>% 
+    summarise(counts = sum(counts)) %>%
+    bind_rows(tpm) %>% 
+    group_by(method) %>% 
     mutate(weight = counts / sum(counts)) %>% 
     ungroup() %>% 
-    ggplot(aes(sample_id, read_length, weight = weight, fill = flowcell)) +
+    mutate(method = factor(method, levels = c("illumina", "teloprime", "cdna", "rna"))) %>% 
+    ggplot(aes(method, read_length, weight = weight)) +
     geom_violin() +
-    facet_wrap(~method, ncol = 1) +
     scale_y_log10() +
     scale_fill_colorblind() +
     theme_tufte() +
     geom_rangeframe(sides = "l") +
     xlab(NULL) + 
-    ylab("Read length")
+    ylab("Read/transcript length")
 ```
 
 ```{r}
@@ -131,52 +132,24 @@ df %>%
     dplyr::select(-sum_weigthed_readlengths) %>% 
     knitr::kable(format = "html") %>%
     kableExtra::kable_styling()
+```
 
-df %>% 
-    group_by(method, sample_id) %>% 
-    mutate(weighted_length = read_length * counts) %>% 
-    summarise(counts = sum(counts),
-        sum_weigthed_readlengths = sum(weighted_length),
-        max_readLength = max(read_length)) %>% 
-    dplyr::select(-sum_weigthed_readlengths) %>% 
-    knitr::kable(format = "html") %>%
-    kableExtra::kable_styling()
 
+# By sample
+
+```{r readLength_Violin}
 df %>% 
     group_by(method, flowcell, sample_id) %>% 
-    mutate(weighted_length = read_length * counts) %>% 
-    summarise(counts = sum(counts),
-        sum_weigthed_readlengths = sum(weighted_length),
-        max_readLength = max(read_length)) %>% 
-    mutate(avg_readlength = sum_weigthed_readlengths / counts) %>% 
-    dplyr::select(-sum_weigthed_readlengths) %>% 
-    knitr::kable(format = "html") %>%
-    kableExtra::kable_styling()
-```
-
-## Compared with tx length from GENCODE annotation
-
-```{r dataImport_referenceTxLengths}
-referenceTxLengths <- read_csv(snakemake@input[["annotation_txLengths"]]) %>% 
-    mutate(method = "gencode") %>% 
-    rename(counts = "n")
-```
-
-```{r}
-df %>% 
-    group_by(method, read_length) %>% 
-    summarise(counts = sum(counts)) %>%
-    bind_rows(referenceTxLengths) %>% 
-    bind_rows(tpm) %>% 
-    group_by(method) %>% 
     mutate(weight = counts / sum(counts)) %>% 
     ungroup() %>% 
-    ggplot(aes(method, read_length, weight = weight)) +
+    filter(method != "rna") %>% 
+    ggplot(aes(sample_id, read_length, weight = weight, fill = flowcell)) +
     geom_violin() +
+    facet_wrap(~method, ncol = 1) +
     scale_y_log10() +
     scale_fill_colorblind() +
     theme_tufte() +
     geom_rangeframe(sides = "l") +
     xlab(NULL) + 
-    ylab("Read/transcript length")
+    ylab("Read length")
 ```
