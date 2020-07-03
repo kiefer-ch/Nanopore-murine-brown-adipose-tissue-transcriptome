@@ -1,12 +1,16 @@
 ---
-title: "Nanopore iBAT, Read lengths etc"
+title: "Nanopore iBAT, read lengths, fastq"
 author: "Christoph Kiefer"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
-output: 
+output:
     html_document:
         toc: true
+        toc_float: true
+        toc_depth: 2
+        fig_caption: false
+        dev: "svg"
 editor_options:
-  chunk_output_type: console
+    chunk_output_type: console
 ---
 
 ```{r setup, include=FALSE}
@@ -14,6 +18,7 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = FA
 ```
 
 ```{r loadPackages}
+save.image()
 source(".Rprofile")
 library("dplyr")
 library("readr")
@@ -22,14 +27,11 @@ library("ggplot2")
 library("ggthemes")
 ```
 
-```{r}
-dir.create(snakemake@params[["fig_folder"]],
-    recursive = TRUE, showWarnings = FALSE)
-```
-
 # Length of reads per sample and flowcell 
 
 These plots are based on the fastq files. 
+
+The illumina values are based on the tpm values.
 
 ```{r}
 sample_info <- read_csv(snakemake@input[["sample_info"]]) %>% 
@@ -41,17 +43,34 @@ sample_info <- read_csv(snakemake@input[["sample_info"]]) %>%
 ```
 
 ```{r dataImport_fastqReadLengths}
+separate_variables <- function(df, method) {
+    if (method %in% c("cdna", "teloprime")) {
+        df <- df %>%
+            tidyr::separate(sample, c("waste1", "method", "flowcell", "barcode"),
+                sep = "/",
+                extra = "drop") %>% 
+            tidyr::separate(barcode, c("barcode"), extra = "drop") %>% 
+            select_at(vars(-matches("waste")))
+    } else if (method == "rna") {
+        df <- df %>%
+            tidyr::separate(sample, c("waste1", "method", "barcode"),
+                sep = "/",
+                extra = "drop") %>% 
+            tidyr::separate(barcode, c("barcode"), extra = "drop") %>% 
+            select_at(vars(-matches("waste"))) 
+    }
+    return(df)
+}
+
 df <- snakemake@input[["readLengths"]] %>% 
     map(read_csv) %>%
     map(tidyr::gather, "sample", "counts", -read_length) %>% 
+    map2(., c("teloprime", "cdna", "rna"), separate_variables) %>% 
     bind_rows() %>% 
-    tidyr::separate(sample, c("waste1", "method", "flowcell", "barcode"),
-        sep = "/",
-        extra = "drop") %>% 
-    tidyr::separate(barcode, c("barcode"), extra = "drop") %>% 
-    select_at(vars(-matches("waste"))) %>%
     mutate(flowcell = if_else(flowcell %in% c("X1_flowcell", "pool1"), "cell_1", "cell_2")) %>% 
-    left_join(sample_info, by = "barcode") %>% 
+    mutate(flowcell = if_else(method == "rna", NA_character_, flowcell)) %>% 
+    left_join(sample_info, by = "barcode") %>%
+    mutate(sample_id = if_else(method == "rna", barcode, sample_id)) %>% 
     dplyr::select(-barcode) %>% 
     mutate_if(is.character, as.factor) %>% 
     filter(counts != 0)
@@ -60,12 +79,24 @@ df <- snakemake@input[["readLengths"]] %>%
 Read lengths from fastq files
 
 ```{r}
+tpm <- snakemake@input[["avg_counts"]] %>% 
+    read_csv() %>% 
+    select(transcript_length, illumina) %>% 
+    rename(read_length = "transcript_length") %>%
+    tidyr::drop_na() %>% 
+    mutate(illumina = 2^illumina - 1) %>% 
+    group_by(read_length) %>% 
+    summarise(counts = sum(illumina, na.rm = TRUE)) %>% 
+    mutate(method = "illumina")
+
+
 df %>% 
     group_by(method, read_length) %>% 
     summarise(counts = sum(counts)) %>% 
+    bind_rows(., tpm) %>% 
     ggplot(aes(read_length, counts)) +
         geom_freqpoly(stat = "identity") +
-        facet_wrap(~method, ncol = 1) +
+        facet_wrap(~method, ncol = 1, scales = "free_y") +
         scale_x_log10() +
         ylab("Reads") + 
         xlab("Read length") +
@@ -127,16 +158,18 @@ df %>%
 
 ```{r dataImport_referenceTxLengths}
 referenceTxLengths <- read_csv(snakemake@input[["annotation_txLengths"]]) %>% 
-    mutate(method = "gencode")
+    mutate(method = "gencode") %>% 
+    rename(counts = "n")
 ```
 
 ```{r}
 df %>% 
     group_by(method, read_length) %>% 
-    summarise(n = sum(counts)) %>%
-    bind_rows(referenceTxLengths) %>%
+    summarise(counts = sum(counts)) %>%
+    bind_rows(referenceTxLengths) %>% 
+    bind_rows(tpm) %>% 
     group_by(method) %>% 
-    mutate(weight = n / sum(n)) %>% 
+    mutate(weight = counts / sum(counts)) %>% 
     ungroup() %>% 
     ggplot(aes(method, read_length, weight = weight)) +
     geom_violin() +

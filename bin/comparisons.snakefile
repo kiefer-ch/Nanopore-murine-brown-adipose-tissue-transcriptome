@@ -238,7 +238,8 @@ rule fasta_readLengthHistogram:
 rule read_lengths_fastq:
     input:
         readLengths = expand("res/comparisons/readLengthDistribution/{dataset}_fastqReadLengths.csv",
-                             dataset=["teloprime", "cdna"]),
+                             dataset=["teloprime", "cdna", "rna"]),
+        avg_counts = "res/comparisons/comparisons_meanCounts_tx.csv.gz",
         annotation_txLengths = "annotation/annotation_transcript_lengths.csv",
         sample_info = "sample_info/sampleInfo.csv"
     params:
