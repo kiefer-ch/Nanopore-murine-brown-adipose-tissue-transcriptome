@@ -365,7 +365,7 @@ pvalues %>%
         order.by = "freq")
 ```
 
-## Individual genes
+# Individual genes
 
 ```{r browserPlotDefinition}
 txdb_gencode <- loadDb(snakemake@input[["txdb"]])
@@ -524,11 +524,8 @@ for (gene in pvalues$ensembl_gene_id_version) {
     gene_p <- pvalues %>% 
         filter(ensembl_gene_id_version == gene)
     
-    gene_p %>% 
-        dplyr::select(mgi_symbol, ensembl_gene_id_version) %>% 
-        knitr::kable(format = "html") %>%
-        kableExtra::kable_styling() %>% 
-        print()
+    cat('\n') 
+    cat("## ", gene_p$mgi_symbol, gene_p$ensembl_gene_id_version, "\n") 
     
     gene_p %>% 
         dplyr::select_at(vars(matches("padj"))) %>% 
@@ -562,6 +559,7 @@ for (gene in pvalues$ensembl_gene_id_version) {
         scale_color_colorblind()
 
     print(pl)
+    cat('\n') 
 }
 
 ```
