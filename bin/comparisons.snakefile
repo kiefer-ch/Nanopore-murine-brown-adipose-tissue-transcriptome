@@ -55,8 +55,6 @@ rule feature_detection:
         biomaRt_tx = "annotation/biomaRt_tx.rds",
         biotype_groups = "data/biotype_groups.csv",
         sample_info = "sample_info/sampleInfo.csv"
-    params:
-        fig_folder = "res/fig/feature_detection"
     output:
         "res/comparisons/comparisons_feature_detection.html"
     script:
@@ -163,8 +161,6 @@ rule coverage:
                                barcode=["rt", "cool"]),
         sample_info = "sample_info/sampleInfo.csv",
         biomaRt_tx = "annotation/biomaRt_tx.rds"
-    params:
-        fig_folder = "res/fig/coverage"
     output:
         "res/comparisons/comparisons_coverage.html"
     script:
@@ -232,8 +228,6 @@ rule read_lengths_fastq:
                              dataset=["teloprime", "cdna", "rna"]),
         avg_counts = "res/comparisons/comparisons_meanCounts_tx.csv.gz",
         sample_info = "sample_info/sampleInfo.csv"
-    params:
-        fig_folder = "res/fig/read_lengths"
     output:
         "res/comparisons/comparisons_readLengths_fastq.html"
     script:
@@ -246,12 +240,12 @@ rule read_lengths_bam:
                                   barcode=SAMPLE_INFO_ont["ont"]),
         cdna_bam_tx = expand("res/comparisons/countReads/cdna_{barcode}_bam_transcriptome.rds",
                              barcode=SAMPLE_INFO_ont["cdna"]),
+        rna_bam_tx = expand("res/comparisons/countReads/rna_{barcode}_bam_transcriptome.rds",
+                             barcode=["rt", "cool"]),
         biomaRt_tx = "annotation/biomaRt_tx.rds",
         sample_info = "sample_info/sampleInfo.csv",
         flagstats = expand("res/comparisons/countReads/{dataset}_flagstats.csv",
-                           dataset=["cdna", "teloprime"])
-    params:
-        fig_folder = "res/fig/read_lengths"
+                           dataset=["cdna", "teloprime", "rna"])
     output:
         "res/comparisons/comparisons_readLengths_bam.html"
     script:

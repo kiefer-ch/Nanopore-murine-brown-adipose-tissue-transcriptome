@@ -1,5 +1,5 @@
 ---
-title: "Nanopore iBAT, Read lengths etc"
+title: "Read lengths bam"
 author: "Christoph Kiefer"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
@@ -26,10 +26,6 @@ library("ggplot2")
 library("ggthemes")
 ```
 
-```{r}
-dir.create(snakemake@params[["fig_folder"]],
-    recursive = TRUE, showWarnings = FALSE)
-```
 
 ```{r}
 sample_info <- read_csv(snakemake@input[["sample_info"]]) %>% 
@@ -43,23 +39,35 @@ sample_info <- read_csv(snakemake@input[["sample_info"]]) %>%
 # Reads and mapping
 
 ```{r import_flagstats}
+separate_variables <- function(df, method) {
+    if (method %in% c("cdna", "teloprime")) {
+        df <- df %>%
+            tidyr::separate(file, c("waste", "library", "flowcell", "filename"),
+                sep = '/') %>% 
+            tidyr::separate(filename, c("waste1", "waste2", "type", "barcode"),
+                extra = "drop") %>%  
+            select_at(vars(-matches("waste")))
+    } else if (method == "rna") {
+        df <- df %>%
+            tidyr::separate(file, c("waste1", "library", "filename"), sep = '/') %>% 
+            tidyr::separate(filename, c("type", "barcode"), extra = "drop") %>% 
+            select_at(vars(-matches("waste"))) 
+    }
+    return(df)
+}
+
 flagstats <- snakemake@input[["flagstats"]] %>% 
     map(read_csv) %>% 
-    bind_rows() %>%  
-    tidyr::separate(file, c("waste", "library", "flowcell", "filename"),
-        sep = '/') %>% 
-    tidyr::separate(filename, c("waste1", "waste2", "type", "barcode"),
-        extra = "drop") %>% 
+    map2(c("cdna", "teloprime", "rna"), separate_variables) %>% 
+    bind_rows() %>% 
     left_join(sample_info, by = "barcode") %>% 
+    mutate(sample_id = if_else(library == "rna", barcode, sample_id)) %>% 
     dplyr::select(-barcode) %>% 
     dplyr::select_at(vars(-matches("waste"))) %>% 
     mutate(flowcell = if_else(flowcell %in% c("X1_flowcell", "pool1"),
         "cell_1", "cell_2")) %>% 
+    mutate(flowcell = if_else(library == "rna", NA_character_, flowcell)) %>% 
     dplyr::select(sample_id, everything())
-
-flagstats %>% 
-    knitr::kable(format = "html") %>%
-    kableExtra::kable_styling()
 ```
 
 ```{r plot_flagstats}
@@ -114,10 +122,10 @@ get_map_type <- function(flag) {
 ```
 
 ```{r dataImport_tx_bam}
-df_tx <- c(snakemake@input[["teloprime_bam_tx"]], snakemake@input[["cdna_bam_tx"]]) %>%
-    set_names(  
-        tools::file_path_sans_ext(basename(snakemake@input[["teloprime_bam_tx"]])),
-        tools::file_path_sans_ext(basename(snakemake@input[["cdna_bam_tx"]])))
+df_tx <- c(snakemake@input[["teloprime_bam_tx"]],
+        snakemake@input[["cdna_bam_tx"]],
+        snakemake@input[["rna_bam_tx"]]) %>%
+    set_names(tools::file_path_sans_ext(basename(.)))
 
 names(df_tx) <- strsplit(names(df_tx), '_') %>% 
     map(`[`, 1:2) %>% 
