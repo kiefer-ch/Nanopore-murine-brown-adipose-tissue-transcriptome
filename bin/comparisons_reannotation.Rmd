@@ -98,6 +98,12 @@ df %>%
 
 # Sqanti
 
+```{r}
+knitr::include_graphics("https://raw.githubusercontent.com/Magdoll/images_public/master/SQANTI2_figures/sqanti2_classification.png")
+```
+
+https://github.com/Magdoll/SQANTI2
+
 ```{r plot_sqanti}
 df2 %>% 
     mutate(grouped_num_exons = cut(exons, 
