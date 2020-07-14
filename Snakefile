@@ -1,7 +1,12 @@
 __author__ = "Christoph Kiefer"
 __email__ = "christophak@bmb.sdu.dk"
 
+
 import pandas as pd
+
+
+configfile: "config.yaml"
+
 
 # URLS to annotation
 GENCODE_URL = "ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_mouse/release_M22"
@@ -13,9 +18,6 @@ TRANSCRIPTS_URL = expand(
 ANNOTATION_URL = expand(
     "{base_url}/gencode.vM22.primary_assembly.annotation.gtf.gz", base_url=GENCODE_URL)
 
-# Paths to software required by salmon
-BEDTOOLS = "/data/bin/bedtools/bedtools-v2.28/bedtools"
-MASHMAP = "/data/home/christophak/bin/mashmap"
 
 # Sample IDs
 SAMPLE_INFO = pd.read_csv("sample_info/sampleInfo.csv", sep=',')

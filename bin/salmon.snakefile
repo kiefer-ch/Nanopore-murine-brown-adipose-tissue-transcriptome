@@ -1,4 +1,7 @@
 # salmon rules
+BEDTOOLS = config["BEDTOOLS"]
+MASHMAP = config["MASHMAP"]
+
 rule salmon_prepareDecoys:
     input:
         transcripts = "annotation/transcripts.fa",
