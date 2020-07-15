@@ -19,7 +19,7 @@ rule stringtie_illumina:
             -l {params.label} \
             -G {input.annotation} \
             -o {output} \
-            -j 10
+            -j 10 -c 1.5 -f 0.05
         """
 
 
@@ -42,7 +42,7 @@ rule stringtie_ont:
             -l {params.label} \
             -G {input.annotation} \
             -o {output} \
-            -j 10
+            -j 10 -c 1.5 -f 0.05
         """
 
 
@@ -73,6 +73,7 @@ rule stringtie_merge:
         {STRINGTIE} --merge \
             -p {threads} \
             -l {params.label} \
+            -c 1.5 -f 0.05 \
             -o {output} \
             {input.gtfs}
         """

@@ -1,3 +1,6 @@
+FLAIR = config["FLAIR"]
+
+
 rule flair_convert_bed12:
     input:
         bam = "bam/{dataset}/{barcode}_genome.bam",
@@ -7,7 +10,7 @@ rule flair_convert_bed12:
     output:
         "flair/{dataset}/bed/raw/{barcode}.bed"
     shell:
-        "python2 ~/src/flair-1.5/bin/bam2Bed12.py -i {input.bam} \
+        "python2 {FLAIR}/bin/bam2Bed12.py -i {input.bam} \
             > {output}"
 
 
@@ -55,7 +58,7 @@ rule flair_correct:
     threads:
         4
     shell:
-        "python2 ~/src/flair-1.5/flair.py correct \
+        "python2 {FLAIR}/flair.py correct \
             -q {input.bed} \
             -g {input.genome} \
             -j {input.junctions} \
@@ -134,17 +137,17 @@ rule flair_collapse:
         psl = "flair/{dataset}/bed/corrected/concatenated_all_corrected.psl",
         promoters = "data/chip/h3k4_cage_combined.bed"
     output:
-        "flair/{dataset}/flair.collapse.isoforms.fa",
-        "flair/{dataset}/flair.collapse.isoforms.gtf",
-        "flair/{dataset}/flair.collapse.isoforms.psl"
+        "flair/{dataset}/flair.collapse.{dataset}.isoforms.fa",
+        "flair/{dataset}/flair.collapse.{dataset}.isoforms.gtf",
+        "flair/{dataset}/flair.collapse.{dataset}.isoforms.psl"
     params:
-        out_prefix = "flair/{dataset}/flair.collapse"
+        out_prefix = "flair/{dataset}/flair.collapse.{dataset}"
     wildcard_constraints:
         dataset = "teloprime|cdna"
     threads:
         40
     shell:
-        "python2 ~/src/flair-1.5/flair.py collapse \
+        "python2 {FLAIR}/flair.py collapse \
             -g {input.genome} \
             -f {input.annotation} \
             -r {input.fastq} \
@@ -152,7 +155,7 @@ rule flair_collapse:
             -t {threads} \
             -p {input.promoters} \
             -o {params.out_prefix} \
-            -s 10 --stringent \
+            -s 5 --stringent \
             --temp_dir ./"
 
 
@@ -180,7 +183,7 @@ rule flair_quantify:
     input:
         get_flair_fastqnames,
         reads_manifest = "sample_info/flair_{dataset}_readsManifest.tsv",
-        isoforms_fasta = "flair/{dataset}/flair.collapse.isoforms.fa"
+        isoforms_fasta = "flair/{dataset}/flair.collapse.{dataset}.isoforms.fa"
     output:
         "flair/{dataset}/flair_{dataset}_counts_matrix.tsv"
     wildcard_constraints:
@@ -188,7 +191,7 @@ rule flair_quantify:
     threads:
         40
     shell:
-        "python2 ~/src/flair-1.5/flair.py quantify \
+        "python2 {FLAIR}/flair.py quantify \
             -r {input.reads_manifest} \
             -i {input.isoforms_fasta} \
             -o {output} \
