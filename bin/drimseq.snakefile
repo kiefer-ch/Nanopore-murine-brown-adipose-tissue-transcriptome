@@ -24,7 +24,7 @@ rule drimseq_dmdsFromScaledTpm:
 # ont
 rule drimseq_dmdsFromCountMatrix_flair:
     input:
-        txdb = "flair/{dataset}/flair.collapse.isoforms_txdb.sqlite",
+        txdb = "flair/{dataset}/flair.collapse.{dataset}.isoforms_txdb.sqlite",
         counts = "flair/{dataset}/flair_{dataset}_counts_matrix.tsv",
         sample_info = "sample_info/sampleInfo.csv"
     output:
@@ -91,8 +91,8 @@ rule isoformswitchanalyser_importData_flair:
     input:
         counts = "flair/{dataset}/flair_{dataset}_counts_matrix.tsv",
         sample_info = "sample_info/sampleInfo.csv",
-        gtf = "flair/{dataset}/flair.collapse.isoforms.gtf",
-        transcripts = "flair/{dataset}/flair.collapse.isoforms_clean.fa",
+        gtf = "flair/{dataset}/flair.collapse.{dataset}.isoforms.gtf",
+        transcripts = "flair/{dataset}/flair.collapse.{dataset}.isoforms_clean.fa",
         test = "res/drimseq/{dataset}_flair/{dataset}_flair_drimSeqStageR.csv"
     output:
         "res/drimseq/{dataset}_flair/{dataset}_flair_sal.rds"

@@ -15,7 +15,7 @@ rule qpcr_dtu_validation:
         sample_info = "sample_info/sampleInfo.csv",
         signif = "res/comparisons/comparisons_dtu_all.rds",
         txdb = "annotation/annotation_txdb.sqlite",
-        txdb_flair = "flair/cdna/flair.collapse.isoforms_txdb.sqlite",
+        txdb_flair = "flair/cdna/flair.collapse.cdna.isoforms_txdb.sqlite",
         illumina_warm = "bam/illumina/5034_S33_Aligned.sortedByCoord.out.bam",
         illumina_cold = "bam/illumina/5035_S34_Aligned.sortedByCoord.out.bam",
         teloprime_warm = "bam/teloprime/barcode01_genome.bam",
