@@ -272,11 +272,11 @@ rule compare_dge:
 rule compare_reannotation:
     input:
         gffcompare = ["stringtie/illumina/all_gffcompare.stringtie_illumina_merged.gtf.tmap",
-                      expand("flair/{dataset}/all_gffcompare.flair.collapse.isoforms.gtf.tmap",
-                             dataset=["cdna", "teloprime"])],
+                      expand("flair/{dataset}/all_gffcompare.flair.collapse.{dataset}.isoforms.gtf.tmap",
+                             dataset=["cdna", "teloprime", "rna"])],
         sqanti = ["stringtie/illumina/sqanti/stringtie_illumina_merged_noUnknownStrand_classification.txt",
-                  expand("flair/{dataset}/sqanti/flair.collapse.isoforms_classification.txt",
-                         dataset=["cdna", "teloprime"])]
+                  expand("flair/{dataset}/sqanti/flair.collapse.{dataset}.isoforms_classification.txt",
+                         dataset=["cdna", "teloprime", "rna"])]
     output:
         "res/comparisons/comparisons_reannotation.html"
     script:

@@ -50,12 +50,12 @@ rule sqanti_illumina:
 rule sqanti_flair:
     input:
         "annotation/genome.fa.fai",
-        isoforms = "flair/{dataset}/flair.collapse.isoforms.gtf",
+        isoforms = "flair/{dataset}/flair.collapse.{dataset}.isoforms.gtf",
         annotation = "annotation/annotation.gtf",
         genome = "annotation/genome.fa"
     output:
-        "flair/{dataset}/sqanti/flair.collapse.isoforms_sqanti_report.pdf",
-        "flair/{dataset}/sqanti/flair.collapse.isoforms_classification.txt"
+        "flair/{dataset}/sqanti/flair.collapse.{dataset}.isoforms_sqanti_report.pdf",
+        "flair/{dataset}/sqanti/flair.collapse.{dataset}.isoforms_classification.txt"
     params:
         out_dir = "flair/{dataset}/sqanti"
     shell:
