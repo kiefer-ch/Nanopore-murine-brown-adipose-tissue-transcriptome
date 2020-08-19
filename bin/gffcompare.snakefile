@@ -1,8 +1,8 @@
 rule gffcompare:
     input:
         gtfs = ["stringtie/illumina/stringtie_illumina_merged.gtf",
-                "flair/teloprime/flair.collapse.isoforms.gtf",
-                "flair/cdna/flair.collapse.isoforms.gtf"],
+                expand("flair/{dataset}/flair.collapse.{dataset}.isoforms.gtf",
+                       dataset=["cdna", "teloprime", "rna"])],
         reference = "annotation/annotation.gtf"
     output:
         "res/comparisons/gffcompare/all_gffcompare.loci",
@@ -10,8 +10,8 @@ rule gffcompare:
         "res/comparisons/gffcompare/all_gffcompare.combined.gtf",
         "res/comparisons/gffcompare/all_gffcompare.tracking",
         "stringtie/illumina/all_gffcompare.stringtie_illumina_merged.gtf.tmap",
-        "flair/cdna/all_gffcompare.flair.collapse.isoforms.gtf.tmap",
-        "flair/teloprime/all_gffcompare.flair.collapse.isoforms.gtf.tmap"
+        expand("flair/{dataset}/all_gffcompare.flair.collapse.{dataset}.isoforms.gtf.tmap",
+               dataset=["cdna", "teloprime", "rna"])
     params:
         out_prefix = "res/comparisons/gffcompare/all_gffcompare"
     shell:
