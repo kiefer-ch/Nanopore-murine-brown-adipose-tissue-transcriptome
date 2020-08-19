@@ -5,6 +5,10 @@ date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
     html_document:
         toc: true
+        toc_float: true
+        toc_depth: 2
+        fig_caption: false
+        dev: "svg"
 editor_options:
   chunk_output_type: console
 ---
