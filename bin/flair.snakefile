@@ -225,3 +225,18 @@ rule flair_quantify:
             -t {threads} \
             --temp_dir ./ \
             --trust_ends"
+
+
+rule flair_example_browser_track:
+    input:
+        txdb = "annotation/annotation_txdb.sqlite",
+        txdb_flair = "flair/cdna/flair.collapse.cdna.isoforms_txdb.sqlite",
+        illumina_warm = "bam/illumina/5034_S33_Aligned.sortedByCoord.out.bam",
+        illumina_cold = "bam/illumina/5035_S34_Aligned.sortedByCoord.out.bam",
+        cdna_warm = "bam/cdna/barcode07_genome.bam",
+        cdna_cold = "bam/cdna/barcode08_genome.bam",
+        genome = "annotation/genome.fa",
+    output:
+        "res/comparisons/flair_browser_examples.html"
+    script:
+        "flair_example_browser_track.Rmd"
