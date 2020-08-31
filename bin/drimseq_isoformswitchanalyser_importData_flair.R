@@ -55,7 +55,9 @@ switchList <- analyzeORF(switchList)
 # add aa sequence
 switchList <- extractSequence(switchList,
     extractNTseq = FALSE,
-    writeToFile = FALSE)
+    writeToFile = TRUE,
+    pathToOutput = snakemake@params[["aa_path"]],
+    outputPrefix = snakemake@params[["aa_prefix"]])
 
 # predict alternative splicing and intron retention
 switchList <- analyzeAlternativeSplicing(switchList)

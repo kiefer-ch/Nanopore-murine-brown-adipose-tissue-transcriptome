@@ -71,7 +71,11 @@ rule isoformswitchanalyser_importData:
         transcripts = "annotation/transcripts.fa",
         test = "res/drimseq/{dataset}/{dataset}_drimSeqStageR.csv"
     output:
-        "res/drimseq/{dataset}/{dataset}_sal.rds"
+        "res/drimseq/{dataset}/{dataset}_sal.rds",
+        "res/drimseq/{dataset}/{dataset}_isoform_AA.fasta"
+    params:
+        aa_path = "res/drimseq/{dataset}",
+        aa_prefix = "{dataset}_isoform"
     wildcard_constraints:
         dataset = "cdna|teloprime|illumina"
     script:
@@ -95,11 +99,35 @@ rule isoformswitchanalyser_importData_flair:
         transcripts = "flair/{dataset}/flair.collapse.{dataset}.isoforms_clean.fa",
         test = "res/drimseq/{dataset}_flair/{dataset}_flair_drimSeqStageR.csv"
     output:
-        "res/drimseq/{dataset}_flair/{dataset}_flair_sal.rds"
+        "res/drimseq/{dataset}_flair/{dataset}_flair_sal.rds",
+        "res/drimseq/{dataset}_flair/{dataset}_flair_isoform_AA.fasta"
+    params:
+        aa_path = "res/drimseq/{dataset}_flair",
+        aa_prefix = "{dataset}_flair_isoform"
     wildcard_constraints:
         dataset = "cdna|teloprime"
     script:
         "drimseq_isoformswitchanalyser_importData_flair.R"
+
+
+rule signalP:
+    input:
+        "res/drimseq/{dataset}/{dataset}_isoform_AA.fasta"
+    output:
+        "res/drimseq/{dataset}/{dataset}_isoform_AA_summary.signalp5"
+    params:
+        out_prefix = "res/drimseq/{dataset}/{dataset}_isoform_AA"
+    wildcard_constraints:
+        dataset = "cdna|teloprime|illumina|cdna_flair|teloprime_flair"
+    threads:
+        40
+    shell:
+        "signalp \
+            -fasta {input} \
+            -format short \
+            -org euk \
+            -plot none \
+            -prefix {params.out_prefix}"
 
 
 def get_txdb(wildcards):
