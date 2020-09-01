@@ -152,6 +152,7 @@ rule drimseq_report:
     input:
         dmds = "res/drimseq/{dataset}/{file}_dmds_dtu.rds",
         res = "res/drimseq/{dataset}/{file}_drimSeqStageR.csv",
+        signalP = "res/drimseq/{dataset}/{dataset}_isoform_AA_summary.signalp5",
         biomaRt_gene = "annotation/biomaRt_gene.rds",
         biomaRt_tx = "annotation/biomaRt_tx.rds",
         switchList = "res/drimseq/{dataset}/{dataset}_sal.rds"
