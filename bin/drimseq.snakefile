@@ -130,6 +130,55 @@ rule signalP:
             -prefix {params.out_prefix}"
 
 
+rule get_pfama:
+    output:
+        pfam_hmm = "data/pfam/Pfam-A.hmm",
+        pfam_hmm_dat = "data/pfam/Pfam-A.hmm.dat",
+        pfam_active_site_dat = "data/pfam/active_site.dat"
+    shell:
+        "wget -q -O \
+            - ftp://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/Pfam-A.hmm.gz \
+            | gunzip > {output.pfam_hmm} && \
+        wget -q -O \
+            - ftp://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/Pfam-A.hmm.dat.gz \
+            | gunzip > {output.pfam_hmm_dat} && \
+        wget -q -O \
+            - ftp://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/active_site.dat.gz \
+            | gunzip > {output.pfam_active_site_dat}"
+
+
+rule hmmpress:
+    input:
+        pfam_hmm = "data/pfam/Pfam-A.hmm",
+        pfam_hmm_dat = "data/pfam/Pfam-A.hmm.dat",
+        pfam_active_site_dat = "data/pfam/active_site.dat"
+    output:
+        multiext("data/pfam/Pfam-A.hmm", ".h3f", ".h3i", ".h3m", ".h3p")
+    shell:
+        "hmmpress {input.pfam_hmm}"
+
+
+rule pfam_scan:
+    input:
+        multiext("data/pfam/Pfam-A.hmm", ".h3f", ".h3i", ".h3m", ".h3p"),
+        fasta = "res/drimseq/{dataset}/{dataset}_isoform_AA.fasta"
+    output:
+        "res/drimseq/{dataset}/{dataset}_isoform_AA.pfam"
+    params:
+        pfam_a_dir = "data/pfam/"
+    wildcard_constraints:
+        dataset = "cdna|teloprime|illumina|cdna_flair|teloprime_flair"
+    threads:
+        5
+    shell:
+        "pfam_scan \
+            -fasta {input.fasta} \
+            -dir {params.pfam_a_dir} \
+            -outfile {output} \
+            -as \
+            -cpu {threads}"
+
+
 def get_txdb(wildcards):
     if wildcards.dataset in ["teloprime", "illumina", "cdna"]:
         txdb = "annotation/annotation_txdb.sqlite"
@@ -150,14 +199,15 @@ def get_axis(wildcards):
 
 rule drimseq_report:
     input:
-        dmds = "res/drimseq/{dataset}/{file}_dmds_dtu.rds",
-        res = "res/drimseq/{dataset}/{file}_drimSeqStageR.csv",
+        dmds = "res/drimseq/{dataset}/{dataset}_dmds_dtu.rds",
+        res = "res/drimseq/{dataset}/{dataset}_drimSeqStageR.csv",
         signalP = "res/drimseq/{dataset}/{dataset}_isoform_AA_summary.signalp5",
+        pfam = "res/drimseq/{dataset}/{dataset}_isoform_AA.pfam",
         biomaRt_gene = "annotation/biomaRt_gene.rds",
         biomaRt_tx = "annotation/biomaRt_tx.rds",
         switchList = "res/drimseq/{dataset}/{dataset}_sal.rds"
     output:
-        "res/drimseq/{dataset}/{file}_drimSeqStageR.html"
+        "res/drimseq/{dataset}/{dataset}_drimSeqStageR.html"
     params:
         axis = get_axis
     wildcard_constraints:

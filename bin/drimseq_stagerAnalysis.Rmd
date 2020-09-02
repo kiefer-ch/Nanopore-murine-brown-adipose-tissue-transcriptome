@@ -37,6 +37,9 @@ res_stageR <- read_csv(snakemake@input[["res"]])
 switchList <- read_rds(snakemake@input[["switchList"]])
 switchList <- analyzeSignalP(switchList,
     pathToSignalPresultFile = snakemake@input[["signalP"]])
+switchList <- analyzePFAM(switchList,
+    pathToPFAMresultFile = snakemake@input[["pfam"]],
+    showProgress = FALSE)
 ```
 
 # Overview
