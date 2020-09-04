@@ -110,33 +110,38 @@ rule flair_concatenate:
         "cat {input} > {output}"
 
 
-rule bedtools_combineWarmColdH3k4:
+rule bedtools_combineH3k4me3:
     input:
-        "data/chip/k4me3/NC_broad.bed"
-        "data/chip/k4me3/NW_broad.bed"
+        expand("data/chip/k4me3/{condition}_peaks.narrowPeak",
+            condition=["cold_hfd", "cold_ncd", "warm_hfd", "warm_ncd"])
     output:
-        "data/chip/k4me3/combined_broad.bed"
+        "data/chip/k4me3/combined_peaks.narrowPeak"
     shell:
-        "TDIR=$(mktemp -d data/chip/k4me3/tmp.XXXXXXXXX) \
-        cat {input} > $TDIR/cat.bed \
-        sort -k1,1 -k2,2n $TDIR/cat.bed > $TDIR/cat.sorted.bed \
-        bedtools merge -i $TDIR/cat.sorted.bed > {output}"
+        """
+        TDIR=$(mktemp -d data/chip/k4me3/tmp.XXXXXXXXX) &&
+        cat {input} > $TDIR/cat.bed &&
+        sort -k1,1 -k2,2n $TDIR/cat.bed > $TDIR/cat.sorted.bed &&
+        bedtools merge -i $TDIR/cat.sorted.bed > {output}
+        rm -r $TDIR
+        """
 
 
-rule bedtools_combine_h3k4me3_cage:
+rule bedtools_combineH3k4me3Cage:
     input:
-        combined = "data/chip/k4me3/combined_broad.bed",
+        combined = "data/chip/k4me3/combined_peaks.narrowPeak",
         # from FANTOM
         cage = "data/chip/cage/mm10.cage_peak_phase1and2combined_coord.bed"
     output:
         "data/chip/h3k4_cage_combined.bed"
     shell:
-        "TDIR=$(mktemp -d data/chip/tmp.XXXXXXXXX) && "
-        "awk '{printf(\"%s\t%s\t%s\n\", $1, $2, $3)}' > $TDIR/cat.bed < {input.cage} && "
-        "cat {input.combined}  >> $TDIR/cat.bed && "
-        "sort -k1,1 -k2,2n $TDIR/cat.bed > $TDIR/cat.sorted.bed && "
-        "bedtools merge -i $TDIR/cat.sorted.bed > {output}"
-
+        """
+        TDIR=$(mktemp -d data/chip/tmp.XXXXXXXXX) &&
+        awk '{{printf(\"%s\\t%s\\t%s\\n\", $1, $2, $3)}}' > $TDIR/cat.bed < {input.cage} &&
+        cat {input.combined} >> $TDIR/cat.bed &&
+        sort -k1,1 -k2,2n $TDIR/cat.bed > $TDIR/cat.sorted.bed &&
+        bedtools merge -i $TDIR/cat.sorted.bed > {output}
+        rm -r $TDIR
+        """
 
 def get_flair_fastqnames(wildcards):
     files = list()
