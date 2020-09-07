@@ -130,6 +130,26 @@ rule signalP:
             -prefix {params.out_prefix}"
 
 
+rule targetP:
+    input:
+        "res/drimseq/{dataset}/{dataset}_isoform_AA.fasta"
+    output:
+        "res/drimseq/{dataset}/{dataset}_isoform_AA_summary.targetp2"
+    params:
+        out_prefix = "res/drimseq/{dataset}/{dataset}_isoform_AA"
+    wildcard_constraints:
+        dataset = "cdna|teloprime|illumina|cdna_flair|teloprime_flair"
+    threads:
+        40
+    shell:
+        "targetp \
+            -fasta {input} \
+            -format short \
+            -org non-pl \
+            -plot none \
+            -prefix {params.out_prefix}"
+
+
 rule get_pfama:
     output:
         pfam_hmm = "data/pfam/Pfam-A.hmm",
