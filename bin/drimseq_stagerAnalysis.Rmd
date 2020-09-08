@@ -40,6 +40,8 @@ switchList <- analyzeSignalP(switchList,
 switchList <- analyzePFAM(switchList,
     pathToPFAMresultFile = snakemake@input[["pfam"]],
     showProgress = FALSE)
+targetP <- read_tsv(snakemake@input[["targetP"]], skip = 1) %>% 
+    select("# ID", "Prediction")
 ```
 
 # Overview
@@ -202,19 +204,20 @@ gene_ids <- res_stageR %>%
 
 for (ens_gene_id in gene_ids) {
     
-    gene_symbol <- res_stageR %>% 
+    gene_info <- res_stageR %>% 
         filter(ensembl_gene_id_version == ens_gene_id) %>% 
-        pull(mgi_symbol) %>% 
-        unique()
+        select(mgi_symbol, ensembl_gene_id_version) %>% 
+        distinct()
     
-    cat('\n') 
-    cat("## ", gene_symbol, "\n") 
-    
+    cat('\n')  
+    cat("## ", gene_info$mgi_symbol, gene_info$ensembl_gene_id_version, "\n") 
+
     res_stageR %>% 
         filter(ensembl_gene_id_version == ens_gene_id) %>% 
         left_join(biomart_tx, by = c("ensembl_transcript_id_version", "ensembl_gene_id_version")) %>% 
-        dplyr::select(ensembl_gene_id_version, ensembl_transcript_id_version, transcript_biotype, transcript) %>%
-        dplyr::rename(padj = "transcript") %>% 
+        dplyr::select(ensembl_transcript_id_version, transcript_biotype, transcript) %>% 
+        left_join(targetP, by = c("ensembl_transcript_id_version" = "# ID")) %>% 
+        dplyr::rename(padj = "transcript", targetP = "Prediction") %>% 
         knitr::kable(format = "html") %>%
         kableExtra::kable_styling() %>% 
         print()

@@ -222,6 +222,7 @@ rule drimseq_report:
         dmds = "res/drimseq/{dataset}/{dataset}_dmds_dtu.rds",
         res = "res/drimseq/{dataset}/{dataset}_drimSeqStageR.csv",
         signalP = "res/drimseq/{dataset}/{dataset}_isoform_AA_summary.signalp5",
+        targetP = "res/drimseq/{dataset}/{dataset}_isoform_AA_summary.targetp2",
         pfam = "res/drimseq/{dataset}/{dataset}_isoform_AA.pfam",
         biomaRt_gene = "annotation/biomaRt_gene.rds",
         biomaRt_tx = "annotation/biomaRt_tx.rds",
