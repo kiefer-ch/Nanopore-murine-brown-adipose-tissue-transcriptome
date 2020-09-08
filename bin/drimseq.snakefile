@@ -150,6 +150,38 @@ rule targetP:
             -prefix {params.out_prefix}"
 
 
+def get_nt_fasta(wildcards):
+    if wildcards.dataset in ["teloprime", "illumina", "cdna"]:
+        fasta = "annotation/transcripts.fa"
+    elif wildcards.dataset == "teloprime_flair":
+        fasta = "flair/teloprime/flair.collapse.teloprime.isoforms.fa"
+    elif wildcards.dataset == "cdna_flair":
+        fasta = "flair/cdna/flair.collapse.cdna.isoforms.fa"
+    return fasta
+
+
+rule CPAT:
+    input:
+        fasta = get_nt_fasta,
+        hex = "data/cpat/Mouse_Hexamer.tsv",
+        logit = "data/cpat/Mouse_logitModel.RData"
+    output:
+        multiext("res/drimseq/{dataset}/{dataset}_cpat.", "ORF_seqs.fa",
+            "ORF_prob.tsv", "ORF.txt", "ORF_prob.best.tsv", "r")
+    params:
+        out_prefix = "res/drimseq/{dataset}/{dataset}_cpat"
+    wildcard_constraints:
+        dataset = "cdna|teloprime|illumina|cdna_flair|teloprime_flair"
+    threads:
+        40
+    shell:
+        "cpat.py \
+            -g {input.fasta} \
+            -o {params.out_prefix} \
+            -d {input.logit} \
+            -x {input.hex}"
+
+
 rule get_pfama:
     output:
         pfam_hmm = "data/pfam/Pfam-A.hmm",
@@ -197,16 +229,6 @@ rule pfam_scan:
             -outfile {output} \
             -as \
             -cpu {threads}"
-
-
-def get_txdb(wildcards):
-    if wildcards.dataset in ["teloprime", "illumina", "cdna"]:
-        txdb = "annotation/annotation_txdb.sqlite"
-    elif wildcards.dataset == "teloprime_flair":
-        txdb = "flair/teloprime/flair.collapse.isoforms_txdb.sqlite"
-    elif wildcards.dataset == "cdna_flair":
-        txdb = "flair/cdna/flair.collapse.isoforms_txdb.sqlite"
-    return txdb
 
 
 def get_axis(wildcards):
