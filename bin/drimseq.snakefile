@@ -166,8 +166,7 @@ rule CPAT:
         hex = "data/cpat/Mouse_Hexamer.tsv",
         logit = "data/cpat/Mouse_logitModel.RData"
     output:
-        multiext("res/drimseq/{dataset}/{dataset}_cpat.", "ORF_seqs.fa",
-            "ORF_prob.tsv", "ORF.txt", "ORF_prob.best.tsv", "r")
+        "res/drimseq/{dataset}/{dataset}_cpat.ORF_prob.best.tsv"
     params:
         out_prefix = "res/drimseq/{dataset}/{dataset}_cpat"
     wildcard_constraints:
@@ -179,7 +178,9 @@ rule CPAT:
             -g {input.fasta} \
             -o {params.out_prefix} \
             -d {input.logit} \
-            -x {input.hex}"
+            -x {input.hex} && \
+         rm {params.out_prefix}.ORF_seqs.fa {params.out_prefix}.ORF_prob.tsv \
+            {params.out_prefix}.no_ORF.txt {params.out_prefix}.r"
 
 
 rule get_pfama:
@@ -246,6 +247,7 @@ rule drimseq_report:
         signalP = "res/drimseq/{dataset}/{dataset}_isoform_AA_summary.signalp5",
         targetP = "res/drimseq/{dataset}/{dataset}_isoform_AA_summary.targetp2",
         pfam = "res/drimseq/{dataset}/{dataset}_isoform_AA.pfam",
+        cpat = "res/drimseq/{dataset}/{dataset}_cpat.ORF_prob.best.tsv",
         biomaRt_gene = "annotation/biomaRt_gene.rds",
         biomaRt_tx = "annotation/biomaRt_tx.rds",
         switchList = "res/drimseq/{dataset}/{dataset}_sal.rds"

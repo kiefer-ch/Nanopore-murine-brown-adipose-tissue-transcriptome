@@ -42,6 +42,14 @@ switchList <- analyzePFAM(switchList,
     showProgress = FALSE)
 targetP <- read_tsv(snakemake@input[["targetP"]], skip = 1) %>% 
     select("# ID", "Prediction")
+CPAT <- read_tsv(snakemake@input[["cpat"]]) %>% 
+    select(seq_ID, Coding_prob, ORF) %>% 
+    tidyr::separate(seq_ID,
+        c("ensembl_transcript_id_version", "ensembl_gene_id_version"),
+        sep = '_') %>% 
+    select(-ensembl_gene_id_version) %>% 
+    mutate(ensembl_transcript_id_version =  if_else(substr(ensembl_transcript_id_version, 1, 7) == "ENSMUST",
+        ensembl_transcript_id_version, tolower(ensembl_transcript_id_version)))
 ```
 
 # Overview
@@ -217,7 +225,9 @@ for (ens_gene_id in gene_ids) {
         left_join(biomart_tx, by = c("ensembl_transcript_id_version", "ensembl_gene_id_version")) %>% 
         dplyr::select(ensembl_transcript_id_version, transcript_biotype, transcript) %>% 
         left_join(targetP, by = c("ensembl_transcript_id_version" = "# ID")) %>% 
-        dplyr::rename(padj = "transcript", targetP = "Prediction") %>% 
+        left_join(CPAT, by = "ensembl_transcript_id_version") %>% 
+        dplyr::rename(padj = "transcript", targetP = "Prediction",
+            CPAT = "Coding_prob", ORF_length = "ORF") %>% 
         knitr::kable(format = "html") %>%
         kableExtra::kable_styling() %>% 
         print()
