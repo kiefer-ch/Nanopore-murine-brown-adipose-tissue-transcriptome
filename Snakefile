@@ -121,6 +121,12 @@ rule comparisons_all:
         "res/comparisons/comparisons_reannotation.html"
 
 
+rule flair_all:
+    input :
+        expand("flair/{dataset}/flair.collapse.{dataset}.isoforms.gtf",
+            dataset=["teloprime", "cdna", "rna"])
+
+
 # Include other rules
 include: "bin/annotation.snakefile"
 include: "bin/fastq.snakefile"

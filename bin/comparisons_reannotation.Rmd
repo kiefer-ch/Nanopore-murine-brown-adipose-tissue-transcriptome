@@ -121,7 +121,7 @@ df2 %>%
 df2 %>% 
     ggplot(aes(dataset)) +
     geom_bar(aes(fill = structural_category), position = "fill") +
-    scale_fill_colorblind() +
+    scale_fill_viridis_d() +
     theme_tufte() +
     geom_rangeframe(sides = 'l') +
     ylab(NULL) +
@@ -131,7 +131,7 @@ df2 %>%
 df2 %>% 
     ggplot(aes(dataset)) +
     geom_bar(aes(fill = structural_category)) +
-    scale_fill_colorblind() +
+    scale_fill_viridis_d() +
     theme_tufte() +
     geom_rangeframe(sides = 'l') +
     ylab(NULL) +

@@ -169,9 +169,8 @@ rule flair_collapse:
         psl = "flair/{dataset}/bed/corrected/concatenated_all_corrected.psl",
         promoters = "data/chip/h3k4_cage_combined.bed"
     output:
-        "flair/{dataset}/flair.collapse.{dataset}.isoforms.fa",
-        "flair/{dataset}/flair.collapse.{dataset}.isoforms.gtf",
-        "flair/{dataset}/flair.collapse.{dataset}.isoforms.psl"
+        multiext("flair/{dataset}/flair.collapse.{dataset}.isoforms",
+            ".fa", ".gtf", ".psl")
     params:
         out_prefix = "flair/{dataset}/flair.collapse.{dataset}"
     wildcard_constraints:
@@ -228,8 +227,7 @@ rule flair_quantify:
             -i {input.isoforms_fasta} \
             -o {output} \
             -t {threads} \
-            --temp_dir ./ \
-            --trust_ends"
+            --temp_dir ./"
 
 
 rule flair_example_browser_track:
