@@ -161,6 +161,14 @@ def get_flair_fastqnames(wildcards):
     return files
 
 
+def ends_switch(wildcards):
+    if wildcards.dataset == "teloprime":
+        par = "--trust_ends"
+    elif wildcards.dataset == "cdna":
+        par = ""
+    return par
+
+
 rule flair_collapse:
     input:
         fastq = get_flair_fastqnames,
@@ -172,7 +180,8 @@ rule flair_collapse:
         multiext("flair/{dataset}/flair.collapse.{dataset}.isoforms",
             ".fa", ".gtf", ".psl")
     params:
-        out_prefix = "flair/{dataset}/flair.collapse.{dataset}"
+        out_prefix = "flair/{dataset}/flair.collapse.{dataset}",
+        ends = ends_switch
     wildcard_constraints:
         dataset = "teloprime|cdna|rna"
     threads:
@@ -187,6 +196,7 @@ rule flair_collapse:
             -p {input.promoters} \
             -o {params.out_prefix} \
             -s 5 --stringent \
+            {params.ends} \
             --temp_dir ./"
 
 
@@ -219,6 +229,8 @@ rule flair_quantify:
         "flair/{dataset}/flair_{dataset}_counts_matrix.tsv"
     wildcard_constraints:
         dataset = "teloprime|cdna"
+    params:
+        ends = ends_switch
     threads:
         40
     shell:
@@ -227,6 +239,7 @@ rule flair_quantify:
             -i {input.isoforms_fasta} \
             -o {output} \
             -t {threads} \
+            {params.ends} \
             --temp_dir ./"
 
 
