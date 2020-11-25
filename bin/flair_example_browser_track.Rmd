@@ -18,7 +18,6 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = FA
 ```
 
 ```{r library, include=FALSE}
-save.image()
 source(".Rprofile")
 library("dplyr")
 library("readr")
@@ -54,7 +53,7 @@ subset.txdb <- function(txdb, txdb_dump, gene_id) {
     do.call(makeTxDb, new_txdb_dump)
 }
 
-plot.transcripts <- function(gene_id) {
+plot.transcripts <- function(gene_id, extend.right = 250, extend.left = 250) {
     
     gene_info <- AnnotationDbi::select(txdb_gencode, keys = gene_id,
             keytype = "GENEID",
@@ -126,9 +125,9 @@ plot.transcripts <- function(gene_id) {
             atrack_flair),
         from = gene_info$TXSTART,
         to = gene_info$TXEND,
-        type = c("pileup"),
-        extend.left = 250,
-        extend.right = 250,
+#        type = c("pileup"),
+        extend.left = extend.left,
+        extend.right = extend.right,
         background.title = "darkblue",
         cex.axis = .4,
         min.height = 2, # controls min height of the single reads in the pileup, set to 0 to plot all reads
@@ -138,5 +137,6 @@ plot.transcripts <- function(gene_id) {
 
 ```{r}
 plot.transcripts("ENSMUSG00000024981.6")
+plot.transcripts("ENSMUSG00000087382.7", extend.right = 5500)
 ```
 
