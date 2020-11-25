@@ -159,7 +159,7 @@ df[[1]] %>%
     geom_text_repel(aes(label = pos),
         family = "serif", size = 2) +
     facet_wrap(~gene) +
-    theme_tufte(base_size = 8) +
+    theme_tufte() +
     geom_rangeframe() +
     ylab("cq") +
     xlab(NULL) +
@@ -176,7 +176,7 @@ df[[2]] %>%
     geom_text_repel(aes(label = pos),
         family = "serif", size = 2) +
     facet_wrap(~gene) +
-    theme_tufte(base_size = 8) +
+    theme_tufte() +
     geom_rangeframe() +
     ylab("cq") +
     xlab(NULL) +
@@ -193,7 +193,7 @@ df[[3]] %>%
     geom_text_repel(aes(label = pos),
         family = "serif", size = 2) +
     facet_wrap(~gene) +
-    theme_tufte(base_size = 8) +
+    theme_tufte() +
     geom_rangeframe() +
     ylab("cq") +
     xlab(NULL) +
@@ -256,15 +256,14 @@ df %>%
     tidyr::separate(gene, c("gene", "isoform"), sep = '_') %>%
     tidyr::drop_na() %>%
     ggplot(aes(condition_temp, 2^-dcq, colour = isoform)) +
-    geom_point(size = 1,
-        position = position_dodge(width = .5)) +
+    geom_point(position = position_dodge(width = .5)) +
     stat_summary(geom = "crossbar",
         fun.data = mean_se,
         width = .25, lwd = .25,
         position = position_dodge(width = .5)) +
     facet_wrap(~gene, scales = "free_y") +
     scale_y_log10(labels = function(x) x) +
-    theme_tufte(base_size = 8) +
+    theme_tufte() +
     geom_rangeframe(colour = "black") +
     ylab("rel. expr. vs. Gtf2b/Hprt") +
     xlab("temperature") +
@@ -545,14 +544,13 @@ for (gene in pvalues$ensembl_gene_id_version) {
         tidyr::separate(gene, c("gene", "isoform"), sep = '_') %>%
         tidyr::drop_na() %>%
         ggplot(aes(condition_temp, 2^-dcq, colour = isoform)) +
-        geom_point(size = 1,
-            position = position_dodge(width = .5)) +
+        geom_point(position = position_dodge(width = .5)) +
         stat_summary(geom = "crossbar",
             fun.data = mean_se,
             width = .25, lwd = .25,
             position = position_dodge(width = .5)) +
         scale_y_log10(labels = function(x) x) +
-        theme_tufte(base_size = 8) +
+        theme_tufte() +
         geom_rangeframe(colour = "black") +
         ylab("rel. expr. vs. Gtf2b/Hprt") +
         xlab("temperature") +
