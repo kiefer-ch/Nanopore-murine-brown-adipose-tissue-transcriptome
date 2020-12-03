@@ -198,6 +198,20 @@ res_stageR %>%
     kableExtra::scroll_box(width = "100%", height = "600px")
 ```
 
+```{r}
+extractConsequenceSummary(
+    switchList,
+    consequencesToAnalyze = "all",
+    plotGenes = FALSE,          
+    asFractionTotal = FALSE)
+
+extractConsequenceEnrichment(
+    switchList,
+    consequencesToAnalyze = "all",
+    analysisOppositeConsequence = TRUE,
+    returnResult = FALSE)
+```
+
 # Plots
 
 The cross is the proportion estimated by DRIMSeq. The red transcripts are significantly changed.
