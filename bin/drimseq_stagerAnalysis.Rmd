@@ -27,7 +27,6 @@ library("ggthemes")
 library("cowplot")
 library("IsoformSwitchAnalyzeR")
 library("topGO")
-library("ReactomePA")
 select <- dplyr::select
 ```
 
@@ -184,16 +183,6 @@ res_go %>%
     kableExtra::kable_styling() %>% 
     kableExtra::scroll_box(width = "100%", height = "600px")
 ```
-
-
-```{r}
-ReactomePA::dotplot(res_reactome, 
-        showCategory = 15)
-
-ReactomePA::cnetplot(res_reactome, categorySize = "pvalue",
-        foldChange = geneList_signif)
-```
-
 
 # Isoform switch analyser
 
