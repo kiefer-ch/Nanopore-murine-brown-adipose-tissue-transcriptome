@@ -14,23 +14,24 @@ editor_options:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = FALSE)
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
+    cache = FALSE, fig.width = 5.35538 * 2/3, fig.asp = 0.7, out.width = 800)
 ```
 
 ```{r library, include=FALSE}
 source(".Rprofile")
 library("dplyr")
 library("readr")
-library("DRIMSeq")
 library("ggplot2")
 library("ggthemes")
-library("cowplot")
+library("patchwork")
+library("DRIMSeq")
 library("IsoformSwitchAnalyzeR")
 library("topGO")
 select <- dplyr::select
 ```
 
-```{r importData}
+```{r importData, include=FALSE}
 dmds <- read_rds(snakemake@input[["dmds"]])
 biomart_gene <- read_rds(snakemake@input[["biomaRt_gene"]])
 biomart_tx <- read_rds(snakemake@input[["biomaRt_tx"]])
@@ -136,7 +137,7 @@ res_stageR %>%
 ## GO
 
 ```{r}
-all_genes <- res_stageR$ensembl_gene_id_version %>% 
+all_genes <- res_stageR$ensembl_gene_id_version %>%
     unique
 
 # function to generate genelist
@@ -171,16 +172,16 @@ get.results <- function(topGO) {
 # run the analysis
 res_go <- res_stageR %>%
     filter(gene < .05) %>%
-    pull(ensembl_gene_id_version) %>% 
+    pull(ensembl_gene_id_version) %>%
     unique() %>%
     get.geneList() %>%
-    make.topGO(description = "allRegulatedGenes") %>% 
+    make.topGO(description = "allRegulatedGenes") %>%
     get.results()
 
 res_go %>%
-    filter(p < .05) %>% 
+    filter(p < .05) %>%
     knitr::kable(format = "html") %>%
-    kableExtra::kable_styling() %>% 
+    kableExtra::kable_styling() %>%
     kableExtra::scroll_box(width = "100%", height = "600px")
 ```
 
@@ -336,6 +337,7 @@ extractConsequenceEnrichment(switchList,
 
 # Plots
 
+The proportions and counts are from drimseq and therefore only for transcripts that have passed the filter criteria.
 The cross is the proportion estimated by DRIMSeq. The red transcripts are significantly changed.
 Note that sometimes there is an indication of significant DTU at the genelevel, but no 
 single transcript changes significantly.
@@ -348,6 +350,7 @@ gene_ids <- res_stageR %>%
 
 for (ens_gene_id in gene_ids) {
     
+    # gene info for header
     gene_info <- res_stageR %>% 
         filter(ensembl_gene_id_version == ens_gene_id) %>% 
         select(mgi_symbol, ensembl_gene_id_version) %>% 
@@ -356,6 +359,7 @@ for (ens_gene_id in gene_ids) {
     cat('\n')  
     cat("## ", gene_info$mgi_symbol, gene_info$ensembl_gene_id_version, "\n") 
 
+    # table with transcript level information
     res_stageR %>% 
         filter(ensembl_gene_id_version == ens_gene_id) %>% 
         left_join(biomart_tx, by = c("ensembl_transcript_id_version", "ensembl_gene_id_version")) %>% 
@@ -368,8 +372,14 @@ for (ens_gene_id in gene_ids) {
         kableExtra::kable_styling() %>% 
         print()
     
-    switchPlotTranscript(switchList, gene = ens_gene_id)
+    # plot of isoforms with domains
+    switchplot <- switchPlotTranscript(switchList, gene = ens_gene_id,
+        localTheme = theme_bw(base_size = 10, base_family = "Helvetica")) +
+        scale_fill_colorblind() +
+        ggtitle(NULL)
 
+    print(switchplot)
+    
     df <- proportions(dmds) %>% 
         filter(gene_id == ens_gene_id) %>%
         dplyr::select(-gene_id) %>% 
@@ -387,24 +397,33 @@ for (ens_gene_id in gene_ids) {
     
     pl1 <- df2 %>% 
         mutate(condition_temp = relevel(condition_temp, "22")) %>% 
-        ggplot(aes(condition_temp, proportion)) +
-        geom_point(aes(colour = feature_id), position = position_dodge(width = .5)) +
-        stat_summary(aes(colour = feature_id), geom = "crossbar",
-            width = .5, lwd = .25,
+        ggplot(aes(feature_id, proportion)) +
+        geom_point(aes(colour = condition_temp), position = position_dodge(width = .5)) +
+        stat_summary(
+            aes(colour = condition_temp),
+            fun = mean, geom = "crossbar",
+            position = position_dodge(width = .5),
+            width = .5,
+            fatten = 1.5, lwd = .25) +
+        stat_summary(
+            aes(colour = condition_temp),
+            geom = "errorbar", fun.data = mean_se,
+            width = .5 * .666,
+            lwd = .25,
             position = position_dodge(width = .5)) +
-        geom_point(aes(y = estimated_proportion, colour = feature_id),
+        geom_point(aes(y = estimated_proportion, group = condition_temp),
             position = position_dodge(width = .5),
             shape = 3, size = 3) +
-        scale_color_colorblind() +
-        theme_tufte() +
+        scale_color_brewer(palette = "Dark2", name = NULL, labels = c("22" = "22°C", "4" = "4°C")) +
+        theme_tufte(base_size = 8, base_family = "Helvetica") +
         geom_rangeframe(sides = "l") +
-        xlab("T [°C]")
-    
+        xlab(NULL)
+
     if (snakemake@params[["axis"]] == "illumina") {
         pl1 <- pl1 +
             ylab("Proportion of scaled TPM")
     } else {
-        pl1<- pl1 +
+        pl1 <- pl1 +
             ylab("Proportion of counts")
     }
    
@@ -415,16 +434,26 @@ for (ens_gene_id in gene_ids) {
         mutate(sample_id = substr(sample_id, 2, nchar(sample_id))) %>% 
         left_join(DRIMSeq::samples(dmds), by = "sample_id") %>% 
         mutate(condition_temp = relevel(condition_temp, "22")) %>% 
-        ggplot(aes(condition_temp, count)) +
-        geom_point(aes(colour = feature_id), position = position_dodge(width = .5)) +
-        stat_summary(aes(colour = feature_id), geom = "crossbar",
-            width = .5, lwd = .25,
+        ggplot(aes(feature_id, count)) +
+        geom_point(aes(colour = condition_temp), position = position_dodge(width = .5)) +
+        stat_summary(
+            aes(colour = condition_temp),
+            fun = mean, geom = "crossbar",
+            position = position_dodge(width = .5),
+            width = .5,
+            fatten = 1.5, lwd = .25) +
+        stat_summary(
+            aes(colour = condition_temp),
+            geom = "errorbar", fun.data = mean_se,
+            width = .5 * .666,
+            lwd = .25,
             position = position_dodge(width = .5)) +
-        scale_color_colorblind() +
+        scale_color_brewer(palette = "Dark2", name = NULL, labels = c("22" = "22°C", "4" = "4°C")) +
         scale_y_log10() +
-        theme_tufte() +
+        theme_tufte(base_size = 8, base_family = "Helvetica") +
         geom_rangeframe(sides = "l") +
         xlab("T [°C]")
+
     
     if (snakemake@params[["axis"]] == "illumina") {
         pl2 <- pl2 +
@@ -434,12 +463,10 @@ for (ens_gene_id in gene_ids) {
             ylab("Counts")
     }
     
-    pl_gr <- plot_grid(pl1 + theme(legend.position="none"),
-        pl2 + theme(legend.position="none"),
-        get_legend(pl1),
-        nrow = 1, rel_widths = c(1, 1, .55))
+    pl_gr <- pl1 + pl2 + plot_layout(guides = 'collect')
     
     print(pl_gr)
+    
     cat('\n') 
 }
 ```
