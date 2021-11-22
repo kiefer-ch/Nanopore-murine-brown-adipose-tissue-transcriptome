@@ -15,7 +15,7 @@ editor_options:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
-    cache = FALSE, fig.width = 5.35538 * 2/3, fig.asp = 0.7, out.width = 800)
+    cache = FALSE, fig.width = 3.4 * 2, fig.asp = 0.7, out.width = 800)
 ```
 
 ```{r library, include=FALSE}
@@ -134,56 +134,56 @@ res_stageR %>%
     kableExtra::scroll_box(width = "100%", height = "600px")
 ```
 
-## GO
+<!-- ## GO -->
 
-```{r}
-all_genes <- res_stageR$ensembl_gene_id_version %>%
-    unique
+<!-- ```{r} -->
+<!-- all_genes <- res_stageR$ensembl_gene_id_version %>%  -->
+<!--     unique -->
 
-# function to generate genelist
-get.geneList <- function(genes) {
-    gl <- as.factor(as.integer(all_genes %in% genes))
-    names(gl) <- all_genes
-    # remove version
-    names(gl) <- unlist(lapply(stringr::str_split(names(gl), "[.]"), "[[",1))
-    gl
-}
+<!-- # function to generate genelist -->
+<!-- get.geneList <- function(genes) { -->
+<!--     gl <- as.factor(as.integer(all_genes %in% genes)) -->
+<!--     names(gl) <- all_genes -->
+<!--     # remove version -->
+<!--     names(gl) <- unlist(lapply(stringr::str_split(names(gl), "[.]"), "[[",1)) -->
+<!--     gl -->
+<!-- } -->
 
-# function to actually create topGO object
-make.topGO <- function(geneList, description) {
-    new("topGOdata",
-        description = description,
-        ontology = "BP",
-        allGenes = geneList,
-        nodeSize = 10,
-        annot = annFUN.org,
-        ID = "ensembl",
-        mapping = "org.Mm.eg")
-}
+<!-- # function to actually create topGO object -->
+<!-- make.topGO <- function(geneList, description) { -->
+<!--     new("topGOdata", -->
+<!--         description = description, -->
+<!--         ontology = "BP", -->
+<!--         allGenes = geneList, -->
+<!--         nodeSize = 10, -->
+<!--         annot = annFUN.org, -->
+<!--         ID = "ensembl", -->
+<!--         mapping = "org.Mm.eg") -->
+<!-- } -->
 
-# conveniance function to get results from topGO
-get.results <- function(topGO) {
-    topGOres <- runTest(topGO, algorithm = "parentchild", statistic = "fisher")
-    GenTable(topGO, p = topGOres, orderBy = "p", ranksOf = "p", topNodes = 100) %>%
-        as_tibble() %>%
-        mutate(p = as.double(p))
-}
+<!-- # conveniance function to get results from topGO -->
+<!-- get.results <- function(topGO) { -->
+<!--     topGOres <- runTest(topGO, algorithm = "parentchild", statistic = "fisher") -->
+<!--     GenTable(topGO, p = topGOres, orderBy = "p", ranksOf = "p", topNodes = 100) %>% -->
+<!--         as_tibble() %>% -->
+<!--         mutate(p = as.double(p)) -->
+<!-- } -->
 
-# run the analysis
-res_go <- res_stageR %>%
-    filter(gene < .05) %>%
-    pull(ensembl_gene_id_version) %>%
-    unique() %>%
-    get.geneList() %>%
-    make.topGO(description = "allRegulatedGenes") %>%
-    get.results()
+<!-- # run the analysis -->
+<!-- res_go <- res_stageR %>% -->
+<!--     filter(gene < .05) %>% -->
+<!--     pull(ensembl_gene_id_version) %>%  -->
+<!--     unique() %>% -->
+<!--     get.geneList() %>% -->
+<!--     make.topGO(description = "allRegulatedGenes") %>%  -->
+<!--     get.results() -->
 
-res_go %>%
-    filter(p < .05) %>%
-    knitr::kable(format = "html") %>%
-    kableExtra::kable_styling() %>%
-    kableExtra::scroll_box(width = "100%", height = "600px")
-```
+<!-- res_go %>% -->
+<!--     filter(p < .05) %>%  -->
+<!--     knitr::kable(format = "html") %>% -->
+<!--     kableExtra::kable_styling() %>%  -->
+<!--     kableExtra::scroll_box(width = "100%", height = "600px") -->
+<!-- ``` -->
 
 # Isoform switch analyser
 
@@ -348,7 +348,7 @@ gene_ids <- res_stageR %>%
     pull(ensembl_gene_id_version) %>% 
     unique()
 
-for (ens_gene_id in gene_ids) {
+for (ens_gene_id in "ENSMUSG00000056228.10") { #gene_ids
     
     # gene info for header
     gene_info <- res_stageR %>% 
@@ -374,7 +374,7 @@ for (ens_gene_id in gene_ids) {
     
     # plot of isoforms with domains
     switchplot <- switchPlotTranscript(switchList, gene = ens_gene_id,
-        localTheme = theme_bw(base_size = 10, base_family = "Helvetica")) +
+        localTheme = theme_bw(base_size = 7, base_family = "Helvetica")) +
         scale_fill_colorblind() +
         ggtitle(NULL)
 
@@ -398,7 +398,9 @@ for (ens_gene_id in gene_ids) {
     pl1 <- df2 %>% 
         mutate(condition_temp = relevel(condition_temp, "22")) %>% 
         ggplot(aes(feature_id, proportion)) +
-        geom_point(aes(colour = condition_temp), position = position_dodge(width = .5)) +
+        geom_point(aes(colour = condition_temp),
+            size = 1, alpha = .5,
+            position = position_dodge(width = .5)) +
         stat_summary(
             aes(colour = condition_temp),
             fun = mean, geom = "crossbar",
@@ -415,8 +417,10 @@ for (ens_gene_id in gene_ids) {
             position = position_dodge(width = .5),
             shape = 3, size = 3) +
         scale_color_brewer(palette = "Dark2", name = NULL, labels = c("22" = "22°C", "4" = "4°C")) +
-        theme_tufte(base_size = 8, base_family = "Helvetica") +
-        geom_rangeframe(sides = "l") +
+        theme_tufte(base_size = 7, base_family = "Helvetica") +
+        geom_rangeframe(sides = "bl") +
+        scale_x_discrete(labels = c("5ae7eec5-5305-4d10-b5ba-46aa6a69568f" = "Cars2-FL",
+                                    "f08a5a5b-5e85-4d78-a6c2-acd7764ef517" = "Cars2-AT")) +
         xlab(NULL)
 
     if (snakemake@params[["axis"]] == "illumina") {
@@ -435,7 +439,9 @@ for (ens_gene_id in gene_ids) {
         left_join(DRIMSeq::samples(dmds), by = "sample_id") %>% 
         mutate(condition_temp = relevel(condition_temp, "22")) %>% 
         ggplot(aes(feature_id, count)) +
-        geom_point(aes(colour = condition_temp), position = position_dodge(width = .5)) +
+        geom_point(aes(colour = condition_temp),
+            size = 1, alpha = .5,
+            position = position_dodge(width = .5)) +
         stat_summary(
             aes(colour = condition_temp),
             fun = mean, geom = "crossbar",
@@ -450,9 +456,11 @@ for (ens_gene_id in gene_ids) {
             position = position_dodge(width = .5)) +
         scale_color_brewer(palette = "Dark2", name = NULL, labels = c("22" = "22°C", "4" = "4°C")) +
         scale_y_log10() +
-        theme_tufte(base_size = 8, base_family = "Helvetica") +
-        geom_rangeframe(sides = "l") +
-        xlab("T [°C]")
+        theme_tufte(base_size = 7, base_family = "Helvetica") +
+        geom_rangeframe(sides = "bl") + 
+        scale_x_discrete(labels = c("5ae7eec5-5305-4d10-b5ba-46aa6a69568f" = "Cars2-FL",
+                                    "f08a5a5b-5e85-4d78-a6c2-acd7764ef517" = "Cars2-AT")) +
+        xlab(NULL)
 
     
     if (snakemake@params[["axis"]] == "illumina") {

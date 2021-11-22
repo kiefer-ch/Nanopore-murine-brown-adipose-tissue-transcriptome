@@ -14,10 +14,11 @@ editor_options:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = FALSE)
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, 
+    cache = FALSE, out.width = 800)
 ```
 
-```{r loadPackages}
+```{r loadPackages, include=FALSE}
 source(".Rprofile")
 library("dplyr")
 library("readr")
@@ -76,7 +77,7 @@ df <- snakemake@input[["readLengths"]] %>%
     filter(counts != 0)
 ```
 
-```{r}
+```{r, fig.width = 6.85 / 2, fig.asp = .7}
 tpm <- snakemake@input[["avg_counts"]] %>% 
     read_csv() %>% 
     select(transcript_length, illumina) %>% 
@@ -98,11 +99,11 @@ df %>%
         scale_x_log10() +
         ylab("Reads") + 
         xlab("Read length") +
-        theme_tufte() +
+        theme_tufte(base_size = 8, base_family = "Helvetica") +
         geom_rangeframe(sides = "lb") 
 ```
 
-```{r}
+```{r, fig.width = 6.85 / 2, fig.asp = .7}
 df %>% 
     group_by(method, read_length) %>% 
     summarise(counts = sum(counts)) %>%
@@ -114,9 +115,8 @@ df %>%
     ggplot(aes(method, read_length, weight = weight)) +
     geom_violin() +
     scale_y_log10() +
-    scale_fill_colorblind() +
-    theme_tufte() +
-    geom_rangeframe(sides = "l") +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe(sides = "bl") +
     xlab(NULL) + 
     ylab("Read/transcript length")
 ```
@@ -147,9 +147,9 @@ df %>%
     geom_violin() +
     facet_wrap(~method, ncol = 1) +
     scale_y_log10() +
-    scale_fill_colorblind() +
-    theme_tufte() +
-    geom_rangeframe(sides = "l") +
+    scale_fill_brewer(palette = "Dark2") +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe(sides = "bl") +
     xlab(NULL) + 
     ylab("Read length")
 ```
