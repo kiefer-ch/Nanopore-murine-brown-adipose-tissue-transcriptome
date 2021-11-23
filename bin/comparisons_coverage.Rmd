@@ -14,11 +14,11 @@ editor_options:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = FALSE)
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
+    cache = FALSE, out.width = 800)
 ```
 
 ```{r loadPackages}
-save.image()
 source(".Rprofile")
 library("dplyr")
 library("readr")
@@ -81,19 +81,22 @@ rna <- snakemake@input[["geneBodyCoverage_rna"]] %>%
     dplyr::select(-waste)
 ```
 
-```{r plot_geneBodyCoverage}
+```{r plot_geneBodyCoverage, fig.width = 6.85 / 2, fig.asp = .7}
 list(illumina, teloprime, cdna, rna) %>%
     bind_rows() %>%
     group_by(dataset, sample_id) %>%
     mutate(p = n / max(n)) %>%
     ungroup() %>%
+    mutate(dataset = factor(dataset, levels = c("illumina", "teloprime", "cdna", "rna"))) %>% 
     ggplot(aes(Percentile, p)) +
-        geom_line(aes(colour = dataset, lty = sample_id)) +
-        theme_tufte() +
+        geom_line(aes(colour = dataset, lty = sample_id), lwd = .25) +
+        theme_tufte(base_size = 8, base_family = "Helvetica") +
         geom_rangeframe(sides = "bl") +
         xlab("Gene body percentile (5' -> 3')") +
         ylab("Coverage") +
-        scale_colour_colorblind()
+        scale_colour_brewer(palette = "Dark2", name = NULL) +
+        guides(linetype = "none") +
+        theme(legend.key.size = unit(.33, "cm"))
 ```
 
 # Coverage
@@ -126,7 +129,7 @@ prepare_dataset2 = function(files) {
 df <- list(snakemake@input[["coverage_teloprime"]],
         snakemake@input[["coverage_cdna"]],
         snakemake@input[["coverage_rna"]]) %>%
-    map(prepare_dataset2) %>% 
+    map(prepare_dataset2) %>%
     map(dplyr::select, coverage, transcript_length, type, ensembl_transcript_id_version) %>%
     map(filter, type == "primary") %>%
     set_names(c("teloprime", "cdna", "rna")) %>%
@@ -134,22 +137,24 @@ df <- list(snakemake@input[["coverage_teloprime"]],
     tidyr::drop_na()
 ```
 
-```{r}
+```{r, fig.width = 6.85 / 2, fig.asp = .7}
 df %>%
     mutate(grouped_transcript_length = cut(transcript_length,
         breaks = c(0, 500, 1000, 1500, 2000, 2500, 3000, max(transcript_length)))) %>%
+    mutate(dataset = factor(dataset, levels = c("illumina", "teloprime", "cdna", "rna"))) %>%
     ggplot(aes(grouped_transcript_length, coverage)) +
-    geom_violin(aes(fill = dataset)) +
+    geom_violin(aes(fill = dataset), lwd = .25) +
     xlab(NULL) +
     ylab("Fraction of transcript covered by read") +
-    theme_tufte() +
-    geom_rangeframe(sides = 'l') +
-    scale_fill_colorblind() +
-    theme(axis.text.x = element_text(angle = 90, hjust = 1))
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe(sides = 'lb') +
+    scale_fill_brewer(palette = "Dark2", name = NULL) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5))
+    theme(legend.key.size = unit(.33, "cm"))
 ```
 
 
-```{r}
+```{r, fig.width = 6.85 / 2, fig.asp = .7}
 df %>%
     mutate(is_fullLength = if_else(coverage > .9, TRUE, FALSE)) %>%
     group_by(dataset, ensembl_transcript_id_version) %>%
@@ -157,22 +162,25 @@ df %>%
         n_fullLength = sum(is_fullLength),
         transcript_length = unique(transcript_length)) %>%
     mutate(rate = n_fullLength / n) %>%
+    mutate(dataset = factor(dataset, levels = c("illumina", "teloprime", "cdna", "rna"))) %>%
     ggplot(aes(transcript_length, rate)) +
     geom_hex(aes(fill = ..density..), bins = 50) +
-    geom_smooth(method = "lm", colour = "black", size = .5, se = FALSE) +
-    geom_quantile(colour = "red", size = .5) +
-    stat_poly_eq(formula = y ~ x,
-        aes(label = paste(..rr.label.., sep = "~~~")),
-        parse = TRUE, family = "serif", size = 3, colour = "grey30",
-        label.x.npc = "left", label.y.npc = "top") +
+#    geom_smooth(method = "lm", colour = "black", size = .5, se = FALSE) +
+    geom_quantile(colour = "red", lwd = .25) +
+    # stat_poly_eq(formula = y ~ x,
+    #     aes(label = paste(..rr.label.., sep = "~~~")),
+    #     parse = TRUE, family = "serif", size = 3, colour = "grey30",
+    #     label.x.npc = "left", label.y.npc = "top") +
     facet_wrap(~dataset) +
     scale_x_log10() +
     scale_y_continuous(trans = "logit",
-        breaks = c(0, .0001, .001, .01, .1, .25, .5, .75, .9, .99, 1),
-        labels = function(x) signif(x, 1)) +
-    theme_tufte() +
+         breaks = c(.0001, .001, .01, .1, .25, .5, .75, .9, .99),
+         labels = function(x) signif(x, 2)) +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
     geom_rangeframe(sides = "bl") +
     xlab("Transcript length") +
     ylab("Fraction of full length reads") +
-    scale_fill_viridis_c()
+    scale_fill_viridis_c() +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5)) +
+    theme(legend.key.size = unit(.33, "cm"))
 ```

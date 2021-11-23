@@ -13,6 +13,7 @@
 !bin/*.sh
 !bin/multiqc.conf
 !bin/*.snakefile
+!bin/*.smk
 !bin/*.py
 
 # Don't ignore necessary data

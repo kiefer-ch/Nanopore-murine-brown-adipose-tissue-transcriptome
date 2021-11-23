@@ -14,7 +14,8 @@ editor_options:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = FALSE)
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
+    cache = FALSE, out.width = 800)
 ```
 
 ```{r loadPackages}
@@ -70,7 +71,7 @@ flagstats <- snakemake@input[["flagstats"]] %>%
     dplyr::select(sample_id, everything())
 ```
 
-```{r plot_flagstats}
+```{r plot_flagstats, fig.width = 6.85 / 2, fig.asp = .7}
 add_total <- function(df) {
     df %>% add_row(library = unique(.$library), 
         type = unique(.$type),
@@ -98,89 +99,64 @@ grouped_flagstats %>%
     filter(mapping_type != "secondary") %>%
     mutate(mapping_type = factor(mapping_type,
         levels = c("total", "primary", "unmapped", "supplementary"))) %>% 
+    mutate(library = factor(library, levels = c("illumina", "teloprime", "cdna", "rna"))) %>% 
     ggplot(aes(x = library, y = count,  fill = mapping_type)) +
     geom_bar(stat = "identity", position = position_dodge()) +
     facet_wrap(~type) +
     scale_y_continuous(labels = function(x) x / 10^6) +
-    theme_tufte() +
-    geom_rangeframe(sides = "l") +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe(sides = "lb") +
     xlab(NULL) + 
     ylab("Mio. Reads") +
-    scale_fill_colorblind()
+    scale_fill_brewer(palette = "Dark2", name = NULL) +
+    theme(legend.key.size = unit(.33, "cm"))
 ```
 
 # Length of primary and supplementary reads
 
 Based on the mapping against the transcriptome. From bam files.
 
-```{r }
-get_map_type <- function(flag) {
-    if_else(flag == 4, "unmapped",
-        if_else(flag %in% c(0, 16), "primary",
-            if_else(flag %in% c(256, 275), "secondary", "supplementary")))
-}
-```
-
 ```{r dataImport_tx_bam}
-df_tx <- c(snakemake@input[["teloprime_bam_tx"]],
-        snakemake@input[["cdna_bam_tx"]],
-        snakemake@input[["rna_bam_tx"]]) %>%
-    set_names(tools::file_path_sans_ext(basename(.)))
-
-names(df_tx) <- strsplit(names(df_tx), '_') %>% 
-    map(`[`, 1:2) %>% 
-    map(paste, collapse = '_')
-
-df_tx <- df_tx %>% 
-    map(read_rds) %>%  
-    map(mutate, type = get_map_type(flag)) %>% 
-    map(dplyr::select, -flag) %>% 
-    map(tidyr::separate, col = seqnames,
-        into = "ensembl_transcript_id_version",
-        sep = '\\|', extra = "drop") %>% 
-    map(as_tibble) %>% 
-    map(group_by, qname) %>% 
-    map(mutate, has_supplementary = any(type == "supplementary")) %>% 
-    map(ungroup) %>% 
-    bind_rows(.id = "sample") %>% 
-    tidyr::separate(sample, c("library", "barcode"), sep = '_')
+df_tx <- read_rds(snakema@input$collapsed_transcripts)
 ```
 
-```{r}
+```{r, fig.width = 6.85 / 2, fig.asp = .7}
 df_tx %>% 
     dplyr::select(-barcode) %>% 
     mutate(category = if_else(type == "supplementary", "supplementary",
         if_else(has_supplementary, "primary_with_supplementary", "primary_wo_supplementary"))) %>% 
     ggplot(aes(category, qwidth)) + 
-    geom_violin(aes(fill = library)) +
+    geom_violin(aes(fill = library), lwd = .25) +
     scale_y_log10() +
-    scale_fill_colorblind() +
-    theme_tufte() +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
     geom_rangeframe(sides = "l") +
     xlab(NULL) + 
-    ylab("Read length")
+    ylab("Read length") +
+    scale_fill_brewer(palette = "Dark2", name = NULL) +
+    theme(legend.key.size = unit(.5, "cm"))
 ```
 
-```{r}
+```{r, fig.width = 6.85 / 2, fig.asp = .7}
 df_tx %>% 
     dplyr::select(-barcode) %>% 
     mutate(category = if_else(type == "supplementary", "supplementary",
         if_else(has_supplementary, "primary_with_supplementary", "primary_wo_supplementary"))) %>% 
     ggplot(aes(category, aligned)) + 
-    geom_violin(aes(fill = library)) +
+    geom_violin(aes(fill = library), lwd = .25) +
     scale_y_log10() +
-    scale_fill_colorblind() +
-    theme_tufte() +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
     geom_rangeframe(sides = "l") +
     xlab(NULL) + 
-    ylab("Aligned read length")
+    ylab("Aligned read length") +
+    scale_fill_brewer(palette = "Dark2", name = NULL) +
+    theme(legend.key.size = unit(.5, "cm"))
 ```
 
 # Aligned length vs read length
 
 Primary hits only
 
-```{r plotTranscriptome}
+```{r plotTranscriptome, fig.width = 6.85 / 2, fig.asp = .7}
 df_tx %>% 
     filter(type == "primary") %>% 
     dplyr::select(library, qwidth, aligned) %>% 
@@ -189,57 +165,60 @@ df_tx %>%
     facet_grid(~library) +
     scale_x_log10() +
     scale_y_log10() +
-    scale_fill_viridis_c(trans = "log") +
-    geom_abline(slope = 1) +
-    theme_tufte() +
+    scale_fill_viridis_c(trans = "log10") +
+    geom_abline(slope = 1, lwd = .25) +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
     geom_rangeframe(sides = "bl") +
     xlab("Read Length") + 
-    ylab("Aligned Length")
+    ylab("Aligned Length") +
+    theme(legend.key.size = unit(.5, "cm"))
 ```
 
 # Aligned length vs expected length
 
 ```{r import_txdb}
-biomart <- snakemake@input[["biomaRt_tx"]] %>% 
+biomart <- snakemake@input[["biomaRt_tx"]] %>%
     read_rds()
 ```
 
-```{r}
-df_tx %>% 
-    filter(type == "primary") %>% 
-    dplyr::select(library, ensembl_transcript_id_version, aligned) %>% 
-    left_join(biomart, by = "ensembl_transcript_id_version") %>% 
-    filter(!is.na(transcript_length)) %>% 
+```{r, fig.width = 6.85 / 2, fig.asp = .7}
+df_tx %>%
+    filter(type == "primary") %>%
+    dplyr::select(library, ensembl_transcript_id_version, aligned) %>%
+    left_join(biomart, by = "ensembl_transcript_id_version") %>%
+    filter(!is.na(transcript_length)) %>%
     ggplot(aes(transcript_length, aligned)) +
     geom_hex(aes(fill = ..density..), binwidth = .025) +
     facet_grid(~library) +
     scale_x_log10() +
     scale_y_log10() +
-    scale_fill_viridis_c(trans = "log") +
-    geom_abline(slope = 1) +
-    theme_tufte() +
+    scale_fill_viridis_c(trans = "log10") +
+    geom_abline(slope = 1, lwd = .25) +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
     geom_rangeframe(sides = "bl") +
-    xlab("Transcript length") + 
-    ylab("Aligned length")
+    xlab("Transcript length") +
+    ylab("Aligned length") +
+    theme(legend.key.size = unit(.5, "cm"))
 ```
 
 # Read length vs expected length
 
-```{r}
-df_tx %>% 
-    filter(type == "primary") %>% 
-    dplyr::select(library, ensembl_transcript_id_version, qwidth) %>% 
-    left_join(biomart, by = "ensembl_transcript_id_version") %>% 
-    filter(!is.na(transcript_length)) %>% 
+```{r, fig.width = 6.85 / 2, fig.asp = .7}
+df_tx %>%
+    filter(type == "primary") %>%
+    dplyr::select(library, ensembl_transcript_id_version, qwidth) %>%
+    left_join(biomart, by = "ensembl_transcript_id_version") %>%
+    filter(!is.na(transcript_length)) %>%
     ggplot(aes(transcript_length, qwidth)) +
     geom_hex(aes(fill = ..density..), binwidth = .025) +
     facet_grid(~library) +
     scale_x_log10() +
     scale_y_log10() +
-    scale_fill_viridis_c(trans = "log") +
-    geom_abline(slope = 1) +
-    theme_tufte() +
+    scale_fill_viridis_c(trans = "log10") +
+    geom_abline(slope = 1, lwd = .25) +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
     geom_rangeframe(sides = "bl") +
-    xlab("Transcript length") + 
-    ylab("Read length")
+    xlab("Transcript length") +
+    ylab("Read length") +
+    theme(legend.key.size = unit(.5, "cm"))
 ```

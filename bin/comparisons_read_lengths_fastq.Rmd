@@ -94,7 +94,7 @@ df %>%
     summarise(counts = sum(counts)) %>% 
     bind_rows(., tpm) %>% 
     ggplot(aes(read_length, counts)) +
-        geom_freqpoly(stat = "identity") +
+        geom_freqpoly(stat = "identity", lwd = .25) +
         facet_wrap(~method, ncol = 1, scales = "free_y") +
         scale_x_log10() +
         ylab("Reads") + 
@@ -113,7 +113,7 @@ df %>%
     ungroup() %>% 
     mutate(method = factor(method, levels = c("illumina", "teloprime", "cdna", "rna"))) %>% 
     ggplot(aes(method, read_length, weight = weight)) +
-    geom_violin() +
+    geom_violin(lwd = .25) +
     scale_y_log10() +
     theme_tufte(base_size = 8, base_family = "Helvetica") +
     geom_rangeframe(sides = "bl") +

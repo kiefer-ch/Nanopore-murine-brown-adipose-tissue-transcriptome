@@ -233,15 +233,23 @@ rule read_lengths_fastq:
     script:
         "comparisons_read_lengths_fastq.Rmd"
 
+rule read_lengths_bam_collapseTranscripts:
+    input:
+        teloprime_bam_tx = expand("res/comparisons/countReads/teloprime_{barcode}_bam_transcriptome.rds",
+            barcode=SAMPLE_INFO_ont["ont"]),
+        cdna_bam_tx = expand("res/comparisons/countReads/cdna_{barcode}_bam_transcriptome.rds",
+            barcode=SAMPLE_INFO_ont["cdna"]),
+        rna_bam_tx = expand("res/comparisons/countReads/rna_{barcode}_bam_transcriptome.rds",
+            barcode=["rt", "cool"])
+    output:
+        "res/comparisons/countReads/bam_transcrips_collapsed.rds"
+    script:
+        "comparisons_read_lengths_bam_collapseTranscripts.R"
+
 
 rule read_lengths_bam:
     input:
-        teloprime_bam_tx = expand("res/comparisons/countReads/teloprime_{barcode}_bam_transcriptome.rds",
-                                  barcode=SAMPLE_INFO_ont["ont"]),
-        cdna_bam_tx = expand("res/comparisons/countReads/cdna_{barcode}_bam_transcriptome.rds",
-                             barcode=SAMPLE_INFO_ont["cdna"]),
-        rna_bam_tx = expand("res/comparisons/countReads/rna_{barcode}_bam_transcriptome.rds",
-                             barcode=["rt", "cool"]),
+        collapsed_transcripts = "res/comparisons/countReads/bam_transcrips_collapsed.rds",
         biomaRt_tx = "annotation/biomaRt_tx.rds",
         sample_info = "sample_info/sampleInfo.csv",
         flagstats = expand("res/comparisons/countReads/{dataset}_flagstats.csv",
