@@ -143,6 +143,22 @@ rule bam_getCoverage:
         "comparisons_bam_getCoverage.R"
 
 
+rule collapse_coverage:
+    input:
+        coverage_teloprime = expand("res/comparisons/coverage/teloprime/{barcode}.rds",
+                                    barcode=SAMPLE_INFO_ont["ont"]),
+        coverage_cdna = expand("res/comparisons/coverage/cdna/{barcode}.rds",
+                               barcode=SAMPLE_INFO_ont["cdna"]),
+        coverage_rna = expand("res/comparisons/coverage/rna/{barcode}.rds",
+                               barcode=["rt", "cool"]),
+        biomaRt_tx = "annotation/biomaRt_tx.rds"
+    output:
+        "res/comparisons/coverage/collapsed_coverage.rds"
+    script:
+        "comparisons_coverage_collapseCoverage"
+
+
+
 rule coverage:
     input:
         geneBodyCoverage_teloprime = expand("res/comparisons/geneBody_coverage/teloprime/{barcode}.geneBodyCoverage.txt",
@@ -153,14 +169,8 @@ rule coverage:
                                            sample=SAMPLES_ont),
         geneBodyCoverage_rna = expand("res/comparisons/geneBody_coverage/rna/{barcode}.geneBodyCoverage.txt",
                                        barcode=["rt", "cool"]),
-        coverage_teloprime = expand("res/comparisons/coverage/teloprime/{barcode}.rds",
-                                    barcode=SAMPLE_INFO_ont["ont"]),
-        coverage_cdna = expand("res/comparisons/coverage/cdna/{barcode}.rds",
-                               barcode=SAMPLE_INFO_ont["cdna"]),
-        coverage_rna = expand("res/comparisons/coverage/rna/{barcode}.rds",
-                               barcode=["rt", "cool"]),
-        sample_info = "sample_info/sampleInfo.csv",
-        biomaRt_tx = "annotation/biomaRt_tx.rds"
+        collapsed_coverage = "res/comparisons/coverage/collapsed_coverage.rds",
+        sample_info = "sample_info/sampleInfo.csv"
     output:
         "res/comparisons/comparisons_coverage.html"
     script:

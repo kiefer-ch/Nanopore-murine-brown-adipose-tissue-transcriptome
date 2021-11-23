@@ -46,6 +46,6 @@ df_tx <- df_tx %>%
 
 log_info("Writing to disc...")
 df_tx %>%
-    write_rds(snakemake@output$df_tx)
+    saveRDS(snakemake@output[[1]])
 
 log_success("Done.")

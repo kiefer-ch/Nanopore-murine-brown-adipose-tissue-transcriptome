@@ -103,11 +103,11 @@ grouped_flagstats %>%
     ggplot(aes(x = library, y = count,  fill = mapping_type)) +
     geom_bar(stat = "identity", position = position_dodge()) +
     facet_wrap(~type) +
-    scale_y_continuous(labels = function(x) x / 10^6) +
+    scale_y_continuous(labels = label_scientific()) +
     theme_tufte(base_size = 8, base_family = "Helvetica") +
     geom_rangeframe(sides = "lb") +
     xlab(NULL) + 
-    ylab("Mio. Reads") +
+    ylab("Reads") +
     scale_fill_brewer(palette = "Dark2", name = NULL) +
     theme(legend.key.size = unit(.33, "cm"))
 ```
@@ -117,7 +117,7 @@ grouped_flagstats %>%
 Based on the mapping against the transcriptome. From bam files.
 
 ```{r dataImport_tx_bam}
-df_tx <- read_rds(snakema@input$collapsed_transcripts)
+df_tx <- read_rds(snakemake@input$collapsed_transcripts)
 ```
 
 ```{r, fig.width = 6.85 / 2, fig.asp = .7}
@@ -127,13 +127,13 @@ df_tx %>%
         if_else(has_supplementary, "primary_with_supplementary", "primary_wo_supplementary"))) %>% 
     ggplot(aes(category, qwidth)) + 
     geom_violin(aes(fill = library), lwd = .25) +
-    scale_y_log10() +
+    scale_y_log10(labels = trans_format("log10", math_format(10^.x))) +
     theme_tufte(base_size = 8, base_family = "Helvetica") +
-    geom_rangeframe(sides = "l") +
+    geom_rangeframe(sides = "bl") +
     xlab(NULL) + 
     ylab("Read length") +
     scale_fill_brewer(palette = "Dark2", name = NULL) +
-    theme(legend.key.size = unit(.5, "cm"))
+    theme(legend.key.size = unit(.33, "cm"))
 ```
 
 ```{r, fig.width = 6.85 / 2, fig.asp = .7}
@@ -143,13 +143,13 @@ df_tx %>%
         if_else(has_supplementary, "primary_with_supplementary", "primary_wo_supplementary"))) %>% 
     ggplot(aes(category, aligned)) + 
     geom_violin(aes(fill = library), lwd = .25) +
-    scale_y_log10() +
+    scale_y_log10(labels = trans_format("log10", math_format(10^.x))) +
     theme_tufte(base_size = 8, base_family = "Helvetica") +
-    geom_rangeframe(sides = "l") +
+    geom_rangeframe(sides = "bl") +
     xlab(NULL) + 
     ylab("Aligned read length") +
     scale_fill_brewer(palette = "Dark2", name = NULL) +
-    theme(legend.key.size = unit(.5, "cm"))
+    theme(legend.key.size = unit(.33, "cm"))
 ```
 
 # Aligned length vs read length
@@ -163,15 +163,15 @@ df_tx %>%
     ggplot(aes(qwidth, aligned)) +
     geom_hex(aes(fill = ..density..), binwidth = .025) +
     facet_grid(~library) +
-    scale_x_log10() +
-    scale_y_log10() +
-    scale_fill_viridis_c(trans = "log10") +
+    scale_x_log10(labels = trans_format("log10", math_format(10^.x))) +
+    scale_y_log10(labels = trans_format("log10", math_format(10^.x))) +
+    scale_fill_viridis_c(trans = "log10", labels = trans_format("log10", math_format(10^.x))) +
     geom_abline(slope = 1, lwd = .25) +
     theme_tufte(base_size = 8, base_family = "Helvetica") +
     geom_rangeframe(sides = "bl") +
     xlab("Read Length") + 
     ylab("Aligned Length") +
-    theme(legend.key.size = unit(.5, "cm"))
+    theme(legend.key.size = unit(.33, "cm"))
 ```
 
 # Aligned length vs expected length
@@ -190,15 +190,15 @@ df_tx %>%
     ggplot(aes(transcript_length, aligned)) +
     geom_hex(aes(fill = ..density..), binwidth = .025) +
     facet_grid(~library) +
-    scale_x_log10() +
-    scale_y_log10() +
-    scale_fill_viridis_c(trans = "log10") +
+    scale_x_log10(labels = trans_format("log10", math_format(10^.x))) +
+    scale_y_log10(labels = trans_format("log10", math_format(10^.x))) +
+    scale_fill_viridis_c(trans = "log10", labels = trans_format("log10", math_format(10^.x))) +
     geom_abline(slope = 1, lwd = .25) +
     theme_tufte(base_size = 8, base_family = "Helvetica") +
     geom_rangeframe(sides = "bl") +
     xlab("Transcript length") +
     ylab("Aligned length") +
-    theme(legend.key.size = unit(.5, "cm"))
+    theme(legend.key.size = unit(.33, "cm"))
 ```
 
 # Read length vs expected length
@@ -212,13 +212,13 @@ df_tx %>%
     ggplot(aes(transcript_length, qwidth)) +
     geom_hex(aes(fill = ..density..), binwidth = .025) +
     facet_grid(~library) +
-    scale_x_log10() +
-    scale_y_log10() +
-    scale_fill_viridis_c(trans = "log10") +
+    scale_x_log10(labels = trans_format("log10", math_format(10^.x))) +
+    scale_y_log10(labels = trans_format("log10", math_format(10^.x))) +
+    scale_fill_viridis_c(trans = "log10", labels = trans_format("log10", math_format(10^.x))) +
     geom_abline(slope = 1, lwd = .25) +
     theme_tufte(base_size = 8, base_family = "Helvetica") +
     geom_rangeframe(sides = "bl") +
     xlab("Transcript length") +
     ylab("Read length") +
-    theme(legend.key.size = unit(.5, "cm"))
+    theme(legend.key.size = unit(.33, "cm"))
 ```

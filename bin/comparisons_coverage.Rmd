@@ -28,10 +28,11 @@ library("ggthemes")
 library("ggpmisc")
 library("quantreg")
 library("AnnotationDbi")
+library("scales")
 ```
 
 ```{r}
-sample_info <- read_csv(snakemake@input[["sample_info"]]) %>%
+sample_info <- read_csv(snakemake@input[["sample_info"]], show_col_types = FALSE) %>%
     filter(!is.na(ont)) %>%
     mutate_at(vars(matches("condition")), as.factor) %>%
     dplyr::select(sample_id, illumina, ont, cdna)
@@ -42,7 +43,7 @@ sample_info <- read_csv(snakemake@input[["sample_info"]]) %>%
 ```{r dataImport_geneBodyCoverage}
 read_geneBodyCoverage <- function(file) {
     file %>%
-        read_tsv() %>%
+        read_tsv(show_col_types = FALSE) %>%
         tidyr::gather() %>%
         magrittr::set_colnames(.[1, ]) %>%
         `[`(-1, ) %>%
@@ -92,6 +93,7 @@ list(illumina, teloprime, cdna, rna) %>%
         geom_line(aes(colour = dataset, lty = sample_id), lwd = .25) +
         theme_tufte(base_size = 8, base_family = "Helvetica") +
         geom_rangeframe(sides = "bl") +
+        scale_y_continuous(labels = scales::percent) +
         xlab("Gene body percentile (5' -> 3')") +
         ylab("Coverage") +
         scale_colour_brewer(palette = "Dark2", name = NULL) +
@@ -99,42 +101,12 @@ list(illumina, teloprime, cdna, rna) %>%
         theme(legend.key.size = unit(.33, "cm"))
 ```
 
+
 # Coverage
 
-```{r import_txdb}
-biomart <- snakemake@input[["biomaRt_tx"]] %>%
-    read_rds()
-```
-
 ```{r import_coverage}
-get_map_type <- function(flag) {
-    if_else(flag %in% c(0, 16), "primary",
-        if_else(flag %in% c(256, 275), "secondary", "supplementary"))
-}
-
-prepare_dataset2 = function(files) {
-    files %>%
-        as.list() %>%
-        set_names(basename(files)) %>%
-        map(read_rds) %>%
-        map(mutate, type = get_map_type(flag)) %>%
-        map(dplyr::select, -qname, -flag, -qwidth) %>%
-        map(tidyr::separate, col = seqnames, into = "ensembl_transcript_id_version",
-            sep = "\\|", extra = "drop") %>%
-        map(left_join, y = biomart, by = "ensembl_transcript_id_version") %>%
-        bind_rows(.id = "sample") %>%
-        mutate(coverage = coverage / transcript_length)
-}
-
-df <- list(snakemake@input[["coverage_teloprime"]],
-        snakemake@input[["coverage_cdna"]],
-        snakemake@input[["coverage_rna"]]) %>%
-    map(prepare_dataset2) %>%
-    map(dplyr::select, coverage, transcript_length, type, ensembl_transcript_id_version) %>%
-    map(filter, type == "primary") %>%
-    set_names(c("teloprime", "cdna", "rna")) %>%
-    bind_rows(.id = "dataset") %>%
-    tidyr::drop_na()
+df <- snakemake@input[["collapsed_coverage"]] %>% 
+    read_rds()
 ```
 
 ```{r, fig.width = 6.85 / 2, fig.asp = .7}
@@ -149,6 +121,7 @@ df %>%
     theme_tufte(base_size = 8, base_family = "Helvetica") +
     geom_rangeframe(sides = 'lb') +
     scale_fill_brewer(palette = "Dark2", name = NULL) +
+    scale_y_continuous(labels = scales::percent) +
     theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5))
     theme(legend.key.size = unit(.33, "cm"))
 ```
@@ -172,7 +145,7 @@ df %>%
     #     parse = TRUE, family = "serif", size = 3, colour = "grey30",
     #     label.x.npc = "left", label.y.npc = "top") +
     facet_wrap(~dataset) +
-    scale_x_log10() +
+    scale_x_log10(labels = trans_format("log10", math_format(10^.x))) +
     scale_y_continuous(trans = "logit",
          breaks = c(.0001, .001, .01, .1, .25, .5, .75, .9, .99),
          labels = function(x) signif(x, 2)) +
@@ -181,6 +154,6 @@ df %>%
     xlab("Transcript length") +
     ylab("Fraction of full length reads") +
     scale_fill_viridis_c() +
-    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5)) +
+#    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5)) +
     theme(legend.key.size = unit(.33, "cm"))
 ```

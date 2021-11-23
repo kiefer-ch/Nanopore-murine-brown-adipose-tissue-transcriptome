@@ -25,6 +25,7 @@ library("readr")
 library("purrr")
 library("ggplot2")
 library("ggthemes")
+library("scales")
 ```
 
 # Length of reads by method
@@ -64,7 +65,7 @@ separate_variables <- function(df, method) {
 }
 
 df <- snakemake@input[["readLengths"]] %>% 
-    map(read_csv) %>%
+    map(read_csv, show_col_types = FALSE) %>%
     map(tidyr::gather, "sample", "counts", -read_length) %>% 
     map2(., c("teloprime", "cdna", "rna"), separate_variables) %>% 
     bind_rows() %>% 
@@ -93,10 +94,12 @@ df %>%
     group_by(method, read_length) %>% 
     summarise(counts = sum(counts)) %>% 
     bind_rows(., tpm) %>% 
+    mutate(method = factor(method, levels = c("illumina", "teloprime", "cdna", "rna"))) %>% 
     ggplot(aes(read_length, counts)) +
         geom_freqpoly(stat = "identity", lwd = .25) +
         facet_wrap(~method, ncol = 1, scales = "free_y") +
-        scale_x_log10() +
+        scale_y_continuous(labels = label_scientific()) +
+        scale_x_log10(labels = trans_format("log10", math_format(10^.x))) +
         ylab("Reads") + 
         xlab("Read length") +
         theme_tufte(base_size = 8, base_family = "Helvetica") +
@@ -114,7 +117,7 @@ df %>%
     mutate(method = factor(method, levels = c("illumina", "teloprime", "cdna", "rna"))) %>% 
     ggplot(aes(method, read_length, weight = weight)) +
     geom_violin(lwd = .25) +
-    scale_y_log10() +
+    scale_y_log10(labels = trans_format("log10", math_format(10^.x))) +
     theme_tufte(base_size = 8, base_family = "Helvetica") +
     geom_rangeframe(sides = "bl") +
     xlab(NULL) + 
@@ -146,7 +149,7 @@ df %>%
     ggplot(aes(sample_id, read_length, weight = weight, fill = flowcell)) +
     geom_violin() +
     facet_wrap(~method, ncol = 1) +
-    scale_y_log10() +
+    scale_y_log10(labels = trans_format("log10", math_format(10^.x))) +
     scale_fill_brewer(palette = "Dark2") +
     theme_tufte(base_size = 8, base_family = "Helvetica") +
     geom_rangeframe(sides = "bl") +
