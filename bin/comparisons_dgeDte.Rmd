@@ -14,7 +14,8 @@ editor_options:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = FALSE)
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
+    cache = FALSE, out.width = 800)
 ```
 
 ```{r library, include=FALSE}
@@ -25,8 +26,8 @@ library("purrr")
 library("ggplot2")
 library("ggthemes")
 library("UpSetR")
-library("ggpmisc")
-library("quantreg")
+library("scales")
+library("patchwork")
     select <- dplyr::select
     rename <- dplyr::rename
 ```
@@ -34,26 +35,17 @@ library("quantreg")
 ```{r dataImport}
 dte <- snakemake@input[["dte"]] %>%
     set_names(., tools::file_path_sans_ext(basename(.), compression = TRUE)) %>%
-    map(read_csv) %>%
+    map(read_csv, show_col_types = FALSE) %>%
     bind_rows(.id = "dataset") %>%
     select(-mgi_symbol, -description, -lfcSE, -baseMean, -log2FoldChange) %>%
     tidyr::separate(dataset, c("dataset", "library"), extra = "drop") %>%
     tidyr::unite("method", dataset, library) %>%
     tidyr::spread(method, svalue) %>%
     mutate_if(is.numeric, tidyr::replace_na, 1)
-
-dte_lfc <- snakemake@input[["dte"]] %>%
-    set_names(., tools::file_path_sans_ext(basename(.), compression = TRUE)) %>%
-    map(read_csv) %>%
-    bind_rows(.id = "dataset") %>%
-    select(-mgi_symbol, -description, -lfcSE, -baseMean, -svalue) %>%
-    tidyr::separate(dataset, c("dataset", "library"), extra = "drop") %>%
-    tidyr::unite("method", dataset, library) %>%
-    tidyr::spread(method, log2FoldChange)
 
 dge <- snakemake@input[["dge"]] %>%
     set_names(., tools::file_path_sans_ext(basename(.), compression = TRUE)) %>%
-    map(read_csv) %>%
+    map(read_csv, show_col_types = FALSE) %>%
     bind_rows(.id = "dataset") %>%
     select(-mgi_symbol, -description, -lfcSE, -baseMean, -log2FoldChange) %>%
     tidyr::separate(dataset, c("dataset", "library"), extra = "drop") %>%
@@ -61,33 +53,24 @@ dge <- snakemake@input[["dge"]] %>%
     tidyr::spread(method, svalue) %>%
     mutate_if(is.numeric, tidyr::replace_na, 1)
 
-dge_lfc <- snakemake@input[["dge"]] %>%
-    set_names(., tools::file_path_sans_ext(basename(.), compression = TRUE)) %>%
-    map(read_csv) %>%
-    bind_rows(.id = "dataset") %>%
-    select(-mgi_symbol, -description, -lfcSE, -baseMean, -svalue) %>%
-    tidyr::separate(dataset, c("dataset", "library"), extra = "drop") %>%
-    tidyr::unite("method", dataset, library) %>%
-    tidyr::spread(method, log2FoldChange)
-
 df_gene <- snakemake@input[["gene_counts"]] %>%
     set_names(basename(.)) %>%
-    map(read_csv) %>%
+    map(read_csv, show_col_types = FALSE) %>%
     map(select, -mgi_symbol, -description, -gene_biotype) %>%
     map(tidyr::gather, key = "sample_id", value = "counts", -ensembl_gene_id_version) %>%
     bind_rows(.id = "dataset") %>%
     tidyr::separate(dataset, "dataset", extra = "drop")
 
-df_tx <- snakemake@input[["tx_counts"]] %>%
-    set_names(basename(.)) %>%
-    map(read_csv) %>%
-    map(select, -mgi_symbol, -description, -gene_biotype, -transcript_biotype, -transcript_length) %>%
-    map(tidyr::gather, key = "sample_id", value = "counts",
-        -ensembl_gene_id_version, -ensembl_transcript_id_version) %>%
-    bind_rows(.id = "dataset") %>%
-    tidyr::separate(dataset, "dataset", extra = "drop")
+# df_tx <- snakemake@input[["tx_counts"]] %>%
+#     set_names(basename(.)) %>%
+#     map(read_csv, show_col_types = FALSE) %>%
+#     map(select, -mgi_symbol, -description, -gene_biotype, -transcript_biotype, -transcript_length) %>%
+#     map(tidyr::gather, key = "sample_id", value = "counts",
+#         -ensembl_gene_id_version, -ensembl_transcript_id_version) %>%
+#     bind_rows(.id = "dataset") %>%
+#     tidyr::separate(dataset, "dataset", extra = "drop")
 
-biotype_groups <- read_csv(snakemake@input[["grouped_biotypes"]])
+biotype_groups <- read_csv(snakemake@input[["grouped_biotypes"]], show_col_types = FALSE)
 ```
 
 ```{r filteringForExpression}
@@ -98,16 +81,18 @@ expressed_genes <- df_gene %>%
     filter(is_expressed_all) %>%
     pull(ensembl_gene_id_version)
 
-expressed_transcripts <- df_tx %>%
-    group_by(ensembl_transcript_id_version, dataset) %>%
-    summarize(is_expressed = if_else(sum(counts) > 5, TRUE, FALSE)) %>%
-    summarise(is_expressed_all = if_else(sum(is_expressed) == 3, TRUE, FALSE)) %>%
-    filter(is_expressed_all) %>%
-    pull(ensembl_transcript_id_version)
+# expressed_transcripts <- df_tx %>%
+#     group_by(ensembl_transcript_id_version, dataset) %>%
+#     summarize(is_expressed = if_else(sum(counts) > 5, TRUE, FALSE)) %>%
+#     summarise(is_expressed_all = if_else(sum(is_expressed) == 3, TRUE, FALSE)) %>%
+#     filter(is_expressed_all) %>%
+#     pull(ensembl_transcript_id_version)
 ```
 
 
 # Intersections
+
+## DGE
 
 Analysis on gene level. The txlevel pvalues are the smallest for any of the transcripts
 of a gene.
@@ -131,10 +116,14 @@ df %>%
     mutate_if(is.numeric, function(x) as.integer(x < .05)) %>%
     tidyr::drop_na(ensembl_gene_id_version) %>%
     as.data.frame() %>%
-    tibble::column_to_rownames("ensembl_gene_id_version") %>%
+    tibble::column_to_rownames("ensembl_gene_id_version") %>% 
     upset(nsets = 6, keep.order = TRUE,
         nintersects = 15,
-        order.by = "freq")
+        order.by = "freq",
+        sets = c("illumina_genelevel", "illumina_txlevel", "teloprime_genelevel", "teloprime_txlevel", "cdna_genelevel", "cdna_txlevel"),
+        sets.x.label = "Diff. expr. features",
+        mainbar.y.label = "Shared diff. expr. features",
+        text.scale = 1.5)
 ```
 
 ## Protein coding only
@@ -170,43 +159,34 @@ df %>%
 
 # Biotypes
 
-## All features
-
-### DGE
-
 ```{r}
-dge %>%
+pl_gene <- dge %>%
     left_join(biotype_groups, by = c("gene_biotype" = "transcript_biotype")) %>%
     select(-gene_biotype) %>%
     tidyr::drop_na(grouped_biotype) %>%
     tidyr::gather("library", "svalue", -grouped_biotype, -ensembl_gene_id_version) %>%
     filter(svalue < .05) %>%
-    tidyr::separate(library, "library", extra = "drop") %>%
-    ggplot(aes(library)) +
-        geom_bar(aes(fill = grouped_biotype), position = "fill") +
-        scale_fill_colorblind() +
-        theme_tufte() +
-        geom_rangeframe(sides = 'l')
-
-dge %>%
-    left_join(biotype_groups, by = c("gene_biotype" = "transcript_biotype")) %>%
-    select(-gene_biotype) %>%
-    tidyr::drop_na(grouped_biotype) %>%
-    tidyr::gather("library", "svalue", -grouped_biotype, -ensembl_gene_id_version) %>%
-    filter(svalue < .05) %>%
-    tidyr::separate(library, "library", extra = "drop") %>%
-    ggplot(aes(library, fill = grouped_biotype)) +
-        geom_bar() +
-        scale_fill_colorblind() +
-        theme_tufte() +
-        geom_rangeframe(sides = 'l')
+    tidyr::separate(library, "library", extra = "drop") %>% 
+    group_by(library, grouped_biotype) %>% 
+    summarise(count = n()) %>% 
+    mutate(fraction = count/sum(count)) %>% 
+    mutate(library = factor(library, levels = c("illumina", "teloprime", "cdna", "rna"))) %>% 
+    mutate(grouped_biotype = factor(grouped_biotype, 
+        levels = c("coding", "long ncRNA", "pseudogenes", "processed_others", "others"))) %>% 
+    ggplot(aes(library, fraction)) +
+        geom_bar(aes(fill = grouped_biotype), stat = "identity") +
+        scale_fill_brewer(palette = "Dark2", name = NULL, drop = FALSE) +
+        theme_tufte(base_size = 8, base_family = "Helvetica") +
+        geom_rangeframe(sides = 'lb', stat = "identity") +
+        scale_y_continuous(labels = label_percent()) +
+        xlab(NULL) +
+        ylab("Diff. expr. genes") +
+        theme(legend.key.size = unit(.33, "cm")) +
+        theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5))
 ```
 
-
-### DTE
-
 ```{r}
-dte %>%
+pl_tx <- dte %>%
     left_join(biotype_groups, by = "transcript_biotype") %>%
     select(-transcript_biotype, -transcript_length, -ensembl_gene_id_version,
         -gene_biotype) %>%
@@ -214,296 +194,25 @@ dte %>%
     tidyr::gather("library", "svalue", -grouped_biotype, -ensembl_transcript_id_version) %>%
     filter(svalue < .05) %>%
     tidyr::separate(library, "library", extra = "drop") %>%
-    ggplot(aes(library)) +
-        geom_bar(aes(fill = grouped_biotype), position = "fill") +
-        scale_fill_colorblind() +
-        theme_tufte() +
-        geom_rangeframe(sides = 'l')
-
-dte %>%
-    left_join(biotype_groups, by = "transcript_biotype") %>%
-    select(-transcript_biotype, -transcript_length, -ensembl_gene_id_version,
-        -gene_biotype) %>%
-    tidyr::drop_na(grouped_biotype) %>%
-    tidyr::gather("library", "svalue", -grouped_biotype, -ensembl_transcript_id_version) %>%
-    filter(svalue < .05) %>%
-    tidyr::separate(library, "library", extra = "drop") %>%
-    ggplot(aes(library, fill = grouped_biotype)) +
-        geom_bar() +
-        scale_fill_colorblind() +
-        theme_tufte() +
-        geom_rangeframe(sides = 'l')
+    group_by(library, grouped_biotype) %>% 
+    summarise(count = n()) %>% 
+    mutate(fraction = count/sum(count)) %>% 
+    mutate(library = factor(library, levels = c("illumina", "teloprime", "cdna", "rna"))) %>% 
+    mutate(grouped_biotype = factor(grouped_biotype, 
+        levels = c("coding", "long ncRNA", "pseudogenes", "processed_others", "others"))) %>% 
+        ggplot(aes(library, fraction)) +
+        geom_bar(aes(fill = grouped_biotype), stat = "identity") +
+        scale_fill_brewer(palette = "Dark2", name = NULL) +
+        theme_tufte(base_size = 8, base_family = "Helvetica") +
+        geom_rangeframe(sides = 'lb', stat = "identity") +
+        scale_y_continuous(labels = label_percent()) +
+        xlab(NULL) +
+        ylab("Diff. expr. transcripts") +
+        theme(legend.key.size = unit(.33, "cm")) +
+        theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5))
 ```
 
-
-## Only features detected by all library prep methods.
-
-### DGE
-
-```{r}
-dge %>%
-    left_join(biotype_groups, by = c("gene_biotype" = "transcript_biotype")) %>%
-    select(-gene_biotype) %>%
-    tidyr::drop_na(grouped_biotype) %>%
-    filter(ensembl_gene_id_version %in% expressed_genes) %>%
-    tidyr::gather("library", "svalue", -grouped_biotype, -ensembl_gene_id_version) %>%
-    filter(svalue < .05) %>%
-    tidyr::separate(library, "library", extra = "drop") %>%
-    ggplot(aes(library)) +
-        geom_bar(aes(fill = grouped_biotype), position = "fill") +
-        scale_fill_colorblind() +
-        theme_tufte() +
-        geom_rangeframe(sides = 'l')
-
-dge %>%
-    left_join(biotype_groups, by = c("gene_biotype" = "transcript_biotype")) %>%
-    select(-gene_biotype) %>%
-    tidyr::drop_na(grouped_biotype) %>%
-    filter(ensembl_gene_id_version %in% expressed_genes) %>%
-    tidyr::gather("library", "svalue", -grouped_biotype, -ensembl_gene_id_version) %>%
-    filter(svalue < .05) %>%
-    tidyr::separate(library, "library", extra = "drop") %>%
-    ggplot(aes(library, fill = grouped_biotype)) +
-        geom_bar() +
-        scale_fill_colorblind() +
-        theme_tufte() +
-        geom_rangeframe(sides = 'l')
+```{r plot, , fig.width = 6.85 / 2, fig.asp = .7}
+pl_gene + pl_tx +  plot_layout(guides = 'collect')
 ```
 
-
-### DTE
-
-```{r}
-dte %>%
-    left_join(biotype_groups, by = "transcript_biotype") %>%
-    select(-transcript_biotype, -transcript_length, -ensembl_gene_id_version,
-        -gene_biotype) %>%
-    tidyr::drop_na(grouped_biotype) %>%
-    filter(ensembl_transcript_id_version %in% expressed_transcripts) %>%
-    tidyr::gather("library", "svalue", -grouped_biotype, -ensembl_transcript_id_version) %>%
-    filter(svalue < .05) %>%
-    tidyr::separate(library, "library", extra = "drop") %>%
-    ggplot(aes(library)) +
-        geom_bar(aes(fill = grouped_biotype), position = "fill") +
-        scale_fill_colorblind() +
-        theme_tufte() +
-        geom_rangeframe(sides = 'l')
-
-dte %>%
-    left_join(biotype_groups, by = "transcript_biotype") %>%
-    select(-transcript_biotype, -transcript_length, -ensembl_gene_id_version,
-        -gene_biotype) %>%
-    tidyr::drop_na(grouped_biotype) %>%
-    filter(ensembl_transcript_id_version %in% expressed_transcripts) %>%
-    tidyr::gather("library", "svalue", -grouped_biotype, -ensembl_transcript_id_version) %>%
-    filter(svalue < .05) %>%
-    tidyr::separate(library, "library", extra = "drop") %>%
-    ggplot(aes(library, fill = grouped_biotype)) +
-        geom_bar() +
-        scale_fill_colorblind() +
-        theme_tufte() +
-        geom_rangeframe(sides = 'l')
-```
-
-
-# Scatter plots
-
-## DGE
-
-### svalues
-
-```{r, dev="png"}
-dge %>%
-    ggplot(aes(-log10(illumina_genelevel), -log10(teloprime_genelevel))) +
-    geom_point() +
-    geom_vline(xintercept = -log10(.05), lty = 2) +
-    geom_hline(yintercept = -log10(.05), lty = 2) +
-    theme_tufte() +
-    geom_rangeframe() +
-    coord_cartesian(xlim = c(0,10), ylim = c(0,10))  +
-    xlab(expression(paste(-log[10], "(s) illumina"))) +
-    ylab(expression(paste(-log[10], "(s) teloprime")))
-
-dge %>%
-    ggplot(aes(-log10(illumina_genelevel), -log10(cdna_genelevel))) +
-    geom_point() +
-    geom_vline(xintercept = -log10(.05), lty = 2) +
-    geom_hline(yintercept = -log10(.05), lty = 2) +
-    theme_tufte() +
-    geom_rangeframe() +
-    coord_cartesian(xlim = c(0,10), ylim = c(0,10)) +
-    xlab(expression(paste(-log[10], "(s) illumina"))) +
-    ylab(expression(paste(-log[10], "(s) cdna")))
-
-dge %>%
-    ggplot(aes(-log10(cdna_genelevel), -log10(teloprime_genelevel))) +
-    geom_point() +
-    geom_vline(xintercept = -log10(.05), lty = 2) +
-    geom_hline(yintercept = -log10(.05), lty = 2) +
-    theme_tufte() +
-    geom_rangeframe() +
-    coord_cartesian(xlim = c(0,10), ylim = c(0,10)) +
-    xlab(expression(paste(-log[10], "(s) cdna"))) +
-    ylab(expression(paste(-log[10], "(s) teloprime")))
-```
-
-### lfc
-
-```{r}
-dge_lfc %>%
-    tidyr::drop_na(illumina_genelevel, teloprime_genelevel) %>%
-    ggplot(aes(illumina_genelevel, teloprime_genelevel)) +
-    geom_hex(aes(fill = ..density..), bins = 150) +
-    geom_vline(xintercept = 0, lty = 2) +
-    geom_hline(yintercept = 0, lty = 2) +
-    geom_smooth(method = "lm", colour = "black", size = .5, se = FALSE) +
-    geom_quantile(colour = "red", size = .5) +
-    stat_poly_eq(formula = y ~ x,
-        aes(label = paste(..rr.label.., sep = "~~~")),
-        parse = TRUE, family = "serif", size = 3, colour = "grey30",
-        label.x.npc = "left", label.y.npc = "top") +
-    theme_tufte() +
-    geom_rangeframe() +
-    scale_fill_viridis_c() +
-    coord_cartesian(xlim = c(-5,5), ylim = c(-5,5)) +
-    xlab("log2FoldChange illumina") +
-    ylab("log2FoldChange teloprime")
-
-dge_lfc %>%
-    tidyr::drop_na(illumina_genelevel, cdna_genelevel) %>%
-    ggplot(aes(illumina_genelevel, cdna_genelevel)) +
-    geom_hex(aes(fill = ..density..), bins = 150) +
-    geom_vline(xintercept = 0, lty = 2) +
-    geom_hline(yintercept = 0, lty = 2) +
-    geom_smooth(method = "lm", colour = "black", size = .5, se = FALSE) +
-    geom_quantile(colour = "red", size = .5) +
-    stat_poly_eq(formula = y ~ x,
-        aes(label = paste(..rr.label.., sep = "~~~")),
-        parse = TRUE, family = "serif", size = 3, colour = "grey30",
-        label.x.npc = "left", label.y.npc = "top") +
-    theme_tufte() +
-    geom_rangeframe() +
-    scale_fill_viridis_c() +
-    coord_cartesian(xlim = c(-5,5), ylim = c(-5,5)) +
-    xlab("log2FoldChange illumina") +
-    ylab("log2FoldChange cdna")
-
-dge_lfc %>%
-    tidyr::drop_na(cdna_genelevel, teloprime_genelevel) %>%
-    ggplot(aes(cdna_genelevel, teloprime_genelevel)) +
-    geom_hex(aes(fill = ..density..), bins = 150) +
-    geom_vline(xintercept = 0, lty = 2) +
-    geom_hline(yintercept = 0, lty = 2) +
-    geom_smooth(method = "lm", colour = "black", size = .5, se = FALSE) +
-    geom_quantile(colour = "red", size = .5) +
-    stat_poly_eq(formula = y ~ x,
-        aes(label = paste(..rr.label.., sep = "~~~")),
-        parse = TRUE, family = "serif", size = 3, colour = "grey30",
-        label.x.npc = "left", label.y.npc = "top") +
-    theme_tufte() +
-    geom_rangeframe() +
-    scale_fill_viridis_c() +
-    coord_cartesian(xlim = c(-5,5), ylim = c(-5,5))  +
-    xlab("log2FoldChange cdna") +
-    ylab("log2FoldChange teloprime")
-```
-
-## DTE
-
-### svalues
-
-```{r, dev="png"}
-dte %>%
-    ggplot(aes(-log10(illumina_txlevel), -log10(teloprime_txlevel))) +
-    geom_point() +
-    geom_vline(xintercept = -log10(.05), lty = 2) +
-    geom_hline(yintercept = -log10(.05), lty = 2) +
-    theme_tufte() +
-    geom_rangeframe() +
-    coord_cartesian(xlim = c(0,10), ylim = c(0,10)) +
-    xlab(expression(paste(-log[10], "(s) illumina"))) +
-    ylab(expression(paste(-log[10], "(s) teloprime")))
-
-dte %>%
-    ggplot(aes(-log10(illumina_txlevel), -log10(cdna_txlevel))) +
-    geom_point() +
-    geom_vline(xintercept = -log10(.05), lty = 2) +
-    geom_hline(yintercept = -log10(.05), lty = 2) +
-    theme_tufte() +
-    geom_rangeframe() +
-    coord_cartesian(xlim = c(0,10), ylim = c(0,10))  +
-    xlab(expression(paste(-log[10], "(s) illumina"))) +
-    ylab(expression(paste(-log[10], "(s) cdna")))
-
-dte %>%
-    ggplot(aes(-log10(cdna_txlevel), -log10(teloprime_txlevel))) +
-    geom_point() +
-    geom_vline(xintercept = -log10(.05), lty = 2) +
-    geom_hline(yintercept = -log10(.05), lty = 2) +
-    theme_tufte() +
-    geom_rangeframe() +
-    coord_cartesian(xlim = c(0,10), ylim = c(0,10)) +
-    xlab(expression(paste(-log[10], "(s) cdna"))) +
-    ylab(expression(paste(-log[10], "(s) teloprime")))
-```
-
-### lfc
-
-```{r}
-dte_lfc %>%
-    tidyr::drop_na(illumina_txlevel, teloprime_txlevel) %>%
-    ggplot(aes(illumina_txlevel, teloprime_txlevel)) +
-    geom_hex(aes(fill = ..density..), bins = 200) +
-    geom_vline(xintercept = 0, lty = 2) +
-    geom_hline(yintercept = 0, lty = 2) +
-    geom_smooth(method = "lm", colour = "black", size = .5, se = FALSE) +
-    geom_quantile(colour = "red", size = .5) +
-    stat_poly_eq(formula = y ~ x,
-        aes(label = paste(..rr.label.., sep = "~~~")),
-        parse = TRUE, family = "serif", size = 3, colour = "grey30",
-        label.x.npc = "left", label.y.npc = "top") +
-    theme_tufte() +
-    geom_rangeframe() +
-    scale_fill_viridis_c() +
-    coord_cartesian(xlim = c(-5,5), ylim = c(-5,5))  +
-    xlab("log2FoldChange illumina") +
-    ylab("log2FoldChange teloprime")
-
-dte_lfc %>%
-    tidyr::drop_na(illumina_txlevel, cdna_txlevel) %>%
-    ggplot(aes(illumina_txlevel, cdna_txlevel)) +
-    geom_hex(aes(fill = ..density..), bins = 200) +
-    geom_vline(xintercept = 0, lty = 2) +
-    geom_hline(yintercept = 0, lty = 2) +
-    geom_smooth(method = "lm", colour = "black", size = .5, se = FALSE) +
-    geom_quantile(colour = "red", size = .5) +
-    stat_poly_eq(formula = y ~ x,
-        aes(label = paste(..rr.label.., sep = "~~~")),
-        parse = TRUE, family = "serif", size = 3, colour = "grey30",
-        label.x.npc = "left", label.y.npc = "top") +
-    theme_tufte() +
-    geom_rangeframe() +
-    scale_fill_viridis_c() +
-    coord_cartesian(xlim = c(-5,5), ylim = c(-5,5)) +
-    xlab("log2FoldChange illumina") +
-    ylab("log2FoldChange cdna")
-
-dte_lfc %>%
-    tidyr::drop_na(cdna_txlevel, teloprime_txlevel) %>%
-    ggplot(aes(cdna_txlevel, teloprime_txlevel)) +
-    geom_hex(aes(fill = ..density..), bins = 150) +
-    geom_vline(xintercept = 0, lty = 2) +
-    geom_hline(yintercept = 0, lty = 2) +
-    geom_smooth(method = "lm", colour = "black", size = .5, se = FALSE) +
-    geom_quantile(colour = "red", size = .5) +
-    stat_poly_eq(formula = y ~ x,
-        aes(label = paste(..rr.label.., sep = "~~~")),
-        parse = TRUE, family = "serif", size = 3, colour = "grey30",
-        label.x.npc = "left", label.y.npc = "top") +
-    theme_tufte() +
-    geom_rangeframe() +
-    scale_fill_viridis_c() +
-    coord_cartesian(xlim = c(-5,5), ylim = c(-5,5)) +
-    xlab("log2FoldChange cdna") +
-    ylab("log2FoldChange teloprime")
-```

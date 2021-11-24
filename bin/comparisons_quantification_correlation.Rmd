@@ -14,7 +14,8 @@ editor_options:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = FALSE)
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
+    cache = FALSE, dpi = 600)
 ```
 
 ```{r loadPackages}
@@ -32,32 +33,26 @@ library("GGally")
 ```
 
 ```{r importData}
-df_gene_average <- read_csv(snakemake@input[["gene_avg"]]) %>%
+df_gene_average <- read_csv(snakemake@input[["gene_avg"]], show_col_types = FALSE) %>%
     tidyr::gather("dataset", "average_counts",  -ensembl_gene_id_version, -mgi_symbol, -description,
         -gene_biotype, -grouped_biotype) %>% 
-    mutate(average_counts = 2^average_counts - 1)
+    mutate(average_counts = 2^average_counts - 1) %>% 
+    mutate(dataset = factor(dataset, levels = c("illumina", "teloprime", "cdna", "rna")))
 
-df_tx_average <- read_csv(snakemake@input[["tx_avg"]]) %>% 
+
+df_tx_average <- read_csv(snakemake@input[["tx_avg"]], show_col_types = FALSE) %>% 
     tidyr::gather("dataset", "average_counts",  -ensembl_transcript_id_version,
         -ensembl_gene_id_version, -mgi_symbol, -description, -gene_biotype,
         -transcript_biotype, -transcript_length, -grouped_biotype) %>% 
-     mutate(average_counts = 2^average_counts - 1)
+    mutate(average_counts = 2^average_counts - 1) %>% 
+    mutate(dataset = factor(dataset, levels = c("illumina", "teloprime", "cdna", "rna")))
 ```
 
-
-```{r}
-mylog10_trans <- function (base = 10) {
-  trans <- function(x) log(x + 1, base)
-  inv <- function(x) base^x - 1
-  trans_new(paste0("log-", format(base)), trans, inv, log_breaks(base = base), 
-            domain = c(1e-100, Inf))
-}
-```
 
 # Average expression over all datasets
 
 ## Genes
-```{r}
+```{r, fig.width = 6.85, fig.asp = .65}
 df_axis <- tibble(x = rep(c("cdna", "illumina", "rna"), c(3, 2, 1)),
     y = c("illumina", "rna", "teloprime", "rna", "teloprime", "teloprime"))
 
@@ -87,25 +82,28 @@ for (i in 1:nrow(df_axis)) {
         tidyr::spread(dataset, average_counts) %>%
         tidyr::drop_na() %>% 
         ggplot(aes(x = !! x, y = !! y)) +
-        geom_point(aes(colour = grouped_biotype), size = 1) +
-        geom_abline(slope = 1, lty = 2) +
+        geom_point(aes(colour = grouped_biotype),
+            size = .5,
+            alpha = .25) +
+        geom_abline(slope = 1, lty = 2, lwd = .25) +
         stat_poly_eq(formula = y ~ x,
             aes(label = paste(..rr.label.., sep = "~~~")),
-            parse = TRUE, family = "serif", size = 3, colour = "grey30",
+            parse = TRUE, family = "Helvetica", size = 3, colour = "grey30",
             label.x.npc = "left", label.y.npc = "top") +
         scale_x_continuous(
-            breaks = c(1, 10, 100, 1000, 10000),
-            labels = function(x) signif(x),
-            trans = "mylog10") +
+            breaks = 10^seq(0:5),
+            labels = trans_format("log10", math_format(10^.x)),
+            trans = "log1p") +
         scale_y_continuous(
-            breaks = c(1, 10, 100, 1000, 10000),
-            labels = function(x) signif(x),
-            trans = "mylog10") +
-        scale_colour_colorblind(name = "Gene biotype") +
-        theme_tufte() +
+            breaks = 10^seq(0:5),
+            labels = trans_format("log10", math_format(10^.x)),
+            trans = "log1p") +
+        scale_colour_brewer(palette = "Dark2", name = "Gene biotype") +
+        theme_tufte(base_size = 8, base_family = "Helvetica") +
         geom_rangeframe(sides = 'bl', na.rm = FALSE) +
         xlab(x_lab) +
-        ylab(y_lab)
+        ylab(y_lab) +
+        theme(legend.key.size = unit(.33, "cm"))
 }
 
 pl <- ggmatrix(pl_list, ncol = 3, nrow = 3,
@@ -125,52 +123,55 @@ pl
 
 ## Transcripts
 
-```{r}
+```{r, fig.width = 6.85, fig.asp = .65}
 pl_list <- vector("list", nrow(df_axis))
 
 for (i in 1:nrow(df_axis)) {
     x <- df_axis$x[i]
     y <- df_axis$y[i]
-    
+
     if (x == "illumina") {
         x_lab <- "Average illumina tpm"
     } else {
         x_lab <- sprintf("Average %s counts", x)
     }
-    
+
     if (y == "illumina") {
         y_lab <- "Average illumina tpm"
     } else {
         y_lab <- sprintf("Average %s counts", y)
     }
-    
+
     x <- sym(x)
     y <- sym(y)
-    
-    pl_list[[i]] <- df_tx_average %>% 
-        filter(dataset %in% c(x, y)) %>% 
+
+    pl_list[[i]] <- df_tx_average %>%
+        filter(dataset %in% c(x, y)) %>%
         tidyr::spread(dataset, average_counts) %>%
-        tidyr::drop_na() %>% 
+        tidyr::drop_na() %>%
         ggplot(aes(x = !! x, y = !! y)) +
-        geom_point(aes(colour = grouped_biotype), size = 1) +
-        geom_abline(slope = 1, lty = 2) +
+        geom_point(aes(colour = grouped_biotype),
+            size = .5,
+            alpha = .25) +
+        geom_abline(slope = 1, lty = 2, lwd = .25) +
         stat_poly_eq(formula = y ~ x,
             aes(label = paste(..rr.label.., sep = "~~~")),
-            parse = TRUE, family = "serif", size = 3, colour = "grey30",
+            parse = TRUE, family = "Helvetica", size = 3, colour = "grey30",
             label.x.npc = "left", label.y.npc = "top") +
         scale_x_continuous(
-            breaks = c(1, 10, 100, 1000, 10000),
-            labels = function(x) signif(x),
-            trans = "mylog10") +
+            breaks = 10^seq(0:5),
+            labels = trans_format("log10", math_format(10^.x)),
+            trans = "log1p") +
         scale_y_continuous(
-            breaks = c(1, 10, 100, 1000, 10000),
-            labels = function(x) signif(x),
-            trans = "mylog10") +
-        scale_colour_colorblind(name = "Transcript biotype") +
-        theme_tufte() +
+            breaks = 10^seq(0:5),
+            labels = trans_format("log10", math_format(10^.x)),
+            trans = "log1p") +
+        scale_colour_brewer(palette = "Dark2", name = "Transcript biotype") +
+        theme_tufte(base_size = 8, base_family = "Helvetica") +
         geom_rangeframe(sides = 'bl', na.rm = FALSE) +
         xlab(x_lab) +
-        ylab(y_lab)
+        ylab(y_lab) +
+        theme(legend.key.size = unit(.33, "cm"))
 }
 
 pl <- ggmatrix(pl_list, ncol = 3, nrow = 3,
@@ -188,192 +189,192 @@ pl[3, 3] <- pl_list[[6]]
 pl
 ```
 
-# Sample wise comparison
+<!-- # Sample wise comparison -->
 
-```{r importData2}
-df_gene <- read_csv(snakemake@input[["gene"]]) %>% 
-    filter(!sample_id %in% c("cool", "rt")) %>% 
-    mutate_if(is.numeric, function(x) 2^x - 1)
+<!-- ```{r importData2} -->
+<!-- df_gene <- read_csv(snakemake@input[["gene"]]) %>% -->
+<!--     filter(!sample_id %in% c("cool", "rt")) %>% -->
+<!--     mutate_if(is.numeric, function(x) 2^x - 1) -->
 
-df_tx <- read_csv(snakemake@input[["tx"]]) %>%
-    filter(!sample_id %in% c("cool", "rt")) %>% 
-    mutate_if(is.numeric, function(x) 2^x - 1)
-```
+<!-- df_tx <- read_csv(snakemake@input[["tx"]]) %>% -->
+<!--     filter(!sample_id %in% c("cool", "rt")) %>% -->
+<!--     mutate_if(is.numeric, function(x) 2^x - 1) -->
+<!-- ``` -->
 
-## Genes
+<!-- ## Genes -->
 
-### cDNA vs Illumina
+<!-- ### cDNA vs Illumina -->
 
-```{r}
-df_gene %>% 
-    select(ensembl_gene_id_version, sample_id, grouped_biotype, cdna, illumina) %>% 
-    tidyr::drop_na() %>% 
-    ggplot(aes(cdna, illumina)) +
-        geom_point(aes(colour = grouped_biotype), size = 1) +
-        geom_abline(slope = 1, lty = 2) +
-        stat_poly_eq(formula = y ~ x,
-            aes(label = paste(..rr.label.., sep = "~~~")),
-            parse = TRUE, family = "serif", size = 3, colour = "grey30",
-            label.x.npc = "left", label.y.npc = "top") +
-        scale_x_continuous(
-            breaks = c(1, 10, 100, 1000, 10000),
-            labels = function(x) signif(x),
-            trans = "mylog10") +
-        scale_y_continuous(
-            breaks = c(1, 10, 100, 1000, 10000),
-            labels = function(x) signif(x),
-            trans = "mylog10") +
-        scale_colour_colorblind(name = "Gene biotype") +
-        theme_tufte() +
-        geom_rangeframe(sides = 'bl', na.rm = FALSE) +
-        facet_wrap(~sample_id) +
-        xlab("cDNA counts") +
-        ylab("Illumina tpm")
-```
+<!-- ```{r} -->
+<!-- df_gene %>% -->
+<!--     select(ensembl_gene_id_version, sample_id, grouped_biotype, cdna, illumina) %>% -->
+<!--     tidyr::drop_na() %>% -->
+<!--     ggplot(aes(cdna, illumina)) + -->
+<!--         geom_point(aes(colour = grouped_biotype), size = 1) + -->
+<!--         geom_abline(slope = 1, lty = 2) + -->
+<!--         stat_poly_eq(formula = y ~ x, -->
+<!--             aes(label = paste(..rr.label.., sep = "~~~")), -->
+<!--             parse = TRUE, family = "serif", size = 3, colour = "grey30", -->
+<!--             label.x.npc = "left", label.y.npc = "top") + -->
+<!--         scale_x_continuous( -->
+<!--             breaks = c(1, 10, 100, 1000, 10000), -->
+<!--             labels = function(x) signif(x), -->
+<!--             trans = "mylog10") + -->
+<!--         scale_y_continuous( -->
+<!--             breaks = c(1, 10, 100, 1000, 10000), -->
+<!--             labels = function(x) signif(x), -->
+<!--             trans = "mylog10") + -->
+<!--         scale_colour_colorblind(name = "Gene biotype") + -->
+<!--         theme_tufte() + -->
+<!--         geom_rangeframe(sides = 'bl', na.rm = FALSE) + -->
+<!--         facet_wrap(~sample_id) + -->
+<!--         xlab("cDNA counts") + -->
+<!--         ylab("Illumina tpm") -->
+<!-- ``` -->
 
-### cDNA vs teloprime
+<!-- ### cDNA vs teloprime -->
 
-```{r}
-df_gene %>% 
-    select(ensembl_gene_id_version, sample_id, grouped_biotype, cdna, teloprime) %>% 
-    tidyr::drop_na() %>% 
-    ggplot(aes(cdna, teloprime)) +
-        geom_point(aes(colour = grouped_biotype), size = 1) +
-        geom_abline(slope = 1, lty = 2) +
-        stat_poly_eq(formula = y ~ x,
-            aes(label = paste(..rr.label.., sep = "~~~")),
-            parse = TRUE, family = "serif", size = 3, colour = "grey30",
-            label.x.npc = "left", label.y.npc = "top") +
-        scale_x_continuous(
-            breaks = c(1, 10, 100, 1000, 10000),
-            labels = function(x) signif(x),
-            trans = "mylog10") +
-        scale_y_continuous(
-            breaks = c(1, 10, 100, 1000, 10000),
-            labels = function(x) signif(x),
-            trans = "mylog10") +
-        scale_colour_colorblind(name = "Gene biotype") +
-        theme_tufte() +
-        geom_rangeframe(sides = 'bl', na.rm = FALSE) +
-        facet_wrap(~sample_id) +
-        xlab("cDNA counts") +
-        ylab("Teloprime counts")
-```
+<!-- ```{r} -->
+<!-- df_gene %>% -->
+<!--     select(ensembl_gene_id_version, sample_id, grouped_biotype, cdna, teloprime) %>% -->
+<!--     tidyr::drop_na() %>% -->
+<!--     ggplot(aes(cdna, teloprime)) + -->
+<!--         geom_point(aes(colour = grouped_biotype), size = 1) + -->
+<!--         geom_abline(slope = 1, lty = 2) + -->
+<!--         stat_poly_eq(formula = y ~ x, -->
+<!--             aes(label = paste(..rr.label.., sep = "~~~")), -->
+<!--             parse = TRUE, family = "serif", size = 3, colour = "grey30", -->
+<!--             label.x.npc = "left", label.y.npc = "top") + -->
+<!--         scale_x_continuous( -->
+<!--             breaks = c(1, 10, 100, 1000, 10000), -->
+<!--             labels = function(x) signif(x), -->
+<!--             trans = "mylog10") + -->
+<!--         scale_y_continuous( -->
+<!--             breaks = c(1, 10, 100, 1000, 10000), -->
+<!--             labels = function(x) signif(x), -->
+<!--             trans = "mylog10") + -->
+<!--         scale_colour_colorblind(name = "Gene biotype") + -->
+<!--         theme_tufte() + -->
+<!--         geom_rangeframe(sides = 'bl', na.rm = FALSE) + -->
+<!--         facet_wrap(~sample_id) + -->
+<!--         xlab("cDNA counts") + -->
+<!--         ylab("Teloprime counts") -->
+<!-- ``` -->
 
-### Illumina vs teloprime
+<!-- ### Illumina vs teloprime -->
 
-```{r}
-df_gene %>% 
-    select(ensembl_gene_id_version, sample_id, grouped_biotype, illumina, teloprime) %>% 
-    tidyr::drop_na() %>% 
-    ggplot(aes(illumina, teloprime)) +
-        geom_point(aes(colour = grouped_biotype), size = 1) +
-        geom_abline(slope = 1, lty = 2) +
-        stat_poly_eq(formula = y ~ x,
-            aes(label = paste(..rr.label.., sep = "~~~")),
-            parse = TRUE, family = "serif", size = 3, colour = "grey30",
-            label.x.npc = "left", label.y.npc = "top") +
-        scale_x_continuous(
-            breaks = c(1, 10, 100, 1000, 10000),
-            labels = function(x) signif(x),
-            trans = "mylog10") +
-        scale_y_continuous(
-            breaks = c(1, 10, 100, 1000, 10000),
-            labels = function(x) signif(x),
-            trans = "mylog10") +
-        scale_colour_colorblind(name = "Gene biotype") +
-        theme_tufte() +
-        geom_rangeframe(sides = 'bl', na.rm = FALSE) +
-        facet_wrap(~sample_id) +
-        xlab("Illumina tpm") +
-        ylab("Teloprime counts")
-```
+<!-- ```{r} -->
+<!-- df_gene %>% -->
+<!--     select(ensembl_gene_id_version, sample_id, grouped_biotype, illumina, teloprime) %>% -->
+<!--     tidyr::drop_na() %>% -->
+<!--     ggplot(aes(illumina, teloprime)) + -->
+<!--         geom_point(aes(colour = grouped_biotype), size = 1) + -->
+<!--         geom_abline(slope = 1, lty = 2) + -->
+<!--         stat_poly_eq(formula = y ~ x, -->
+<!--             aes(label = paste(..rr.label.., sep = "~~~")), -->
+<!--             parse = TRUE, family = "serif", size = 3, colour = "grey30", -->
+<!--             label.x.npc = "left", label.y.npc = "top") + -->
+<!--         scale_x_continuous( -->
+<!--             breaks = c(1, 10, 100, 1000, 10000), -->
+<!--             labels = function(x) signif(x), -->
+<!--             trans = "mylog10") + -->
+<!--         scale_y_continuous( -->
+<!--             breaks = c(1, 10, 100, 1000, 10000), -->
+<!--             labels = function(x) signif(x), -->
+<!--             trans = "mylog10") + -->
+<!--         scale_colour_colorblind(name = "Gene biotype") + -->
+<!--         theme_tufte() + -->
+<!--         geom_rangeframe(sides = 'bl', na.rm = FALSE) + -->
+<!--         facet_wrap(~sample_id) + -->
+<!--         xlab("Illumina tpm") + -->
+<!--         ylab("Teloprime counts") -->
+<!-- ``` -->
 
-## Transcripts
+<!-- ## Transcripts -->
 
-### cDNA vs Illumina
+<!-- ### cDNA vs Illumina -->
 
-```{r}
-df_tx %>% 
-    select(ensembl_transcript_id_version, sample_id, grouped_biotype, cdna, illumina) %>% 
-    tidyr::drop_na() %>% 
-    ggplot(aes(cdna, illumina)) +
-        geom_point(aes(colour = grouped_biotype), size = 1) +
-        geom_abline(slope = 1, lty = 2) +
-        stat_poly_eq(formula = y ~ x,
-            aes(label = paste(..rr.label.., sep = "~~~")),
-            parse = TRUE, family = "serif", size = 3, colour = "grey30",
-            label.x.npc = "left", label.y.npc = "top") +
-        scale_x_continuous(
-            breaks = c(1, 10, 100, 1000, 10000),
-            labels = function(x) signif(x),
-            trans = "mylog10") +
-        scale_y_continuous(
-            breaks = c(1, 10, 100, 1000, 10000),
-            labels = function(x) signif(x),
-            trans = "mylog10") +
-        scale_colour_colorblind(name = "Gene biotype") +
-        theme_tufte() +
-        geom_rangeframe(sides = 'bl', na.rm = FALSE) +
-        facet_wrap(~sample_id) +
-        xlab("cDNA counts") +
-        ylab("Illumina tpm")
-```
+<!-- ```{r} -->
+<!-- df_tx %>% -->
+<!--     select(ensembl_transcript_id_version, sample_id, grouped_biotype, cdna, illumina) %>% -->
+<!--     tidyr::drop_na() %>% -->
+<!--     ggplot(aes(cdna, illumina)) + -->
+<!--         geom_point(aes(colour = grouped_biotype), size = 1) + -->
+<!--         geom_abline(slope = 1, lty = 2) + -->
+<!--         stat_poly_eq(formula = y ~ x, -->
+<!--             aes(label = paste(..rr.label.., sep = "~~~")), -->
+<!--             parse = TRUE, family = "serif", size = 3, colour = "grey30", -->
+<!--             label.x.npc = "left", label.y.npc = "top") + -->
+<!--         scale_x_continuous( -->
+<!--             breaks = c(1, 10, 100, 1000, 10000), -->
+<!--             labels = function(x) signif(x), -->
+<!--             trans = "mylog10") + -->
+<!--         scale_y_continuous( -->
+<!--             breaks = c(1, 10, 100, 1000, 10000), -->
+<!--             labels = function(x) signif(x), -->
+<!--             trans = "mylog10") + -->
+<!--         scale_colour_colorblind(name = "Gene biotype") + -->
+<!--         theme_tufte() + -->
+<!--         geom_rangeframe(sides = 'bl', na.rm = FALSE) + -->
+<!--         facet_wrap(~sample_id) + -->
+<!--         xlab("cDNA counts") + -->
+<!--         ylab("Illumina tpm") -->
+<!-- ``` -->
 
-### cDNA vs teloprime
+<!-- ### cDNA vs teloprime -->
 
-```{r}
-df_tx %>% 
-    select(ensembl_transcript_id_version, sample_id, grouped_biotype, cdna, teloprime) %>% 
-    tidyr::drop_na() %>% 
-    ggplot(aes(cdna, teloprime)) +
-        geom_point(aes(colour = grouped_biotype), size = 1) +
-        geom_abline(slope = 1, lty = 2) +
-        stat_poly_eq(formula = y ~ x,
-            aes(label = paste(..rr.label.., sep = "~~~")),
-            parse = TRUE, family = "serif", size = 3, colour = "grey30",
-            label.x.npc = "left", label.y.npc = "top") +
-        scale_x_continuous(
-            breaks = c(1, 10, 100, 1000, 10000),
-            labels = function(x) signif(x),
-            trans = "mylog10") +
-        scale_y_continuous(
-            breaks = c(1, 10, 100, 1000, 10000),
-            labels = function(x) signif(x),
-            trans = "mylog10") +
-        scale_colour_colorblind(name = "Gene biotype") +
-        theme_tufte() +
-        geom_rangeframe(sides = 'bl', na.rm = FALSE) +
-        facet_wrap(~sample_id) +
-        xlab("cDNA counts") +
-        ylab("Teloprime counts")
-```
+<!-- ```{r} -->
+<!-- df_tx %>% -->
+<!--     select(ensembl_transcript_id_version, sample_id, grouped_biotype, cdna, teloprime) %>% -->
+<!--     tidyr::drop_na() %>% -->
+<!--     ggplot(aes(cdna, teloprime)) + -->
+<!--         geom_point(aes(colour = grouped_biotype), size = 1) + -->
+<!--         geom_abline(slope = 1, lty = 2) + -->
+<!--         stat_poly_eq(formula = y ~ x, -->
+<!--             aes(label = paste(..rr.label.., sep = "~~~")), -->
+<!--             parse = TRUE, family = "serif", size = 3, colour = "grey30", -->
+<!--             label.x.npc = "left", label.y.npc = "top") + -->
+<!--         scale_x_continuous( -->
+<!--             breaks = c(1, 10, 100, 1000, 10000), -->
+<!--             labels = function(x) signif(x), -->
+<!--             trans = "mylog10") + -->
+<!--         scale_y_continuous( -->
+<!--             breaks = c(1, 10, 100, 1000, 10000), -->
+<!--             labels = function(x) signif(x), -->
+<!--             trans = "mylog10") + -->
+<!--         scale_colour_colorblind(name = "Gene biotype") + -->
+<!--         theme_tufte() + -->
+<!--         geom_rangeframe(sides = 'bl', na.rm = FALSE) + -->
+<!--         facet_wrap(~sample_id) + -->
+<!--         xlab("cDNA counts") + -->
+<!--         ylab("Teloprime counts") -->
+<!-- ``` -->
 
-### Illumina vs teloprime
+<!-- ### Illumina vs teloprime -->
 
-```{r}
-df_tx %>% 
-    select(ensembl_transcript_id_version, sample_id, grouped_biotype, illumina, teloprime) %>% 
-    tidyr::drop_na() %>% 
-    ggplot(aes(illumina, teloprime)) +
-        geom_point(aes(colour = grouped_biotype), size = 1) +
-        geom_abline(slope = 1, lty = 2) +
-        stat_poly_eq(formula = y ~ x,
-            aes(label = paste(..rr.label.., sep = "~~~")),
-            parse = TRUE, family = "serif", size = 3, colour = "grey30",
-            label.x.npc = "left", label.y.npc = "top") +
-        scale_x_continuous(
-            breaks = c(1, 10, 100, 1000, 10000),
-            labels = function(x) signif(x),
-            trans = "mylog10") +
-        scale_y_continuous(
-            breaks = c(1, 10, 100, 1000, 10000),
-            labels = function(x) signif(x),
-            trans = "mylog10") +
-        scale_colour_colorblind(name = "Gene biotype") +
-        theme_tufte() +
-        geom_rangeframe(sides = 'bl', na.rm = FALSE) +
-        facet_wrap(~sample_id) +
-        xlab("Illumina tpm") +
-        ylab("Teloprime counts")
-```
+<!-- ```{r} -->
+<!-- df_tx %>% -->
+<!--     select(ensembl_transcript_id_version, sample_id, grouped_biotype, illumina, teloprime) %>% -->
+<!--     tidyr::drop_na() %>% -->
+<!--     ggplot(aes(illumina, teloprime)) + -->
+<!--         geom_point(aes(colour = grouped_biotype), size = 1) + -->
+<!--         geom_abline(slope = 1, lty = 2) + -->
+<!--         stat_poly_eq(formula = y ~ x, -->
+<!--             aes(label = paste(..rr.label.., sep = "~~~")), -->
+<!--             parse = TRUE, family = "serif", size = 3, colour = "grey30", -->
+<!--             label.x.npc = "left", label.y.npc = "top") + -->
+<!--         scale_x_continuous( -->
+<!--             breaks = c(1, 10, 100, 1000, 10000), -->
+<!--             labels = function(x) signif(x), -->
+<!--             trans = "mylog10") + -->
+<!--         scale_y_continuous( -->
+<!--             breaks = c(1, 10, 100, 1000, 10000), -->
+<!--             labels = function(x) signif(x), -->
+<!--             trans = "mylog10") + -->
+<!--         scale_colour_colorblind(name = "Gene biotype") + -->
+<!--         theme_tufte() + -->
+<!--         geom_rangeframe(sides = 'bl', na.rm = FALSE) + -->
+<!--         facet_wrap(~sample_id) + -->
+<!--         xlab("Illumina tpm") + -->
+<!--         ylab("Teloprime counts") -->
+<!-- ``` -->

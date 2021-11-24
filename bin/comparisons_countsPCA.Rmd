@@ -14,7 +14,8 @@ editor_options:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = FALSE)
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
+    cache = FALSE, out.width = 800)
 ```
 
 ```{r loadPackages}
@@ -29,13 +30,13 @@ library("tidyr")
 
 ```{r importData}
 # sample info
-sample_info <- read_csv(snakemake@input[["sample_info"]]) %>%
+sample_info <- read_csv(snakemake@input[["sample_info"]], show_col_types = FALSE) %>%
     mutate_at(vars(matches("condition")), as.factor)
 
 # gene level
 df_gene <- snakemake@input[["gene_counts"]] %>%
     set_names(basename(.)) %>%
-    map(read_csv) %>%
+    map(read_csv, show_col_types = FALSE) %>%
     map(select, -mgi_symbol, -description, -gene_biotype) %>%
     map(tidyr::gather, key = "sample_id", value = "counts", -ensembl_gene_id_version) %>%
     bind_rows(.id = "dataset") %>%
@@ -44,7 +45,7 @@ df_gene <- snakemake@input[["gene_counts"]] %>%
 # tx level
 df_tx <- snakemake@input[["tx_counts"]] %>%
     set_names(basename(.)) %>%
-    map(read_csv) %>%
+    map(read_csv, show_col_types = FALSE) %>%
     map(select, -mgi_symbol, -description, -gene_biotype, -transcript_biotype, -transcript_length) %>%
     map(tidyr::gather, key = "sample_id", value = "counts",
         -ensembl_gene_id_version, -ensembl_transcript_id_version) %>%
@@ -77,9 +78,35 @@ cm_tx <- df_tx %>%
     DESeq2::rlog(blind = TRUE)
 ```
 
+
+```{r function_definition}
+plot_pca <- function(pca) {
+    pca %>% 
+        mutate(library = factor(library, levels = c("illumina", "teloprime", "cdna", "rna"))) %>% 
+        ggplot(aes(PC1, PC2)) +
+        geom_point(aes(colour = library, pch = condition_temp),
+            size = 1,
+            alpha = .5) +
+        theme_tufte(base_size = 8, base_family = "Helvetica") +
+        geom_rangeframe(sides = 'bl') +
+        scale_y_continuous(breaks = extended_range_breaks()(pca[, 4]),
+            labels = function(x) round(x, 1),
+            name = sprintf("PC2 (%s %% variance)",
+                round(importance[2,2] * 100, 1))) +
+        scale_x_continuous(breaks = extended_range_breaks()(pca[, 3]),
+            labels = function(x) round(x, 1),
+            name = sprintf("PC1 (%s %% variance)",
+                round(importance[2,1] * 100, 1))) +
+        scale_colour_brewer(palette = "Dark2", name = NULL) +
+        scale_shape(labels = c("22" = "22°C", "4" = "4°C"), name = NULL) +
+        theme(legend.key.size = unit(.33, "cm"))
+}
+```
+
+
 ## Gene level
 
-```{r}
+```{r, fig.width = 6.85 / 2, fig.asp = .7}
 # calculate pcs
 pca <- prcomp(t(cm_gene), scale. = FALSE)
 
@@ -89,24 +116,13 @@ pca <- as_tibble(pca$x, rownames = "sample") %>%
     separate(sample, c("library", "sample_id"), extra = "merge") %>%
     left_join(sample_info, by = "sample_id")
 
-ggplot(pca, aes(PC1, PC2, colour = library, pch = condition_temp)) +
-    geom_point(size = 2) +
-    theme_tufte() +
-    geom_rangeframe(colour = "black", sides = 'bl') +
-    scale_y_continuous(breaks = extended_range_breaks()(pca[, 4]),
-                       labels = function(x) round(x, 1),
-                       name = sprintf("PC2 (%s %% variance)",
-                                      round(importance[2,2] * 100, 1))) +
-    scale_x_continuous(breaks = extended_range_breaks()(pca[, 3]),
-                       labels = function(x) round(x, 1),
-                       name = sprintf("PC1 (%s %% variance)",
-                                      round(importance[2,1] * 100, 1))) +
-    scale_color_colorblind()
+pca %>% 
+    plot_pca()
 ```
 
 ## Transcript level
 
-```{r}
+```{r, fig.width = 6.85 / 2, fig.asp = .7}
 # calculate pcs
 pca <- prcomp(t(cm_tx), scale. = FALSE)
 
@@ -116,19 +132,8 @@ pca <- as_tibble(pca$x, rownames = "sample") %>%
     separate(sample, c("library", "sample_id"), extra = "merge") %>%
     left_join(sample_info, by = "sample_id")
 
-ggplot(pca, aes(PC1, PC2, colour = library, pch = condition_temp)) +
-    geom_point(size = 2) +
-    theme_tufte() +
-    geom_rangeframe(colour = "black", sides = 'bl') +
-    scale_y_continuous(breaks = extended_range_breaks()(pca[, 4]),
-                       labels = function(x) round(x, 1),
-                       name = sprintf("PC2 (%s %% variance)",
-                                      round(importance[2,2] * 100, 1))) +
-    scale_x_continuous(breaks = extended_range_breaks()(pca[, 3]),
-                       labels = function(x) round(x, 1),
-                       name = sprintf("PC1 (%s %% variance)",
-                                      round(importance[2,1] * 100, 1))) +
-    scale_color_colorblind()
+pca %>% 
+    plot_pca()
 ```
 
 # Genes expressed in all samples
@@ -175,7 +180,7 @@ cm_tx <- df_tx %>%
 
 ## Gene level
 
-```{r}
+```{r, fig.width = 6.85 / 2, fig.asp = .7}
 # calculate pcs
 pca <- prcomp(t(cm_gene), scale. = FALSE)
 
@@ -185,24 +190,13 @@ pca <- as_tibble(pca$x, rownames = "sample") %>%
     separate(sample, c("library", "sample_id"), extra = "merge") %>%
     left_join(sample_info, by = "sample_id")
 
-ggplot(pca, aes(PC1, PC2, colour = library, pch = condition_temp)) +
-    geom_point(size = 2) +
-    theme_tufte() +
-    geom_rangeframe(colour = "black", sides = 'bl') +
-    scale_y_continuous(breaks = extended_range_breaks()(pca[, 4]),
-                       labels = function(x) round(x, 1),
-                       name = sprintf("PC2 (%s %% variance)",
-                                      round(importance[2,2] * 100, 1))) +
-    scale_x_continuous(breaks = extended_range_breaks()(pca[, 3]),
-                       labels = function(x) round(x, 1),
-                       name = sprintf("PC1 (%s %% variance)",
-                                      round(importance[2,1] * 100, 1))) +
-    scale_color_colorblind()
+pca %>% 
+    plot_pca()
 ```
 
 ## Transcript level
 
-```{r}
+```{r, fig.width = 6.85 / 2, fig.asp = .7}
 # calculate pcs
 pca <- prcomp(t(cm_tx), scale. = FALSE)
 
@@ -212,17 +206,6 @@ pca <- as_tibble(pca$x, rownames = "sample") %>%
     separate(sample, c("library", "sample_id"), extra = "merge") %>%
     left_join(sample_info, by = "sample_id")
 
-ggplot(pca, aes(PC1, PC2, colour = library, pch = condition_temp)) +
-    geom_point(size = 2) +
-    theme_tufte() +
-    geom_rangeframe(colour = "black", sides = 'bl') +
-    scale_y_continuous(breaks = extended_range_breaks()(pca[, 4]),
-                       labels = function(x) round(x, 1),
-                       name = sprintf("PC2 (%s %% variance)",
-                                      round(importance[2,2] * 100, 1))) +
-    scale_x_continuous(breaks = extended_range_breaks()(pca[, 3]),
-                       labels = function(x) round(x, 1),
-                       name = sprintf("PC1 (%s %% variance)",
-                                      round(importance[2,1] * 100, 1))) +
-    scale_color_colorblind()
+pca %>% 
+    plot_pca()
 ```
