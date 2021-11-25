@@ -299,7 +299,7 @@ df_gene_sum %>%
         sets = c("illumina", "teloprime", "cdna", "rna"),
         sets.x.label = "Detected genes",
         mainbar.y.label = "Shared detected genes",
-        text.scale = 1.5)
+        text.scale = 1.75)
 ```
 
 ## Transcripts
@@ -318,7 +318,7 @@ df_tx_sum %>%
         sets = c("illumina", "teloprime", "cdna", "rna"),
         sets.x.label = "Detected transcripts",
         mainbar.y.label = "Shared detected transcripts",
-        text.scale = 1.5)
+        text.scale = 1.75)
 ```
 
 ## Genes detected by illumina but not by teloprime

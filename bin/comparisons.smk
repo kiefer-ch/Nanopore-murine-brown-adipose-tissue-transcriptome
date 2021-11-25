@@ -276,10 +276,8 @@ rule compare_dge:
                      dataset=["illumina", "teloprime", "cdna"]),
         dge = expand("res/deseq/{dataset}/genelevel/{dataset}_genelevel_apeglm_results.csv.gz",
                      dataset=["illumina", "teloprime", "cdna"]),
-        gene_counts = expand("res/deseq/{dataset}/genelevel/{dataset}_genelevel_cm_cts.csv.gz",
-                             dataset=["cdna", "teloprime", "illumina"]),
-        tx_counts = expand("res/deseq/{dataset}/txlevel/{dataset}_txlevel_cm_cts.csv.gz",
-                           dataset=["cdna", "teloprime", "illumina"]),
+        gene_avg = "res/comparisons/comparisons_meanCounts_gene.csv.gz",
+        tx_avg = "res/comparisons/comparisons_meanCounts_tx.csv.gz",
         grouped_biotypes = "data/biotype_groups.csv"
     output:
         "res/comparisons/comparisons_dgeDte.html"

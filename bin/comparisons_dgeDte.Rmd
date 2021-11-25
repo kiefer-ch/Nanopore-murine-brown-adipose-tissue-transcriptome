@@ -33,69 +33,64 @@ library("patchwork")
 ```
 
 ```{r dataImport}
-dte <- snakemake@input[["dte"]] %>%
+tx_input <- snakemake@input[["dte"]] %>% 
     set_names(., tools::file_path_sans_ext(basename(.), compression = TRUE)) %>%
     map(read_csv, show_col_types = FALSE) %>%
-    bind_rows(.id = "dataset") %>%
+    bind_rows(.id = "dataset")
+    
+gene_input <- snakemake@input[["dge"]] %>%
+    set_names(., tools::file_path_sans_ext(basename(.), compression = TRUE)) %>%
+    map(read_csv, show_col_types = FALSE) %>%
+    bind_rows(.id = "dataset")
+
+# tables with pvalues
+dte <- tx_input %>%
     select(-mgi_symbol, -description, -lfcSE, -baseMean, -log2FoldChange) %>%
     tidyr::separate(dataset, c("dataset", "library"), extra = "drop") %>%
     tidyr::unite("method", dataset, library) %>%
     tidyr::spread(method, svalue) %>%
     mutate_if(is.numeric, tidyr::replace_na, 1)
 
-dge <- snakemake@input[["dge"]] %>%
-    set_names(., tools::file_path_sans_ext(basename(.), compression = TRUE)) %>%
-    map(read_csv, show_col_types = FALSE) %>%
-    bind_rows(.id = "dataset") %>%
+dge <- gene_input %>%
     select(-mgi_symbol, -description, -lfcSE, -baseMean, -log2FoldChange) %>%
     tidyr::separate(dataset, c("dataset", "library"), extra = "drop") %>%
     tidyr::unite("method", dataset, library) %>%
     tidyr::spread(method, svalue) %>%
     mutate_if(is.numeric, tidyr::replace_na, 1)
 
-df_gene <- snakemake@input[["gene_counts"]] %>%
-    set_names(basename(.)) %>%
-    map(read_csv, show_col_types = FALSE) %>%
-    map(select, -mgi_symbol, -description, -gene_biotype) %>%
-    map(tidyr::gather, key = "sample_id", value = "counts", -ensembl_gene_id_version) %>%
-    bind_rows(.id = "dataset") %>%
-    tidyr::separate(dataset, "dataset", extra = "drop")
 
-# df_tx <- snakemake@input[["tx_counts"]] %>%
-#     set_names(basename(.)) %>%
-#     map(read_csv, show_col_types = FALSE) %>%
-#     map(select, -mgi_symbol, -description, -gene_biotype, -transcript_biotype, -transcript_length) %>%
-#     map(tidyr::gather, key = "sample_id", value = "counts",
-#         -ensembl_gene_id_version, -ensembl_transcript_id_version) %>%
-#     bind_rows(.id = "dataset") %>%
-#     tidyr::separate(dataset, "dataset", extra = "drop")
+# tables with log2 fold change
+tx_lfc <- tx_input %>%
+    select(-mgi_symbol, -description, -lfcSE, -baseMean, -svalue) %>%
+    tidyr::separate(dataset, "dataset", extra = "drop") %>%
+    tidyr::spread(dataset, log2FoldChange)
 
-biotype_groups <- read_csv(snakemake@input[["grouped_biotypes"]], show_col_types = FALSE)
+gene_lfc <- gene_input %>%
+    select(-mgi_symbol, -gene_biotype, -description, -lfcSE, -baseMean, -svalue) %>%
+    tidyr::separate(dataset, "dataset", extra = "drop") %>%
+    tidyr::spread(dataset, log2FoldChange)
+
+
+# average counts/tpm per gene
+df_tx_average <- read_csv(snakemake@input[["tx_avg"]], show_col_types = FALSE) %>% 
+    tidyr::gather("dataset", "average_counts",  -ensembl_transcript_id_version,
+        -ensembl_gene_id_version, -mgi_symbol, -description, -gene_biotype,
+        -transcript_biotype, -transcript_length, -grouped_biotype) %>% 
+    mutate(average_counts = 2^average_counts - 1) %>% 
+    mutate(dataset = factor(dataset, levels = c("illumina", "teloprime", "cdna", "rna")))
+
+df_gene_average <- read_csv(snakemake@input[["gene_avg"]], show_col_types = FALSE) %>%
+    tidyr::gather("dataset", "average_counts",  -ensembl_gene_id_version, -mgi_symbol, -description,
+        -gene_biotype, -grouped_biotype) %>% 
+    mutate(average_counts = 2^average_counts - 1) %>% 
+    mutate(dataset = factor(dataset, levels = c("illumina", "teloprime", "cdna", "rna")))
+
+
+# biotypes
+biotype_groups <- read_csv(snakemake@input[["grouped_biotypes"]],
+    show_col_types = FALSE)
 ```
 
-```{r filteringForExpression}
-expressed_genes <- df_gene %>%
-    group_by(ensembl_gene_id_version, dataset) %>%
-    summarize(is_expressed = if_else(sum(counts) > 5, TRUE, FALSE)) %>%
-    summarise(is_expressed_all = if_else(sum(is_expressed) == 3, TRUE, FALSE)) %>%
-    filter(is_expressed_all) %>%
-    pull(ensembl_gene_id_version)
-
-# expressed_transcripts <- df_tx %>%
-#     group_by(ensembl_transcript_id_version, dataset) %>%
-#     summarize(is_expressed = if_else(sum(counts) > 5, TRUE, FALSE)) %>%
-#     summarise(is_expressed_all = if_else(sum(is_expressed) == 3, TRUE, FALSE)) %>%
-#     filter(is_expressed_all) %>%
-#     pull(ensembl_transcript_id_version)
-```
-
-
-# Intersections
-
-## DGE
-
-Analysis on gene level. The txlevel pvalues are the smallest for any of the transcripts
-of a gene.
 
 ```{r mergeTx}
 dte_grouped <- dte %>%
@@ -107,6 +102,15 @@ df <- dge %>%
     full_join(dte_grouped, by = "ensembl_gene_id_version") %>%
     mutate_if(is.numeric, tidyr::replace_na, 1)
 ```
+
+# Intersections
+
+## DGE
+
+Analysis on gene level. The txlevel pvalues are the smallest for any of the transcripts
+of a gene.
+
+
 
 ## All genes
 
@@ -123,7 +127,7 @@ df %>%
         sets = c("illumina_genelevel", "illumina_txlevel", "teloprime_genelevel", "teloprime_txlevel", "cdna_genelevel", "cdna_txlevel"),
         sets.x.label = "Diff. expr. features",
         mainbar.y.label = "Shared diff. expr. features",
-        text.scale = 1.5)
+        text.scale = 1.75)
 ```
 
 ## Protein coding only
@@ -138,22 +142,11 @@ df %>%
     tibble::column_to_rownames("ensembl_gene_id_version") %>%
     upset(nsets = 6, keep.order = TRUE,
         nintersects = 15,
-        order.by = "freq")
-```
-
-## Only genes, that were detected by both datasets
-
-```{r}
-df %>%
-    filter(ensembl_gene_id_version %in% expressed_genes) %>%
-    select(-gene_biotype) %>%
-    mutate_if(is.numeric, function(x) as.integer(x < .05)) %>%
-    tidyr::drop_na(ensembl_gene_id_version) %>%
-    as.data.frame() %>%
-    tibble::column_to_rownames("ensembl_gene_id_version") %>%
-    upset(nsets = 6, keep.order = TRUE,
-        nintersects = 15,
-        order.by = "freq")
+        order.by = "freq",
+        sets = c("illumina_genelevel", "illumina_txlevel", "teloprime_genelevel", "teloprime_txlevel", "cdna_genelevel", "cdna_txlevel"),
+        sets.x.label = "Diff. expr. features",
+        mainbar.y.label = "Shared diff. expr. features",
+        text.scale = 1.75)
 ```
 
 
@@ -212,7 +205,266 @@ pl_tx <- dte %>%
         theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5))
 ```
 
-```{r plot, , fig.width = 6.85 / 2, fig.asp = .7}
+```{r plot, fig.width = 6.85 / 2, fig.asp = .7}
 pl_gene + pl_tx +  plot_layout(guides = 'collect')
 ```
 
+# Features found in one but not another dataset
+
+## Genes 
+
+```{r}
+df_plot <- df_gene_average %>%
+    tidyr::pivot_wider(names_from = dataset, values_from = average_counts) %>%
+    left_join(df %>% mutate_if(is.numeric, function(x) if_else(x < .05, TRUE, FALSE)),
+        by = "ensembl_gene_id_version") %>%
+    filter(!is.na(illumina) | !is.na(teloprime) | !is.na(cdna)) %>% 
+    mutate(illumina = tidyr::replace_na(illumina, 0))
+```
+
+```{r teloprime_expression}
+telo_exp <- df_plot %>%
+    mutate(signif = if_else(illumina_genelevel & teloprime_genelevel, "both",
+                        if_else(illumina_genelevel, "illumina",
+                            if_else(teloprime_genelevel, "longRead", "n.s.")))) %>%
+    filter(signif != "n.s.") %>%
+    mutate(signif = factor(signif, levels = c("illumina", "longRead", "both"))) %>% 
+    ggplot(aes(illumina, teloprime)) +
+    geom_point(aes(colour = signif, pch = grouped_biotype),
+        size = 1,
+        alpha = .5) +
+    geom_abline(slope = 1, lty = 2, lwd = .25) +
+    scale_x_continuous(
+        name = "illumina [TPM]",
+        breaks = 10^seq(0:5),
+        labels = trans_format("log10", math_format(10^.x)),
+        trans = "log1p") +
+    scale_y_continuous(
+        name = "teloprime [counts]",
+        breaks = 10^seq(0:5),
+        labels = trans_format("log10", math_format(10^.x)),
+        trans = "log1p") +
+    scale_colour_brewer(palette = "Dark2", name = "DGE") +
+    scale_shape(name = "Biotype", na.value = 8) +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe(sides = 'bl', na.rm = FALSE) +
+    theme(legend.key.size = unit(.33, "cm"))
+```
+
+```{r cdna_expression}
+cdna_exp <- df_plot %>%
+    mutate(signif = if_else(illumina_genelevel & cdna_genelevel, "both",
+                        if_else(illumina_genelevel, "illumina",
+                            if_else(cdna_genelevel, "longRead", "n.s.")))) %>%
+    filter(signif != "n.s.") %>%
+    mutate(signif = factor(signif, levels = c("illumina", "longRead", "both"))) %>% 
+    ggplot(aes(illumina, cdna)) +
+    geom_point(aes(colour = signif, pch = grouped_biotype),
+        size = 1,
+        alpha = .5) +
+    geom_abline(slope = 1, lty = 2, lwd = .25) +
+    scale_x_continuous(
+        name = "illumina [TPM]",
+        breaks = 10^seq(0:5),
+        labels = trans_format("log10", math_format(10^.x)),
+        trans = "log1p") +
+    scale_y_continuous(
+        name = "cdna [counts]",
+        breaks = 10^seq(0:5),
+        labels = trans_format("log10", math_format(10^.x)),
+        trans = "log1p") +
+    scale_colour_brewer(palette = "Dark2", name = "DGE") +
+    scale_shape(name = "Biotype", na.value = 8) +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe(sides = 'bl', na.rm = FALSE) +
+    theme(legend.key.size = unit(.33, "cm"))
+```
+
+
+```{r}
+df_plot <- gene_lfc %>% 
+    left_join(df %>% mutate_if(is.numeric, function(x) if_else(x < .05, TRUE, FALSE)),
+        by = "ensembl_gene_id_version") %>%
+    filter(!is.na(illumina) | !is.na(teloprime) | !is.na(cdna)) %>% 
+    left_join(biotype_groups, by = c("gene_biotype" = "transcript_biotype")) %>%
+    select(-gene_biotype) %>% 
+    mutate_if(is.numeric, abs)
+```
+
+```{r telo_lfc}
+telo_lfc <- df_plot %>%
+    mutate(signif = if_else(illumina_genelevel & teloprime_genelevel, "both",
+                        if_else(illumina_genelevel, "illumina",
+                            if_else(teloprime_genelevel, "longRead", "n.s.")))) %>%
+    filter(signif != "n.s.") %>%
+    mutate(signif = factor(signif, levels = c("illumina", "longRead", "both"))) %>% 
+    tidyr::drop_na(illumina, teloprime) %>% 
+    ggplot(aes(illumina, teloprime)) +
+    geom_point(aes(colour = signif, pch = grouped_biotype),
+        size = 1,
+        alpha = .5) +
+    geom_abline(slope = 1, lty = 2, lwd = .25) +
+    scale_colour_brewer(palette = "Dark2", name = "DGE") +
+    scale_shape(name = "Biotype", na.value = 8) +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe(sides = 'bl', na.rm = FALSE) +
+    xlab("illumina [log2FC]") +
+    ylab("teloprime [log2FC]") +
+    theme(legend.key.size = unit(.33, "cm"))
+```
+
+```{r cdna_lfc}
+cdna_lfc <- df_plot %>%
+    mutate(signif = if_else(illumina_genelevel & cdna_genelevel, "both",
+                        if_else(illumina_genelevel, "illumina",
+                            if_else(cdna_genelevel, "longRead", "n.s.")))) %>%
+    filter(signif != "n.s.") %>%
+    mutate(signif = factor(signif, levels = c("illumina", "longRead", "both"))) %>% 
+    tidyr::drop_na(illumina, cdna) %>% 
+    ggplot(aes(illumina, cdna)) +
+    geom_point(aes(colour = signif, pch = grouped_biotype),
+        size = 1,
+        alpha = .5) +
+    geom_abline(slope = 1, lty = 2, lwd = .25) +
+    scale_colour_brewer(palette = "Dark2", name = "DGE") +
+    scale_shape(name = "Biotype", na.value = 8) +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe(sides = 'bl', na.rm = FALSE) +
+    xlab("illumina [log2FC]") +
+    ylab("cdna [log2FC]") +
+    theme(legend.key.size = unit(.33, "cm"))
+```
+
+```{r combine_plots, fig.width = 6.85, fig.asp = .7}
+telo_exp + telo_lfc + cdna_exp + cdna_lfc + plot_layout(guides = "collect")
+```
+
+
+## Transcripts
+
+```{r}
+df_plot <- df_tx_average %>%
+    tidyr::pivot_wider(names_from = dataset, values_from = average_counts) %>%
+    left_join(df %>% mutate_if(is.numeric, function(x) if_else(x < .05, TRUE, FALSE)),
+        by = "ensembl_gene_id_version") %>%
+    filter(!is.na(illumina) | !is.na(teloprime) | !is.na(cdna)) %>% 
+    mutate(illumina = tidyr::replace_na(illumina, 0))
+```
+
+```{r teloprime_tx_expression}
+telo_exp <- df_plot %>%
+    mutate(signif = if_else(illumina_txlevel & teloprime_txlevel, "both",
+                        if_else(illumina_txlevel, "illumina",
+                            if_else(teloprime_txlevel, "longRead", "n.s.")))) %>%
+    filter(signif != "n.s.") %>%
+    mutate(signif = factor(signif, levels = c("illumina", "longRead", "both"))) %>% 
+    ggplot(aes(illumina, teloprime)) +
+    geom_point(aes(colour = signif, pch = grouped_biotype),
+        size = 1,
+        alpha = .5) +
+    geom_abline(slope = 1, lty = 2, lwd = .25) +
+    scale_x_continuous(
+        name = "illumina [TPM]",
+        breaks = 10^seq(0:5),
+        labels = trans_format("log10", math_format(10^.x)),
+        trans = "log1p") +
+    scale_y_continuous(
+        name = "teloprime [counts]",
+        breaks = 10^seq(0:5),
+        labels = trans_format("log10", math_format(10^.x)),
+        trans = "log1p") +
+    scale_colour_brewer(palette = "Dark2", name = "DGE") +
+    scale_shape(name = "Biotype", na.value = 8) +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe(sides = 'bl', na.rm = FALSE) +
+    theme(legend.key.size = unit(.33, "cm"))
+```
+
+```{r cdna_tx_expression}
+cdna_exp <- df_plot %>%
+    mutate(signif = if_else(illumina_txlevel & cdna_txlevel, "both",
+                        if_else(illumina_txlevel, "illumina",
+                            if_else(cdna_txlevel, "longRead", "n.s.")))) %>%
+    filter(signif != "n.s.") %>%
+    mutate(signif = factor(signif, levels = c("illumina", "longRead", "both"))) %>% 
+    ggplot(aes(illumina, cdna)) +
+    geom_point(aes(colour = signif, pch = grouped_biotype),
+        size = 1,
+        alpha = .5) +
+    geom_abline(slope = 1, lty = 2, lwd = .25) +
+    scale_x_continuous(
+        name = "illumina [TPM]",
+        breaks = 10^seq(0:5),
+        labels = trans_format("log10", math_format(10^.x)),
+        trans = "log1p") +
+    scale_y_continuous(
+        name = "cdna [counts]",
+        breaks = 10^seq(0:5),
+        labels = trans_format("log10", math_format(10^.x)),
+        trans = "log1p") +
+    scale_colour_brewer(palette = "Dark2", name = "DGE") +
+    scale_shape(name = "Biotype", na.value = 8) +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe(sides = 'bl', na.rm = FALSE) +
+    theme(legend.key.size = unit(.33, "cm"))
+```
+
+
+```{r}
+df_plot <- tx_lfc %>% 
+    select(-gene_biotype, -transcript_biotype) %>% 
+    left_join(dte %>% mutate_if(is.numeric, function(x) if_else(x < .05, TRUE, FALSE)),
+        by = c("ensembl_transcript_id_version", "ensembl_gene_id_version")) %>%
+    filter(!is.na(illumina) | !is.na(teloprime) | !is.na(cdna)) %>%
+    left_join(biotype_groups, by = "transcript_biotype") %>%
+    select(-gene_biotype) %>% 
+    mutate_if(is.numeric, abs)
+```
+
+```{r telo_lfc_tx}
+telo_lfc <- df_plot %>%
+    mutate(signif = if_else(illumina_txlevel & teloprime_txlevel, "both",
+                        if_else(illumina_txlevel, "illumina",
+                            if_else(teloprime_txlevel, "longRead", "n.s.")))) %>%
+    filter(signif != "n.s.") %>%
+    mutate(signif = factor(signif, levels = c("illumina", "longRead", "both"))) %>% 
+    tidyr::drop_na(illumina, teloprime) %>% 
+    ggplot(aes(illumina, teloprime)) +
+    geom_point(aes(colour = signif, pch = grouped_biotype),
+        size = 1,
+        alpha = .5) +
+    geom_abline(slope = 1, lty = 2, lwd = .25) +
+    scale_colour_brewer(palette = "Dark2", name = "DGE") +
+    scale_shape(name = "Biotype", na.value = 8) +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe(sides = 'bl', na.rm = FALSE) +
+    xlab("illumina [log2FC]") +
+    ylab("teloprime [log2FC]") +
+    theme(legend.key.size = unit(.33, "cm"))
+```
+
+```{r cdna_tx_lfc}
+cdna_lfc <- df_plot %>%
+    mutate(signif = if_else(illumina_txlevel & cdna_txlevel, "both",
+                        if_else(illumina_txlevel, "illumina",
+                            if_else(cdna_txlevel, "longRead", "n.s.")))) %>%
+    filter(signif != "n.s.") %>%
+    mutate(signif = factor(signif, levels = c("illumina", "longRead", "both"))) %>% 
+    tidyr::drop_na(illumina, cdna) %>% 
+    ggplot(aes(illumina, cdna)) +
+    geom_point(aes(colour = signif, pch = grouped_biotype),
+        size = 1,
+        alpha = .5) +
+    geom_abline(slope = 1, lty = 2, lwd = .25) +
+    scale_colour_brewer(palette = "Dark2", name = "DGE") +
+    scale_shape(name = "Biotype", na.value = 8) +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe(sides = 'bl', na.rm = FALSE) +
+    xlab("illumina [log2FC]") +
+    ylab("cdna [log2FC]") +
+    theme(legend.key.size = unit(.33, "cm"))
+```
+
+```{r combine_plots_tx, fig.width = 6.85, fig.asp = .7}
+telo_exp + telo_lfc + cdna_exp + cdna_lfc + plot_layout(guides = "collect")
+```
