@@ -223,7 +223,7 @@ def get_fastqnames(wildcards):
     return files
 
 
-rule fastq_readLengthogram:
+rule fastq_readLengthHistoogram:
     input:
         get_fastqnames
     output:

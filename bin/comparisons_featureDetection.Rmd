@@ -89,7 +89,7 @@ tx_tpm <- read_csv(snakemake@input[["tx_tpm"]], show_col_types = FALSE) %>%
 
 The counts are taken from the DESeq raw count files.
 
-```{r mappedReads, fig.width = 6.85 / 2, fig.asp = .7}
+```{r mappedReads, fig.width = 6.85 / 2, fig.asp = .65}
 df_gene %>%
     group_by(dataset, sample_id) %>%
     summarise(tot_counts = sum(counts)) %>%

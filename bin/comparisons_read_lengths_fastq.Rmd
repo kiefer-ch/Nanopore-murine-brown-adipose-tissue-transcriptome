@@ -94,10 +94,52 @@ tpm <- snakemake@input[["avg_counts"]] %>%
     mutate(method = "illumina")
 ```
 
-# Length of reads by method, flowcell, sample
+# Number of reads after quality filtering
 
 These plots are based on the fastq files from the ont data. All values after quality filtering.
 
+```{r, fig.width = 6.85 / 2, fig.asp = .65}
+df %>% 
+    group_by(method, sample_id, flowcell) %>% 
+    summarise(counts = sum(counts)) %>% 
+    mutate(method = factor(method, levels = c("illumina", "teloprime", "cdna", "rna"))) %>% 
+    group_by(method, sample_id) %>% 
+    ungroup() %>% 
+    left_join(read_csv(snakemake@input[["sample_info"]]) %>%
+            select(sample_id, condition_temp) %>% 
+            mutate(condition_temp = relevel(as.factor(condition_temp), "22")),
+        by = "sample_id") %>% 
+    mutate(flowcell = if_else(sample_id == "rt", "cell_1",
+        if_else(sample_id == "cool", "cell_2", as.character(flowcell)))) %>% 
+    ggplot(aes(method, counts)) +
+    geom_point(aes(colour = condition_temp, pch = flowcell),
+        size = 1,
+        alpha = .5,
+        position = position_dodge2(width = .75)) +
+    stat_summary(aes(colour = condition_temp, lty = flowcell),
+        fun = mean, geom = "crossbar",
+        position = position_dodge(width = .75),
+        width = 1,
+        fatten = 1, lwd = .5) +
+    stat_summary(aes(colour = condition_temp, lty = flowcell),
+        geom = "errorbar", fun.data = mean_se,
+        width = .75,
+        lwd = .25,
+        position = position_dodge(width = .75)) +
+    scale_y_continuous(labels = label_scientific()) +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe(sides = 'bl') +
+    xlab(NULL) +
+    ylab("Reads") +
+    scale_shape(name = NULL) +
+    scale_linetype(name = NULL) +
+    scale_colour_brewer(palette = "Dark2", name = NULL,
+        labels = c("22" = "22°C", "4" = "4°C")) +
+    theme(legend.key.size = unit(.33, "cm"))
+```
+
+
+# Length of reads by method, flowcell, sample
 
 ```{r, fig.width = 6.85 / 2, fig.asp = .65}
 df %>% 
@@ -119,12 +161,13 @@ df %>%
             lwd = .25) +
         facet_wrap(~method, ncol = 1, scales = "free_y") +
         scale_x_log10(labels = trans_format("log10", math_format(10^.x))) +
-        ylab("Reads") + 
+        ylab("Density") + 
         xlab("Read length") +
         theme_tufte(base_size = 8, base_family = "Helvetica") +
         geom_rangeframe(sides = "lb") +
         scale_colour_brewer(palette = "Dark2", name = NULL,
             labels = c("22" = "22°C", "4" = "4°C")) +
+        scale_linetype(name = NULL) +
         theme(legend.key.size = unit(.33, "cm"))
 ```
 
@@ -149,12 +192,13 @@ quals %>%
             group = paste(sample_id, flowcell)),
             lwd = .25) +
         facet_wrap(~method, ncol = 1, scales = "free_y") +
-        ylab("Reads") + 
+        ylab("Density") + 
         xlab("Average read quality") +
         theme_tufte(base_size = 8, base_family = "Helvetica") +
         geom_rangeframe(sides = "lb") +
         scale_colour_brewer(palette = "Dark2", name = NULL,
             labels = c("22" = "22°C", "4" = "4°C")) +
+        scale_linetype(name = NULL) +
         theme(legend.key.size = unit(.33, "cm"))
 ```
 
