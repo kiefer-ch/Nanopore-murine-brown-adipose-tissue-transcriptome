@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""fastq_counts.py: Count reads and readlengths of a fastq file."""
+"""fastq_readLengthHistogram.py: Aggregate read lengths for multiple fastq files."""
 
 __author__ = "Christoph Kiefer"
 __email__ = "christophak@bmb.sdu.dk"

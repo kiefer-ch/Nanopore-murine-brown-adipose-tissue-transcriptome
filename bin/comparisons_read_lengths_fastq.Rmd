@@ -28,13 +28,6 @@ library("ggthemes")
 library("scales")
 ```
 
-# Length of reads by method
-
-These plots are based on the fastq files from the ont data. 
-
-The illumina values are estimated based on the tpm values from salmon. They are
-somewhat a reference, but not actual read lengths.
-
 ```{r}
 sample_info <- read_csv(snakemake@input[["sample_info"]]) %>% 
     filter(!is.na(ont)) %>%
@@ -76,9 +69,20 @@ df <- snakemake@input[["readLengths"]] %>%
     dplyr::select(-barcode) %>% 
     mutate_if(is.character, as.factor) %>% 
     filter(counts != 0)
-```
 
-```{r, fig.width = 6.85 / 2, fig.asp = .7}
+quals <- snakemake@input[["readQualities"]] %>% 
+    map(read_csv, show_col_types = FALSE) %>%
+    map(tidyr::gather, "sample", "counts", -read_quality) %>% 
+    map2(., c("teloprime", "cdna", "rna"), separate_variables) %>% 
+    bind_rows() %>% 
+    mutate(flowcell = if_else(flowcell %in% c("X1_flowcell", "pool1"), "cell_1", "cell_2")) %>% 
+    mutate(flowcell = if_else(method == "rna", NA_character_, flowcell)) %>% 
+    left_join(sample_info, by = "barcode") %>%
+    mutate(sample_id = if_else(method == "rna", barcode, sample_id)) %>% 
+    dplyr::select(-barcode) %>% 
+    mutate_if(is.character, as.factor) %>% 
+    filter(counts != 0)
+
 tpm <- snakemake@input[["avg_counts"]] %>% 
     read_csv() %>% 
     select(transcript_length, illumina) %>% 
@@ -88,25 +92,78 @@ tpm <- snakemake@input[["avg_counts"]] %>%
     group_by(read_length) %>% 
     summarise(counts = sum(illumina, na.rm = TRUE)) %>% 
     mutate(method = "illumina")
+```
+
+# Length of reads by method, flowcell, sample
+
+These plots are based on the fastq files from the ont data. All values after quality filtering.
 
 
+```{r, fig.width = 6.85 / 2, fig.asp = .65}
 df %>% 
-    group_by(method, read_length) %>% 
+    group_by(method, sample_id, flowcell, read_length) %>% 
     summarise(counts = sum(counts)) %>% 
-    bind_rows(., tpm) %>% 
     mutate(method = factor(method, levels = c("illumina", "teloprime", "cdna", "rna"))) %>% 
-    ggplot(aes(read_length, counts)) +
-        geom_freqpoly(stat = "identity", lwd = .25) +
+    group_by(method, sample_id) %>% 
+    mutate(weight = counts / sum(counts)) %>% 
+    ungroup() %>% 
+    left_join(read_csv(snakemake@input[["sample_info"]]) %>%
+            select(sample_id, condition_temp) %>% 
+            mutate(condition_temp = relevel(as.factor(condition_temp), "22")),
+        by = "sample_id") %>% 
+    mutate(flowcell = if_else(sample_id == "rt", "cell_1",
+        if_else(sample_id == "cool", "cell_2", as.character(flowcell)))) %>% 
+    ggplot(aes(read_length)) +
+        geom_density(aes(weight = weight, colour = condition_temp, lty = flowcell,
+            group = paste(sample_id, flowcell)),
+            lwd = .25) +
         facet_wrap(~method, ncol = 1, scales = "free_y") +
-        scale_y_continuous(labels = label_scientific()) +
         scale_x_log10(labels = trans_format("log10", math_format(10^.x))) +
         ylab("Reads") + 
         xlab("Read length") +
         theme_tufte(base_size = 8, base_family = "Helvetica") +
-        geom_rangeframe(sides = "lb") 
+        geom_rangeframe(sides = "lb") +
+        scale_colour_brewer(palette = "Dark2", name = NULL,
+            labels = c("22" = "22°C", "4" = "4°C")) +
+        theme(legend.key.size = unit(.33, "cm"))
 ```
 
-```{r, fig.width = 6.85 / 2, fig.asp = .7}
+# Average read quality
+
+```{r, fig.width = 6.85 / 2, fig.asp = .65}
+quals %>% 
+    group_by(method, sample_id, flowcell, read_quality) %>% 
+    summarise(counts = sum(counts)) %>% 
+    mutate(method = factor(method, levels = c("illumina", "teloprime", "cdna", "rna"))) %>% 
+    group_by(method, sample_id) %>% 
+    mutate(weight = counts / sum(counts)) %>% 
+    ungroup() %>% 
+    left_join(read_csv(snakemake@input[["sample_info"]]) %>%
+            select(sample_id, condition_temp) %>% 
+            mutate(condition_temp = relevel(as.factor(condition_temp), "22")),
+        by = "sample_id") %>% 
+    mutate(flowcell = if_else(sample_id == "rt", "cell_1",
+        if_else(sample_id == "cool", "cell_2", as.character(flowcell)))) %>% 
+    ggplot(aes(read_quality)) +
+        geom_density(aes(weight = weight, colour = condition_temp, lty = flowcell,
+            group = paste(sample_id, flowcell)),
+            lwd = .25) +
+        facet_wrap(~method, ncol = 1, scales = "free_y") +
+        ylab("Reads") + 
+        xlab("Average read quality") +
+        theme_tufte(base_size = 8, base_family = "Helvetica") +
+        geom_rangeframe(sides = "lb") +
+        scale_colour_brewer(palette = "Dark2", name = NULL,
+            labels = c("22" = "22°C", "4" = "4°C")) +
+        theme(legend.key.size = unit(.33, "cm"))
+```
+
+# Grouped read lengths
+
+The illumina values are estimated based on the tpm values from salmon. They are
+somewhat a reference, but not actual read lengths.
+
+```{r, fig.width = 6.85 / 2, fig.asp = .65}
 df %>% 
     group_by(method, read_length) %>% 
     summarise(counts = sum(counts)) %>%
@@ -135,24 +192,4 @@ df %>%
     dplyr::select(-sum_weigthed_readlengths) %>% 
     knitr::kable(format = "html") %>%
     kableExtra::kable_styling()
-```
-
-
-# By sample
-
-```{r readLength_Violin}
-df %>% 
-    group_by(method, flowcell, sample_id) %>% 
-    mutate(weight = counts / sum(counts)) %>% 
-    ungroup() %>% 
-    filter(method != "rna") %>% 
-    ggplot(aes(sample_id, read_length, weight = weight, fill = flowcell)) +
-    geom_violin() +
-    facet_wrap(~method, ncol = 1) +
-    scale_y_log10(labels = trans_format("log10", math_format(10^.x))) +
-    scale_fill_brewer(palette = "Dark2") +
-    theme_tufte(base_size = 8, base_family = "Helvetica") +
-    geom_rangeframe(sides = "bl") +
-    xlab(NULL) + 
-    ylab("Read length")
 ```

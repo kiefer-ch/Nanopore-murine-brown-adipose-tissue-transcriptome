@@ -51,6 +51,7 @@ rule feature_detection:
         gene_counts = expand("res/deseq/{dataset}/genelevel/{dataset}_genelevel_cm_cts.csv.gz",
                              dataset=["cdna", "teloprime", "illumina", "rna"]),
         gene_tpm = "res/deseq/illumina/genelevel/illumina_genelevel_cm_ntd.csv.gz",
+        tx_tpm = "res/deseq/illumina/txlevel/illumina_txlevel_cm_ntd.csv.gz",
         biomaRt_gene = "annotation/biomaRt_gene.rds",
         biomaRt_tx = "annotation/biomaRt_tx.rds",
         biotype_groups = "data/biotype_groups.csv",
@@ -158,7 +159,6 @@ rule collapse_coverage:
         "comparisons_coverage_collapseCoverage"
 
 
-
 rule coverage:
     input:
         geneBodyCoverage_teloprime = expand("res/comparisons/geneBody_coverage/teloprime/{barcode}.geneBodyCoverage.txt",
@@ -223,7 +223,7 @@ def get_fastqnames(wildcards):
     return files
 
 
-rule fastq_readLengthHistogram:
+rule fastq_readLengthogram:
     input:
         get_fastqnames
     output:
@@ -232,9 +232,20 @@ rule fastq_readLengthHistogram:
         "comparisons_fastq_readLengthHistogram.py"
 
 
+rule fastq_readQualityHistogram:
+    input:
+        get_fastqnames
+    output:
+        "res/comparisons/readQualityDistribution/{dataset}_fastqQualities.csv"
+    script:
+        "comparisons_fastq_readQualityHistogram.py"
+
+
 rule read_lengths_fastq:
     input:
         readLengths = expand("res/comparisons/readLengthDistribution/{dataset}_fastqReadLengths.csv",
+                             dataset=["teloprime", "cdna", "rna"]),
+        readQualities = expand("res/comparisons/readQualityDistribution/{dataset}_fastqQualities.csv",
                              dataset=["teloprime", "cdna", "rna"]),
         avg_counts = "res/comparisons/comparisons_meanCounts_tx.csv.gz",
         sample_info = "sample_info/sampleInfo.csv"
