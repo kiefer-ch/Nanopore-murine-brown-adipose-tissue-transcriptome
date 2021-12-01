@@ -1,9 +1,6 @@
-#!/usr/bin/Rscript --no-restore --no-environ --no-save
 
-# set libpaths to packrat local library
-message("Load packages...")
 source(".Rprofile")
-
+suppressPackageStartupMessages(library("logger"))
 suppressPackageStartupMessages(library("dplyr"))
 suppressPackageStartupMessages(library("purrr"))
 suppressPackageStartupMessages(library("GenomicAlignments"))
@@ -17,30 +14,49 @@ suppressPackageStartupMessages(library("GenomicAlignments"))
 #
 ################################################################################
 
-# genome
-message(sprintf("Loading %s...", snakemake@input[[1]]))
-bam <- readGAlignments(snakemake@input[[1]],
-    use.names = TRUE,
-    param = ScanBamParam(tag = c("NM"),
-        scanBamFlag(isUnmappedQuery = NA),
-        what = c("qname","flag", "rname", "pos")))
+# function definitions
+get_cigar <- function(cigar) {
+
+    if(is.na(cigar)) {
+
+        out <- list(NA_character_)
+
+    } else {
+
+        lengths = explodeCigarOpLengths(cigar)
+        values = explodeCigarOps(cigar)
+
+        out <- relist(paste0(unlist(lengths), unlist(values)), values)
+    }
+
+    out
+
+}
 
 get_opts <- function(cigar, opts) {
     sum(as.numeric(gsub(paste0(opts, "$"), "", cigar)), na.rm = TRUE)
 }
 
-message(sprintf("Processing %s...", snakemake@input[[1]]))
-bam %>%
+
+log_info(sprintf("Importing %s...", snakemake@input[[1]]))
+bam <- scanBam(snakemake@input[[1]],
+    param = ScanBamParam(what = c("qname", "flag", "rname", "qwidth", "cigar")))[[1]]
+
+
+log_info(sprintf("Processing %s...", snakemake@input[[1]]))
+bam <- bam %>%
     as_tibble() %>%
-    select(qname, flag, qwidth, cigar, seqnames) %>%
-    mutate(lengths = explodeCigarOpLengths(cigar),
-        values = explodeCigarOps(cigar)) %>%
-    mutate(cigar = relist(paste0(unlist(lengths), unlist(values)), values)) %>%
-    select(-lengths, -values) %>%
     rowwise() %>%
+    mutate(cigar = get_cigar(cigar)) %>%
     mutate(n_I = get_opts(cigar, "I"),
         n_M = get_opts(cigar, "M")) %>%
     ungroup() %>%
     mutate(aligned = n_I + n_M) %>%
-    select(-cigar, -n_I, -n_M) %>%
+    select(-cigar, -n_I, -n_M)
+
+
+log_info(sprintf("Writing %s to disk...", snakemake@output[[1]]))
+bam %>%
     saveRDS(snakemake@output[[1]])
+
+log_success("Done.")

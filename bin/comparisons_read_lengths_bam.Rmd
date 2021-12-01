@@ -18,6 +18,7 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
     cache = FALSE, out.width = 800)
 ```
 
+
 ```{r loadPackages}
 source(".Rprofile")
 library("dplyr")
@@ -43,110 +44,6 @@ biomart <- snakemake@input[["biomaRt_tx"]] %>%
     read_rds()
 ```
 
-
-# Read categories based on flagstat
-
-```{r import_flagstats}
-separate_variables <- function(df, method) {
-    if (method %in% c("cdna", "teloprime")) {
-        df <- df %>%
-            tidyr::separate(file, c("waste", "library", "flowcell", "filename"),
-                sep = '/') %>% 
-            tidyr::separate(filename, c("waste1", "waste2", "type", "barcode"),
-                extra = "drop") %>%  
-            select_at(vars(-matches("waste")))
-    } else if (method == "rna") {
-        df <- df %>%
-            tidyr::separate(file, c("waste1", "library", "filename"), sep = '/') %>% 
-            tidyr::separate(filename, c("type", "barcode"), extra = "drop") %>% 
-            select_at(vars(-matches("waste"))) 
-    }
-    return(df)
-}
-
-flagstats <- snakemake@input[["flagstats"]] %>% 
-    map(read_csv) %>% 
-    map2(c("cdna", "teloprime", "rna"), separate_variables) %>% 
-    bind_rows() %>% 
-    left_join(sample_info2, by = "barcode") %>% 
-    mutate(sample_id = if_else(library == "rna", barcode, sample_id)) %>% 
-    dplyr::select(-barcode) %>% 
-    dplyr::select_at(vars(-matches("waste"))) %>% 
-    mutate(flowcell = if_else(flowcell %in% c("X1_flowcell", "pool1"),
-        "cell_1", "cell_2")) %>% 
-    mutate(flowcell = if_else(library == "rna", NA_character_, flowcell)) %>% 
-    dplyr::select(sample_id, everything())
-```
-
-```{r plot_flagstats, fig.width = 6.85 / 2, fig.asp = .65}
-add_total <- function(df) {
-    df %>% add_row(library = unique(.$library), 
-        type = unique(.$type),
-        mapping_type = "total",
-        count = .$count[.$mapping_type == "primary"] +
-            .$count[.$mapping_type == "unmapped"]) 
-}
-
-grouped_flagstats <- flagstats %>% 
-    group_by(library, type) %>%
-    summarise_if(is.numeric, sum) %>%
-    ungroup() %>% 
-    tidyr::gather("mapping_type", "count", -library, -type) %>% 
-    arrange(type, library) %>% 
-    split(list(.$library, .$type)) %>% 
-    map(add_total) %>% 
-    bind_rows()
-
-grouped_flagstats %>% 
-    tidyr::spread(mapping_type, count) %>% 
-    mutate(primary_pc = primary / total,
-           supplementary_pc = supplementary / total,
-           unmapped_pc = unmapped / total) %>% 
-    select(library, type, total, primary, primary_pc, supplementary,
-        supplementary_pc, unmapped, unmapped_pc) %>% 
-    knitr::kable(format = "html") %>%
-    kableExtra::kable_styling()
-
-grouped_flagstats %>% 
-    filter(mapping_type != "secondary") %>%
-    mutate(mapping_type = factor(mapping_type,
-        levels = c("total", "primary", "unmapped", "supplementary"))) %>% 
-    mutate(library = factor(library, levels = c("illumina", "teloprime", "cdna", "rna"))) %>% 
-    ggplot(aes(x = library, y = count,  fill = mapping_type)) +
-    geom_bar(stat = "identity", position = position_dodge()) +
-    facet_wrap(~type) +
-    scale_y_continuous(labels = label_scientific()) +
-    theme_tufte(base_size = 8, base_family = "Helvetica") +
-    geom_rangeframe(sides = "lb") +
-    xlab(NULL) + 
-    ylab("Reads") +
-    scale_fill_brewer(palette = "Dark2", name = NULL) +
-    theme(legend.key.size = unit(.33, "cm"))
-
-grouped_flagstats %>% 
-    filter(mapping_type != "secondary") %>%
-    mutate(mapping_type = factor(mapping_type,
-        levels = c("total", "primary", "unmapped", "supplementary"))) %>%
-    group_by(type, library) %>% 
-    mutate(count = count / count[mapping_type == "total"]) %>% 
-    ungroup() %>% 
-    mutate(library = factor(library, levels = c("illumina", "teloprime", "cdna", "rna"))) %>% 
-    ggplot(aes(x = library, y = count,  fill = mapping_type)) +
-    geom_bar(stat = "identity", position = position_dodge()) +
-    facet_wrap(~type) +
-    scale_y_continuous(labels = label_percent()) +
-    theme_tufte(base_size = 8, base_family = "Helvetica") +
-    geom_rangeframe(sides = "lb") +
-    xlab(NULL) + 
-    ylab("Fraction of reads") +
-    scale_fill_brewer(palette = "Dark2", name = NULL) +
-    theme(legend.key.size = unit(.33, "cm"))
-```
-
-# Length of primary and supplementary reads (against transcriptome)
-
-Based on the mapping against the transcriptome. From bam files.
-
 ```{r dataImport_tx_bam}
 df_tx <- read_rds(snakemake@input$collapsed_transcripts) %>% 
     mutate(category = if_else(type == "supplementary", "supplementary",
@@ -164,7 +61,7 @@ tpm <- snakemake@input[["avg_counts"]] %>%
     mutate(library = "illumina")
 ```
 
-## Read categories
+# Read categories (transcriptome mapping)
 
 ```{r, fig.width = 6.85 / 2, fig.asp = .65}
 df_tx %>% 
@@ -201,6 +98,9 @@ df_tx %>%
     scale_fill_brewer(palette = "Dark2", name = NULL) +
     theme(legend.key.size = unit(.33, "cm"))
 ```
+
+
+# Length of primary and supplementary reads (against transcriptome)
 
 ## Grouped read lengths
 

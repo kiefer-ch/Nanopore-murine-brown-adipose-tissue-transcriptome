@@ -1,4 +1,3 @@
-
 source(".Rprofile")
 suppressPackageStartupMessages(library("logger"))
 suppressPackageStartupMessages(library("dplyr"))
@@ -34,11 +33,10 @@ df_tx <- df_tx %>%
     map(read_rds) %>%
     map(mutate, type = get_map_type(flag)) %>%
     map(dplyr::select, -flag) %>%
-    map(tidyr::separate, col = seqnames,
-        into = "ensembl_transcript_id_version",
-        sep = '\\|', extra = "drop") %>%
     map(group_by, qname) %>%
     map(mutate, has_supplementary = any(type == "supplementary")) %>%
+    mutate(category = if_else(type == "supplementary", "supplementary",
+        if_else(has_supplementary, "primary_with_supplementary", "primary_wo_supplementary"))) %>%
     map(ungroup) %>%
     bind_rows(.id = "sample") %>%
     tidyr::separate(sample, c("library", "barcode"), sep = '_') %>%
