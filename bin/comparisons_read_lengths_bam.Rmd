@@ -29,16 +29,22 @@ library("scales")
 ```
 
 
-```{r}
+```{r import_general}
 sample_info <- read_csv(snakemake@input[["sample_info"]]) %>% 
     filter(!is.na(ont)) %>%
-    mutate_at(vars(matches("condition")), as.factor) %>% 
+    mutate_at(vars(matches("condition")), as.factor)
+
+sample_info2 <- sample_info %>% 
     dplyr::select(sample_id, illumina, ont, cdna) %>% 
     tidyr::gather("method", "barcode", -sample_id) %>% 
     dplyr::select(-method) 
+
+biomart <- snakemake@input[["biomaRt_tx"]] %>%
+     read_rds()
 ```
 
-# Reads and mapping
+
+# Read categories based on flagstat
 
 ```{r import_flagstats}
 separate_variables <- function(df, method) {
@@ -62,7 +68,7 @@ flagstats <- snakemake@input[["flagstats"]] %>%
     map(read_csv) %>% 
     map2(c("cdna", "teloprime", "rna"), separate_variables) %>% 
     bind_rows() %>% 
-    left_join(sample_info, by = "barcode") %>% 
+    left_join(sample_info2, by = "barcode") %>% 
     mutate(sample_id = if_else(library == "rna", barcode, sample_id)) %>% 
     dplyr::select(-barcode) %>% 
     dplyr::select_at(vars(-matches("waste"))) %>% 
@@ -93,6 +99,11 @@ grouped_flagstats <- flagstats %>%
 
 grouped_flagstats %>% 
     tidyr::spread(mapping_type, count) %>% 
+    mutate(primary_pc = primary / total,
+           supplementary_pc = supplementary / total,
+           unmapped_pc = unmapped / total) %>% 
+    select(library, type, total, primary, primary_pc, supplementary,
+        supplementary_pc, unmapped, unmapped_pc) %>% 
     knitr::kable(format = "html") %>%
     kableExtra::kable_styling()
 
@@ -111,6 +122,24 @@ grouped_flagstats %>%
     ylab("Reads") +
     scale_fill_brewer(palette = "Dark2", name = NULL) +
     theme(legend.key.size = unit(.33, "cm"))
+
+grouped_flagstats %>% 
+    filter(mapping_type != "secondary") %>%
+    mutate(mapping_type = factor(mapping_type,
+        levels = c("total", "primary", "unmapped", "supplementary"))) %>%
+    group_by(type, library) %>% 
+    mutate(count = count / count[mapping_type == "total"]) %>% 
+    mutate(library = factor(library, levels = c("illumina", "teloprime", "cdna", "rna"))) %>% 
+    ggplot(aes(x = library, y = count,  fill = mapping_type)) +
+    geom_bar(stat = "identity", position = position_dodge()) +
+    facet_wrap(~type) +
+    scale_y_continuous(labels = label_percent()) +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe(sides = "lb") +
+    xlab(NULL) + 
+    ylab("Fraction of reads") +
+    scale_fill_brewer(palette = "Dark2", name = NULL) +
+    theme(legend.key.size = unit(.33, "cm"))
 ```
 
 # Length of primary and supplementary reads (against transcriptome)
@@ -118,7 +147,9 @@ grouped_flagstats %>%
 Based on the mapping against the transcriptome. From bam files.
 
 ```{r dataImport_tx_bam}
-df_tx <- read_rds(snakemake@input$collapsed_transcripts)
+df_tx <- read_rds(snakemake@input$collapsed_transcripts) %>% 
+    mutate(category = if_else(type == "supplementary", "supplementary",
+        if_else(has_supplementary, "primary_with_supplementary", "primary_wo_supplementary")))
 
 tpm <- snakemake@input[["avg_counts"]] %>% 
     read_csv() %>% 
@@ -129,6 +160,44 @@ tpm <- snakemake@input[["avg_counts"]] %>%
     group_by(qwidth) %>% 
     summarise(n = sum(illumina, na.rm = TRUE)) %>% 
     mutate(library = "illumina")
+```
+
+## Read categories
+
+```{r, fig.width = 6.85 / 2, fig.asp = .65}
+df_tx %>% 
+    group_by(library, barcode, category) %>% 
+    summarise(n = n()) %>% 
+    left_join(sample_info2) %>%
+    ungroup() %>% 
+    mutate(sample_id = if_else(library == "rna", barcode, sample_id)) %>% 
+    ggplot(aes(x = sample_id, y = n,  fill = category)) +
+    geom_bar(stat = "identity") +
+    facet_wrap(~library, scales = "free_x") +
+    scale_y_continuous(labels = label_scientific()) +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe(sides = "l") +
+    scale_x_discrete(labels = NULL, breaks = NULL, name = NULL) +
+    ylab("Reads") +
+    scale_fill_brewer(palette = "Dark2", name = NULL) +
+    theme(legend.key.size = unit(.33, "cm"))
+
+df_tx %>% 
+    group_by(library, barcode, category) %>% 
+    summarise(n = n()) %>% 
+    left_join(sample_info2) %>%  
+    mutate(n = n / sum(n)) %>% 
+    ungroup() %>% 
+    mutate(sample_id = if_else(library == "rna", barcode, sample_id)) %>% 
+    ggplot(aes(x = sample_id, y = n,  fill = category)) +
+    geom_bar(stat = "identity") +
+    facet_wrap(~library, scales = "free_x") +
+    scale_y_continuous(name = "Fraction of reads", labels = label_percent()) +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe(sides = "l") +
+    scale_x_discrete(labels = NULL, breaks = NULL, name = NULL) +
+    scale_fill_brewer(palette = "Dark2", name = NULL) +
+    theme(legend.key.size = unit(.33, "cm"))
 ```
 
 ## Grouped read lengths
@@ -155,11 +224,26 @@ df_tx %>%
     theme(legend.key.size = unit(.33, "cm"))
 ```
 
+# Mapping of supplementary reads
+
+```{r}
+df_tx %>% 
+    filter(category != "primary_wo_supplementary") %>% 
+    left_join(biomart %>% 
+            select(ensembl_transcript_id_version, ensembl_gene_id_version),
+        by = "ensembl_transcript_id_version") %>% 
+    group_by(library, qname) %>% 
+    summarise(supplementary_type = if_else(all(ensembl_transcript_id_version == ensembl_transcript_id_version), "same_transcript", 
+            if_else(all(ensembl_gene_id_version == ensembl_gene_id_version), "same_gene", "not_same_gene")),
+        n = n()) %>% 
+    mutate(supplementary_type = as.factor(supplementary_type)) %>% 
+    filter(n > 1) %>% 
+    summary()
+```
+
+
 ```{r, fig.width = 6.85 / 2, fig.asp = .65}
 df_tx %>% 
-    dplyr::select(-barcode) %>% 
-    mutate(category = if_else(type == "supplementary", "supplementary",
-        if_else(has_supplementary, "primary_with_supplementary", "primary_wo_supplementary"))) %>% 
     ggplot(aes(category, qwidth)) + 
     geom_violin(aes(fill = library), lwd = .25) +
     scale_y_log10(labels = trans_format("log10", math_format(10^.x))) +
@@ -174,9 +258,6 @@ df_tx %>%
 
 ```{r, fig.width = 6.85 / 2, fig.asp = .65}
 df_tx %>% 
-    dplyr::select(-barcode) %>% 
-    mutate(category = if_else(type == "supplementary", "supplementary",
-        if_else(has_supplementary, "primary_with_supplementary", "primary_wo_supplementary"))) %>% 
     ggplot(aes(category, aligned)) + 
     geom_violin(aes(fill = library), lwd = .25) +
     scale_y_log10(labels = trans_format("log10", math_format(10^.x))) +
@@ -189,13 +270,20 @@ df_tx %>%
     theme(legend.key.size = unit(.33, "cm"))
 ```
 
-# Aligned length vs read length
+## Correlations
+
+```{r}
+df_tx <- df_tx %>% 
+    filter(type == "primary")
+```
+
+
+### Aligned length vs read length
 
 Primary hits only
 
 ```{r plotTranscriptome, fig.width = 6.85 / 2, fig.asp = .65}
 df_tx %>% 
-    filter(type == "primary") %>% 
     dplyr::select(library, qwidth, aligned) %>% 
     ggplot(aes(qwidth, aligned)) +
     geom_hex(aes(fill = ..density..), binwidth = .025) +
@@ -211,18 +299,12 @@ df_tx %>%
     theme(legend.key.size = unit(.33, "cm"))
 ```
 
-# Aligned length vs expected length
-
-```{r import_txdb}
-biomart <- snakemake@input[["biomaRt_tx"]] %>%
-    read_rds()
-```
+## Aligned length vs expected length
 
 ```{r, fig.width = 6.85 / 2, fig.asp = .65}
 df_tx %>%
-    filter(type == "primary") %>%
     dplyr::select(library, ensembl_transcript_id_version, aligned) %>%
-    left_join(biomart, by = "ensembl_transcript_id_version") %>%
+#    left_join(biomart, by = "ensembl_transcript_id_version") %>%
     filter(!is.na(transcript_length)) %>%
     ggplot(aes(transcript_length, aligned)) +
     geom_hex(aes(fill = ..density..), binwidth = .025) +
@@ -238,13 +320,12 @@ df_tx %>%
     theme(legend.key.size = unit(.33, "cm"))
 ```
 
-# Read length vs expected length
+## Read length vs expected length
 
 ```{r, fig.width = 6.85 / 2, fig.asp = .65}
 df_tx %>%
-    filter(type == "primary") %>%
     dplyr::select(library, ensembl_transcript_id_version, qwidth) %>%
-    left_join(biomart, by = "ensembl_transcript_id_version") %>%
+#    left_join(biomart, by = "ensembl_transcript_id_version") %>%
     filter(!is.na(transcript_length)) %>%
     ggplot(aes(transcript_length, qwidth)) +
     geom_hex(aes(fill = ..density..), binwidth = .025) +

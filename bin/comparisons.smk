@@ -223,7 +223,7 @@ def get_fastqnames(wildcards):
     return files
 
 
-rule fastq_readLengthHistoogram:
+rule fastq_readLengthHistogram:
     input:
         get_fastqnames
     output:
@@ -253,7 +253,22 @@ rule read_lengths_fastq:
     script:
         "comparisons_read_lengths_fastq.Rmd"
 
-rule read_lengths_bam_collapseTranscripts:
+
+rule read_lengths_bam_collapseTranscripts_genome:
+    input:
+        teloprime_bam_tx = expand("res/comparisons/countReads/teloprime_{barcode}_bam_genome.rds",
+            barcode=SAMPLE_INFO_ont["ont"]),
+        cdna_bam_tx = expand("res/comparisons/countReads/cdna_{barcode}_bam_genome.rds",
+            barcode=SAMPLE_INFO_ont["cdna"]),
+        rna_bam_tx = expand("res/comparisons/countReads/rna_{barcode}_bam_genome.rds",
+            barcode=["rt", "cool"])
+    output:
+        "res/comparisons/countReads/bam_transcrips_collapsed_genome.rds"
+    script:
+        "comparisons_read_lengths_bam_collapseTranscripts_genome.R"
+
+
+rule read_lengths_bam_collapseTranscripts_transcriptome:
     input:
         teloprime_bam_tx = expand("res/comparisons/countReads/teloprime_{barcode}_bam_transcriptome.rds",
             barcode=SAMPLE_INFO_ont["ont"]),
@@ -265,7 +280,6 @@ rule read_lengths_bam_collapseTranscripts:
         "res/comparisons/countReads/bam_transcrips_collapsed.rds"
     script:
         "comparisons_read_lengths_bam_collapseTranscripts.R"
-
 
 rule read_lengths_bam:
     input:
