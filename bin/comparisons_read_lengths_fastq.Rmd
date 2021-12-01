@@ -29,7 +29,9 @@ library("scales")
 ```
 
 ```{r}
-sample_info <- read_csv(snakemake@input[["sample_info"]]) %>% 
+sample_info <- read_csv(snakemake@input[["sample_info"]])
+
+sample_info2 <- sample_info %>% 
     filter(!is.na(ont)) %>%
     mutate_at(vars(matches("condition")), as.factor) %>% 
     dplyr::select(sample_id, illumina, ont, cdna) %>% 
@@ -64,7 +66,7 @@ df <- snakemake@input[["readLengths"]] %>%
     bind_rows() %>% 
     mutate(flowcell = if_else(flowcell %in% c("X1_flowcell", "pool1"), "cell_1", "cell_2")) %>% 
     mutate(flowcell = if_else(method == "rna", NA_character_, flowcell)) %>% 
-    left_join(sample_info, by = "barcode") %>%
+    left_join(sample_info2, by = "barcode") %>%
     mutate(sample_id = if_else(method == "rna", barcode, sample_id)) %>% 
     dplyr::select(-barcode) %>% 
     mutate_if(is.character, as.factor) %>% 
@@ -77,21 +79,11 @@ quals <- snakemake@input[["readQualities"]] %>%
     bind_rows() %>% 
     mutate(flowcell = if_else(flowcell %in% c("X1_flowcell", "pool1"), "cell_1", "cell_2")) %>% 
     mutate(flowcell = if_else(method == "rna", NA_character_, flowcell)) %>% 
-    left_join(sample_info, by = "barcode") %>%
+    left_join(sample_info2, by = "barcode") %>%
     mutate(sample_id = if_else(method == "rna", barcode, sample_id)) %>% 
     dplyr::select(-barcode) %>% 
     mutate_if(is.character, as.factor) %>% 
     filter(counts != 0)
-
-tpm <- snakemake@input[["avg_counts"]] %>% 
-    read_csv() %>% 
-    select(transcript_length, illumina) %>% 
-    rename(read_length = "transcript_length") %>%
-    tidyr::drop_na() %>% 
-    mutate(illumina = 2^illumina - 1) %>% 
-    group_by(read_length) %>% 
-    summarise(counts = sum(illumina, na.rm = TRUE)) %>% 
-    mutate(method = "illumina")
 ```
 
 # Number of reads after quality filtering
@@ -105,7 +97,7 @@ df %>%
     mutate(method = factor(method, levels = c("illumina", "teloprime", "cdna", "rna"))) %>% 
     group_by(method, sample_id) %>% 
     ungroup() %>% 
-    left_join(read_csv(snakemake@input[["sample_info"]]) %>%
+    left_join(sample_info %>%
             select(sample_id, condition_temp) %>% 
             mutate(condition_temp = relevel(as.factor(condition_temp), "22")),
         by = "sample_id") %>% 
@@ -149,7 +141,7 @@ df %>%
     group_by(method, sample_id) %>% 
     mutate(weight = counts / sum(counts)) %>% 
     ungroup() %>% 
-    left_join(read_csv(snakemake@input[["sample_info"]]) %>%
+    left_join(sample_info %>%
             select(sample_id, condition_temp) %>% 
             mutate(condition_temp = relevel(as.factor(condition_temp), "22")),
         by = "sample_id") %>% 
@@ -202,38 +194,117 @@ quals %>%
         theme(legend.key.size = unit(.33, "cm"))
 ```
 
-# Grouped read lengths
+# Correlations
 
-The illumina values are estimated based on the tpm values from salmon. They are
-somewhat a reference, but not actual read lengths.
+## RIN score
 
 ```{r, fig.width = 6.85 / 2, fig.asp = .65}
-df %>% 
-    group_by(method, read_length) %>% 
-    summarise(counts = sum(counts)) %>%
-    bind_rows(tpm) %>% 
-    group_by(method) %>% 
-    mutate(weight = counts / sum(counts)) %>% 
-    ungroup() %>% 
+df_1 <- df %>% 
+    group_by(method, sample_id, flowcell) %>% 
+    summarise(counts = sum(counts)) %>% 
     mutate(method = factor(method, levels = c("illumina", "teloprime", "cdna", "rna"))) %>% 
-    ggplot(aes(method, read_length, weight = weight)) +
-    geom_violin(lwd = .25) +
-    scale_y_log10(labels = trans_format("log10", math_format(10^.x))) +
+    group_by(method, sample_id) %>% 
+    ungroup() %>% 
+    left_join(sample_info, by = "sample_id") %>% 
+    mutate(condition_temp = relevel(as.factor(condition_temp), "22")) %>% 
+    filter(method != "rna")
+
+df_1 %>% 
+    ggplot(aes(RIN, counts)) +
+    geom_point(aes(colour = condition_temp, pch = flowcell),
+        size = 1,
+        alpha = .5) +
+    geom_smooth(aes(colour = condition_temp, lty = flowcell),
+        method = 'lm', se = FALSE,
+        lwd = .25) +
+    facet_grid(~method) +
+    scale_y_continuous(name = "Reads", labels = label_scientific()) +
     theme_tufte(base_size = 8, base_family = "Helvetica") +
-    geom_rangeframe(sides = "bl") +
-    xlab(NULL) + 
-    ylab("Read/transcript length")
+    geom_rangeframe(sides = 'bl') +
+    xlab("RIN") +
+    scale_shape(name = NULL) +
+    scale_linetype(name = NULL) +
+    scale_colour_brewer(palette = "Dark2", name = NULL,
+        labels = c("22" = "22°C", "4" = "4°C")) +
+    theme(legend.key.size = unit(.33, "cm"))
+
+df_2 <- quals %>% 
+    group_by(method, sample_id, flowcell) %>% 
+    summarise(quality = mean(read_quality)) %>% 
+    mutate(method = factor(method, levels = c("illumina", "teloprime", "cdna", "rna"))) %>% 
+    group_by(method, sample_id) %>% 
+    ungroup() %>% 
+    left_join(sample_info, by = "sample_id") %>% 
+    mutate(condition_temp = relevel(as.factor(condition_temp), "22")) %>% 
+    filter(method != "rna")
+
+df_2 %>% 
+    ggplot(aes(RIN, quality)) +
+    geom_point(aes(colour = condition_temp, pch = flowcell),
+       size = 1,
+        alpha = .5) +
+    geom_smooth(aes(colour = condition_temp, lty = flowcell),
+        method = 'lm', se = FALSE,
+        lwd = .25) +
+    facet_grid(~method) +
+    scale_y_continuous(name = "Average quality") +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe(sides = 'bl') +
+    xlab("RIN") +
+    scale_shape(name = NULL) +
+    scale_linetype(name = NULL) +
+    scale_colour_brewer(palette = "Dark2", name = NULL,
+        labels = c("22" = "22°C", "4" = "4°C")) +
+    theme(legend.key.size = unit(.33, "cm"))
+
+df_1 %>% 
+    left_join(df_2) %>% 
+    ggplot(aes(quality, counts)) +
+    geom_point(aes(colour = condition_temp, pch = flowcell),
+        size = 1,
+        alpha = .5) +
+    geom_smooth(aes(colour = condition_temp, lty = flowcell),
+        method = 'lm', se = FALSE,
+        lwd = .25) +
+    facet_grid(~method) +
+    scale_y_continuous(name = "Reads", labels = label_scientific()) +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe(sides = 'bl') +
+    xlab("Average quality") +
+    scale_shape(name = NULL) +
+    scale_linetype(name = NULL) +
+    scale_colour_brewer(palette = "Dark2", name = NULL,
+        labels = c("22" = "22°C", "4" = "4°C")) +
+    theme(legend.key.size = unit(.33, "cm"))
 ```
 
+
+# Tabular output
+
 ```{r}
-df %>% 
+df_1 <- df %>% 
+    mutate(flowcell = if_else(sample_id == "rt", "cell_1",
+    if_else(sample_id == "cool", "cell_2", as.character(flowcell)))) %>% 
     group_by(method, flowcell) %>% 
     mutate(weighted_length = read_length * counts) %>% 
     summarise(counts = sum(counts),
         sum_weigthed_readlengths = sum(weighted_length),
         max_readLength = max(read_length)) %>% 
     mutate(avg_readlength = sum_weigthed_readlengths / counts) %>% 
-    dplyr::select(-sum_weigthed_readlengths) %>% 
+    dplyr::select(-sum_weigthed_readlengths)
+
+df_2 <- quals %>% 
+    mutate(flowcell = if_else(sample_id == "rt", "cell_1",
+    if_else(sample_id == "cool", "cell_2", as.character(flowcell)))) %>% 
+    group_by(method, flowcell)  %>% 
+    mutate(weighted_length = read_quality * counts) %>% 
+    summarise(counts = sum(counts),
+        sum_weigthed_readlengths = sum(weighted_length)) %>% 
+    mutate(avg_readQuality = sum_weigthed_readlengths / counts) %>% 
+    dplyr::select(-sum_weigthed_readlengths)
+
+df_1 %>% 
+    left_join(df_2, by = c("method", "flowcell", "counts")) %>% 
     knitr::kable(format = "html") %>%
     kableExtra::kable_styling()
 ```

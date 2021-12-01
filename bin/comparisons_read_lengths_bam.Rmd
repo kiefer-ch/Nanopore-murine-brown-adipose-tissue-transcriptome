@@ -72,7 +72,7 @@ flagstats <- snakemake@input[["flagstats"]] %>%
     dplyr::select(sample_id, everything())
 ```
 
-```{r plot_flagstats, fig.width = 6.85 / 2, fig.asp = .7}
+```{r plot_flagstats, fig.width = 6.85 / 2, fig.asp = .65}
 add_total <- function(df) {
     df %>% add_row(library = unique(.$library), 
         type = unique(.$type),
@@ -113,15 +113,49 @@ grouped_flagstats %>%
     theme(legend.key.size = unit(.33, "cm"))
 ```
 
-# Length of primary and supplementary reads
+# Length of primary and supplementary reads (against transcriptome)
 
 Based on the mapping against the transcriptome. From bam files.
 
 ```{r dataImport_tx_bam}
 df_tx <- read_rds(snakemake@input$collapsed_transcripts)
+
+tpm <- snakemake@input[["avg_counts"]] %>% 
+    read_csv() %>% 
+    select(transcript_length, illumina) %>% 
+    rename(qwidth = "transcript_length") %>%
+    tidyr::drop_na() %>% 
+    mutate(illumina = 2^illumina - 1) %>% 
+    group_by(qwidth) %>% 
+    summarise(n = sum(illumina, na.rm = TRUE)) %>% 
+    mutate(library = "illumina")
 ```
 
-```{r, fig.width = 6.85 / 2, fig.asp = .7}
+## Grouped read lengths
+
+The illumina values are estimated based on the tpm values from salmon. They are
+somewhat a reference, but not actual read lengths.
+
+```{r, fig.width = 6.85 / 2, fig.asp = .65}
+df_tx %>% 
+    filter(type == "primary") %>% 
+    group_by(library, qwidth) %>% 
+    summarise(n = n()) %>% 
+    bind_rows(tpm) %>% 
+    mutate(weight = n / sum(n)) %>% 
+    ungroup() %>% 
+    mutate(library = factor(library, levels = c("illumina", "teloprime", "cdna", "rna"))) %>% 
+    ggplot(aes(library, qwidth, weight = weight)) +
+    geom_violin(lwd = .25) +
+    scale_y_log10(labels = trans_format("log10", math_format(10^.x))) +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe(sides = "bl") +
+    xlab(NULL) + 
+    ylab("Read/transcript length") +
+    theme(legend.key.size = unit(.33, "cm"))
+```
+
+```{r, fig.width = 6.85 / 2, fig.asp = .65}
 df_tx %>% 
     dplyr::select(-barcode) %>% 
     mutate(category = if_else(type == "supplementary", "supplementary",
@@ -134,10 +168,11 @@ df_tx %>%
     xlab(NULL) + 
     ylab("Read length") +
     scale_fill_brewer(palette = "Dark2", name = NULL) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5)) +
     theme(legend.key.size = unit(.33, "cm"))
 ```
 
-```{r, fig.width = 6.85 / 2, fig.asp = .7}
+```{r, fig.width = 6.85 / 2, fig.asp = .65}
 df_tx %>% 
     dplyr::select(-barcode) %>% 
     mutate(category = if_else(type == "supplementary", "supplementary",
@@ -150,6 +185,7 @@ df_tx %>%
     xlab(NULL) + 
     ylab("Aligned read length") +
     scale_fill_brewer(palette = "Dark2", name = NULL) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5)) +
     theme(legend.key.size = unit(.33, "cm"))
 ```
 
@@ -157,7 +193,7 @@ df_tx %>%
 
 Primary hits only
 
-```{r plotTranscriptome, fig.width = 6.85 / 2, fig.asp = .7}
+```{r plotTranscriptome, fig.width = 6.85 / 2, fig.asp = .65}
 df_tx %>% 
     filter(type == "primary") %>% 
     dplyr::select(library, qwidth, aligned) %>% 
@@ -182,7 +218,7 @@ biomart <- snakemake@input[["biomaRt_tx"]] %>%
     read_rds()
 ```
 
-```{r, fig.width = 6.85 / 2, fig.asp = .7}
+```{r, fig.width = 6.85 / 2, fig.asp = .65}
 df_tx %>%
     filter(type == "primary") %>%
     dplyr::select(library, ensembl_transcript_id_version, aligned) %>%
@@ -204,7 +240,7 @@ df_tx %>%
 
 # Read length vs expected length
 
-```{r, fig.width = 6.85 / 2, fig.asp = .7}
+```{r, fig.width = 6.85 / 2, fig.asp = .65}
 df_tx %>%
     filter(type == "primary") %>%
     dplyr::select(library, ensembl_transcript_id_version, qwidth) %>%

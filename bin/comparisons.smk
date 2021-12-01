@@ -247,7 +247,6 @@ rule read_lengths_fastq:
                              dataset=["teloprime", "cdna", "rna"]),
         readQualities = expand("res/comparisons/readQualityDistribution/{dataset}_fastqQualities.csv",
                              dataset=["teloprime", "cdna", "rna"]),
-        avg_counts = "res/comparisons/comparisons_meanCounts_tx.csv.gz",
         sample_info = "sample_info/sampleInfo.csv"
     output:
         "res/comparisons/comparisons_readLengths_fastq.html"
@@ -273,6 +272,7 @@ rule read_lengths_bam:
         collapsed_transcripts = "res/comparisons/countReads/bam_transcrips_collapsed.rds",
         biomaRt_tx = "annotation/biomaRt_tx.rds",
         sample_info = "sample_info/sampleInfo.csv",
+        avg_counts = "res/comparisons/comparisons_meanCounts_tx.csv.gz",
         flagstats = expand("res/comparisons/countReads/{dataset}_flagstats.csv",
                            dataset=["cdna", "teloprime", "rna"])
     output:
