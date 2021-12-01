@@ -40,7 +40,7 @@ sample_info2 <- sample_info %>%
     dplyr::select(-method) 
 
 biomart <- snakemake@input[["biomaRt_tx"]] %>%
-     read_rds()
+    read_rds()
 ```
 
 
@@ -129,6 +129,7 @@ grouped_flagstats %>%
         levels = c("total", "primary", "unmapped", "supplementary"))) %>%
     group_by(type, library) %>% 
     mutate(count = count / count[mapping_type == "total"]) %>% 
+    ungroup() %>% 
     mutate(library = factor(library, levels = c("illumina", "teloprime", "cdna", "rna"))) %>% 
     ggplot(aes(x = library, y = count,  fill = mapping_type)) +
     geom_bar(stat = "identity", position = position_dodge()) +
@@ -159,6 +160,7 @@ tpm <- snakemake@input[["avg_counts"]] %>%
     mutate(illumina = 2^illumina - 1) %>% 
     group_by(qwidth) %>% 
     summarise(n = sum(illumina, na.rm = TRUE)) %>% 
+    ungroup() %>% 
     mutate(library = "illumina")
 ```
 
@@ -304,7 +306,7 @@ df_tx %>%
 ```{r, fig.width = 6.85 / 2, fig.asp = .65}
 df_tx %>%
     dplyr::select(library, ensembl_transcript_id_version, aligned) %>%
-#    left_join(biomart, by = "ensembl_transcript_id_version") %>%
+    left_join(biomart, by = "ensembl_transcript_id_version") %>%
     filter(!is.na(transcript_length)) %>%
     ggplot(aes(transcript_length, aligned)) +
     geom_hex(aes(fill = ..density..), binwidth = .025) +
@@ -325,7 +327,7 @@ df_tx %>%
 ```{r, fig.width = 6.85 / 2, fig.asp = .65}
 df_tx %>%
     dplyr::select(library, ensembl_transcript_id_version, qwidth) %>%
-#    left_join(biomart, by = "ensembl_transcript_id_version") %>%
+    left_join(biomart, by = "ensembl_transcript_id_version") %>%
     filter(!is.na(transcript_length)) %>%
     ggplot(aes(transcript_length, qwidth)) +
     geom_hex(aes(fill = ..density..), binwidth = .025) +

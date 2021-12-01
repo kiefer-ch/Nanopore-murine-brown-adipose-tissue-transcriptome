@@ -152,7 +152,7 @@ get_numberDetectedFeatures <- function(cm, prop, cutoff = 1) {
 Cutoff is 1 read in any of the librarys per method. (Maybe it should be redone
 taking replicates, condition etc. into account)
 
-```{r saturationCurve, fig.width = 6.85 / 2, fig.asp = .7}
+```{r saturationCurve, fig.width = 6.85 / 2, fig.asp = .65}
 fractions <- 10^seq(-4, 0, length.out = 25)
 
 cm_gene <- snakemake@input[["gene_counts"]] %>%
@@ -221,7 +221,7 @@ yet. In addition, the teloprime curves seem to plateau out at smaller values.
 
 ## Overview
 
-```{r, fig.width = 6.85 / 2, fig.asp = .7}
+```{r, fig.width = 6.85 / 2, fig.asp = .65}
 df <- df_tx_sum %>%
     tidyr::drop_na() %>%
     mutate(grouped_transcript_length = cut(transcript_length,
@@ -254,7 +254,7 @@ df %>%
 
 ## By transcript biotype
 
-```{r, fig.width = 6.85 / 2, fig.asp = .7}
+```{r, fig.width = 6.85 / 2, fig.asp = .65}
 df_tx_sum %>%
     tidyr::drop_na() %>%
     mutate(grouped_transcript_length = cut(transcript_length,
@@ -291,7 +291,7 @@ df_tx_sum %>%
 
 ## Genes
 
-```{r, fig.asp = .7}
+```{r, fig.asp = .65}
 df_gene_sum %>%
     mutate(detected = if_else(sum_counts > 1, TRUE, FALSE)) %>%
     select(dataset, ensembl_gene_id_version, detected) %>%
@@ -310,7 +310,7 @@ df_gene_sum %>%
 
 The violin plot only shows features detected by illumina.
 
-```{r, fig.width = 6.85, fig.asp = .35}
+```{r, fig.width = 6.85, fig.asp = .65 / 2}
 df_plot <- df_gene_sum %>%
     ungroup() %>% 
     mutate(detected = if_else(sum_counts > 1, TRUE, FALSE)) %>%
@@ -345,7 +345,7 @@ df_plot %>%
 ```
 
 
-```{r, fig.width = 6.85, fig.asp = .35, dev = "png", dpi = 600}
+```{r, fig.width = 6.85, fig.asp = .65 / 2, dev = "png", dpi = 600}
 df_plot <- df_gene_sum %>%
     ungroup() %>% 
     mutate(detected = if_else(sum_counts > 1, TRUE, FALSE)) %>%
@@ -423,7 +423,7 @@ df_plot %>%
 
 ## Transcripts
 
-```{r, fig.asp = .7}
+```{r, fig.asp = .65}
 df_tx_sum %>%
     mutate(detected = if_else(sum_counts > 1, TRUE, FALSE)) %>%
     select(dataset, ensembl_transcript_id_version, detected) %>%
@@ -440,7 +440,7 @@ df_tx_sum %>%
         text.scale = 1.75)
 ```
 
-```{r, fig.width = 6.85, fig.asp = .35}
+```{r, fig.width = 6.85, fig.asp = .65 / 2}
 df_plot <- df_tx_sum %>%
     ungroup() %>% 
     mutate(detected = if_else(sum_counts > 1, TRUE, FALSE)) %>%
@@ -475,7 +475,7 @@ df_plot %>%
 ```
 
 
-```{r, fig.width = 6.85, fig.asp = .35, dev = "png", dpi = 600}
+```{r, fig.width = 6.85, fig.asp = .65 / 2, dev = "png", dpi = 600}
 df_plot <- df_tx_sum %>%
     ungroup() %>% 
     mutate(detected = if_else(sum_counts > 1, TRUE, FALSE)) %>%

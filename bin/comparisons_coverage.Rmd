@@ -82,7 +82,7 @@ rna <- snakemake@input[["geneBodyCoverage_rna"]] %>%
     dplyr::select(-waste)
 ```
 
-```{r plot_geneBodyCoverage, fig.width = 6.85 / 2, fig.asp = .7}
+```{r plot_geneBodyCoverage, fig.width = 6.85 / 2, fig.asp = .65}
 list(illumina, teloprime, cdna, rna) %>%
     bind_rows() %>%
     group_by(dataset, sample_id) %>%
@@ -109,7 +109,7 @@ df <- snakemake@input[["collapsed_coverage"]] %>%
     read_rds()
 ```
 
-```{r, fig.width = 6.85 / 2, fig.asp = .7}
+```{r, fig.width = 6.85 / 2, fig.asp = .65}
 df %>%
     mutate(grouped_transcript_length = cut(transcript_length,
         breaks = c(0, 500, 1000, 1500, 2000, 2500, 3000, max(transcript_length)))) %>%
@@ -127,7 +127,7 @@ df %>%
 ```
 
 
-```{r, fig.width = 6.85 / 2, fig.asp = .7}
+```{r, fig.width = 6.85 / 2, fig.asp = .65}
 df %>%
     mutate(is_fullLength = if_else(coverage > .9, TRUE, FALSE)) %>%
     group_by(dataset, ensembl_transcript_id_version) %>%
