@@ -39,12 +39,11 @@ df_tx <- df_tx %>%
     map(dplyr::select, -flag) %>%
     map(group_by, qname) %>%
     map(mutate, has_supplementary = any(type == "supplementary")) %>%
-    map(mutate, category = if_else(type == "supplementary", "supplementary",
+    map(mutate, category = if_else(type %in% c("supplementary", "unmapped"), type,
         if_else(has_supplementary, "primary_with_supplementary", "primary_wo_supplementary"))) %>%
     map(ungroup) %>%
     bind_rows(.id = "sample") %>%
-    tidyr::separate(sample, c("library", "barcode"), sep = '_') %>%
-    mutate(library = factor(library, levels = c("illumina", "teloprime", "cdna", "rna")))
+    tidyr::separate(sample, c("library", "barcode"), sep = '_')
 
 log_info("Writing to disc...")
 df_tx %>%

@@ -45,9 +45,7 @@ biomart <- snakemake@input[["biomaRt_tx"]] %>%
 ```
 
 ```{r dataImport_tx_bam}
-df_tx <- read_rds(snakemake@input$collapsed_transcripts) %>% 
-    mutate(category = if_else(type == "supplementary", "supplementary",
-        if_else(has_supplementary, "primary_with_supplementary", "primary_wo_supplementary")))
+df_tx <- read_rds(snakemake@input$collapsed_transcripts)
 
 tpm <- snakemake@input[["avg_counts"]] %>% 
     read_csv() %>% 
@@ -65,11 +63,21 @@ tpm <- snakemake@input[["avg_counts"]] %>%
 
 ```{r, fig.width = 6.85 / 2, fig.asp = .65}
 df_tx %>% 
+    group_by(library, category) %>% 
+    summarise(n = n()) %>% 
+    ungroup() %>% 
+    tidyr::pivot_wider(names_from = "category", values_from = "n") %>% 
+    knitr::kable(format = "html") %>%
+    kableExtra::kable_styling()
+
+
+df_tx %>% 
     group_by(library, barcode, category) %>% 
     summarise(n = n()) %>% 
     left_join(sample_info2) %>%
     ungroup() %>% 
-    mutate(sample_id = if_else(library == "rna", barcode, sample_id)) %>% 
+    filter(category != "supplementary") %>% 
+    mutate(sample_id = if_else(library == "rna", barcode, sample_id)) %>%  
     ggplot(aes(x = sample_id, y = n,  fill = category)) +
     geom_bar(stat = "identity") +
     facet_wrap(~library, scales = "free_x") +
@@ -82,6 +90,7 @@ df_tx %>%
     theme(legend.key.size = unit(.33, "cm"))
 
 df_tx %>% 
+    filter(category != "supplementary") %>% 
     group_by(library, barcode, category) %>% 
     summarise(n = n()) %>% 
     left_join(sample_info2) %>%  
@@ -130,7 +139,8 @@ df_tx %>%
 
 ```{r}
 df_tx %>% 
-    filter(category != "primary_wo_supplementary") %>% 
+    filter(category %in% c("primary_with_supplementary", "supplementary")) %>% 
+    tidyr::separate(rname, "ensembl_transcript_id_version", sep = '|', extra = "drop") %>% 
     left_join(biomart %>% 
             select(ensembl_transcript_id_version, ensembl_gene_id_version),
         by = "ensembl_transcript_id_version") %>% 

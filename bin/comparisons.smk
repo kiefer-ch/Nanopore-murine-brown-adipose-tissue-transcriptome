@@ -63,26 +63,16 @@ rule feature_detection:
 
 
 def get_input_bam_AlignedLength(wildcards):
-    files = list()
     if wildcards.dataset == "teloprime":
-        for barcode in SAMPLE_INFO_ont["ont"]:
-            file_name = "bam/teloprime/{}_{}.bam".format(
-                wildcards.file, wildcards.type)
-            files.append(file_name)
-            files.append(file_name  + ".bai")
+        file_name = "bam/teloprime/{}_{}.bam".format(
+            wildcards.file, wildcards.type)
     elif wildcards.dataset == "cdna":
-        for barcode in SAMPLE_INFO_ont["cdna"]:
-            file_name = "bam/cdna/{}_{}.bam".format(
-                wildcards.file, wildcards.type)
-            files.append(file_name)
-            files.append(file_name  + ".bai")
+        file_name = "bam/cdna/{}_{}.bam".format(
+            wildcards.file, wildcards.type)
     elif wildcards.dataset == "rna":
-        for temperature in ["rt", "cool"]:
-            file_name = "bam/rna/{}_{}_q7_sort.bam".format(
-                wildcards.type, temperature)
-            files.append(file_name)
-            files.append(file_name  + ".bai")
-    return files
+        file_name = "bam/rna/{}_{}_q7_sort.bam".format(
+            wildcards.type, wildcards.file)
+    return [file_name, file_name + ".bai"]
 
 
 rule bam_getAlignedLength:
@@ -250,9 +240,9 @@ rule read_lengths_bam_transcriptome:
         sample_info = "sample_info/sampleInfo.csv",
         avg_counts = "res/comparisons/comparisons_meanCounts_tx.csv.gz"
     output:
-        "res/comparisons/comparisons_readLengths_bam.html"
+        "res/comparisons/comparisons_readLengths_bam_transcriptome.html"
     script:
-        "comparisons_read_lengths_bam.Rmd"
+        "comparisons_read_lengths_bam_transcriptome.Rmd"
 
 
 rule compare_dge:
@@ -295,3 +285,4 @@ rule render_GOcomp:
         "res/comparisons/comparisons_go.html"
     script:
         "comparisons_go.Rmd"
+
