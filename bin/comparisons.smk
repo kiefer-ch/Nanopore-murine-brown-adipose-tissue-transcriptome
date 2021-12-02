@@ -63,13 +63,27 @@ rule feature_detection:
 
 
 def get_input_bam_AlignedLength(wildcards):
-    if wildcards.dataset in ["teloprime", "cdna"]:
-        file_name = "bam/{}/{}_{}.bam".format(
-            wildcards.dataset, wildcards.file, wildcards.type)
+    files = list()
+    if wildcards.dataset == "teloprime":
+        for barcode in SAMPLE_INFO_ont["ont"]:
+            file_name = "bam/teloprime/{}_{}.bam".format(
+                wildcards.file, wildcards.type)
+            files.append(file_name)
+            files.append(file_name  + ".bai")
+    elif wildcards.dataset == "cdna":
+        for barcode in SAMPLE_INFO_ont["cdna"]:
+            file_name = "bam/cdna/{}_{}.bam".format(
+                wildcards.file, wildcards.type)
+            files.append(file_name)
+            files.append(file_name  + ".bai")
     elif wildcards.dataset == "rna":
-        file_name = "bam/rna/{}_{}_q7_sort.bam".format(
-            wildcards.type, wildcards.barcode)
-    return [file_name, file_name + ".bai"]
+        for temperature in ["rt", "cool"]:
+            file_name = "bam/rna/{}_{}_q7_sort.bam".format(
+                wildcards.type, temperature)
+            files.append(file_name)
+            files.append(file_name  + ".bai")
+    return files
+
 
 rule bam_getAlignedLength:
     input:
@@ -215,23 +229,23 @@ rule read_lengths_fastq:
 
 rule read_lengths_bam_collapseTranscripts:
     input:
-        teloprime_bam_tx = expand("res/comparisons/countReads/teloprime/teloprime_{barcode}_bam_{type}.rds",
+        teloprime_bam_tx = expand("res/comparisons/countReads/teloprime/teloprime_{barcode}_bam_{{type}}.rds",
             barcode=SAMPLE_INFO_ont["ont"]),
-        cdna_bam_tx = expand("res/comparisons/countReads/cdna/cdna_{barcode}_bam_{type}.rds",
+        cdna_bam_tx = expand("res/comparisons/countReads/cdna/cdna_{barcode}_bam_{{type}}.rds",
             barcode=SAMPLE_INFO_ont["cdna"]),
-        rna_bam_tx = expand("res/comparisons/countReads/rna/rna_{barcode}_bam_{type}.rds",
+        rna_bam_tx = expand("res/comparisons/countReads/rna/rna_{barcode}_bam_{{type}}.rds",
             barcode=["rt", "cool"])
     wildcard_constraints:
         type = "genome|transcriptome"
     output:
-        "res/comparisons/countReads/bam_transcrips_collapsed.rds"
+        "res/comparisons/countReads/bam_transcripts_collapsed_{type}.rds"
     script:
         "comparisons_read_lengths_bam_collapseTranscripts.R"
 
 
 rule read_lengths_bam_transcriptome:
     input:
-        collapsed_transcripts = "res/comparisons/countReads/bam_transcrips_collapsed_transcriptome.rds",
+        collapsed_transcripts = "res/comparisons/countReads/bam_transcripts_collapsed_transcriptome.rds",
         biomaRt_tx = "annotation/biomaRt_tx.rds",
         sample_info = "sample_info/sampleInfo.csv",
         avg_counts = "res/comparisons/comparisons_meanCounts_tx.csv.gz"
