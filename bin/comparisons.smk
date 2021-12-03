@@ -62,31 +62,6 @@ rule feature_detection:
         "comparisons_featureDetection.Rmd"
 
 
-def get_input_bam_AlignedLength(wildcards):
-    if wildcards.dataset == "teloprime":
-        file_name = "bam/teloprime/{}_{}.bam".format(
-            wildcards.file, wildcards.type)
-    elif wildcards.dataset == "cdna":
-        file_name = "bam/cdna/{}_{}.bam".format(
-            wildcards.file, wildcards.type)
-    elif wildcards.dataset == "rna":
-        file_name = "bam/rna/{}_{}_q7_sort.bam".format(
-            wildcards.type, wildcards.file)
-    return [file_name, file_name + ".bai"]
-
-
-rule bam_getAlignedLength:
-    input:
-        get_input_bam_AlignedLength
-    wildcard_constraints:
-        type = "genome|transcriptome",
-        dataset = "teloprime|cdna|rna"
-    output:
-        "res/comparisons/countReads/{dataset}/{dataset}_{file}_bam_{type}.rds"
-    script:
-        "comparisons_read_lengths_bam.R"
-
-
 def get_input_bam_coverage(wildcards):
     if wildcards.dataset in ["teloprime", "cdna"]:
         file_name = "bam/{}/{}_transcriptome.bam".format(
@@ -138,30 +113,6 @@ rule coverage:
         "res/comparisons/comparisons_coverage.html"
     script:
         "comparisons_coverage.Rmd"
-
-
-rule compare_dtu_1:
-    input:
-        drimseq = expand("res/drimseq/{dataset}/{dataset}_drimSeqStageR.csv",
-                         dataset=["illumina", "cdna", "teloprime", "cdna_flair", "teloprime_flair"]),
-        dexseq = expand("res/dexseq/{dataset}/{dataset}_dexseq_results.csv.gz",
-                        dataset=["illumina", "cdna", "teloprime"]),
-        biomaRt_gene = "annotation/biomaRt_gene.rds",
-        counts = "res/comparisons/comparisons_meanCounts_gene.csv.gz"
-    output:
-        signif = "res/comparisons/comparisons_dtu_significant.csv",
-        all = "res/comparisons/comparisons_dtu_all.rds"
-    script:
-        "comparisons_dtu.R"
-
-rule compare_dtu_2:
-    input:
-        signif = "res/comparisons/comparisons_dtu_significant.csv",
-        all = "res/comparisons/comparisons_dtu_all.rds"
-    output:
-        "res/comparisons/comparisons_dtu.html"
-    script:
-        "comparisons_dtu.Rmd"
 
 
 def get_fastqnames(wildcards):
@@ -217,6 +168,31 @@ rule read_lengths_fastq:
         "comparisons_read_lengths_fastq.Rmd"
 
 
+def get_input_bam_AlignedLength(wildcards):
+    if wildcards.dataset == "teloprime":
+        file_name = "bam/teloprime/{}_{}.bam".format(
+            wildcards.file, wildcards.type)
+    elif wildcards.dataset == "cdna":
+        file_name = "bam/cdna/{}_{}.bam".format(
+            wildcards.file, wildcards.type)
+    elif wildcards.dataset == "rna":
+        file_name = "bam/rna/{}_{}_q7_sort.bam".format(
+            wildcards.type, wildcards.file)
+    return [file_name, file_name + ".bai"]
+
+
+rule bam_getAlignedLength:
+    input:
+        get_input_bam_AlignedLength
+    wildcard_constraints:
+        type = "genome|transcriptome",
+        dataset = "teloprime|cdna|rna"
+    output:
+        "res/comparisons/countReads/{dataset}/{dataset}_{file}_bam_{type}.rds"
+    script:
+        "comparisons_read_lengths_bam.R"
+
+
 rule read_lengths_bam_collapseTranscripts:
     input:
         teloprime_bam_tx = expand("res/comparisons/countReads/teloprime/teloprime_{barcode}_bam_{{type}}.rds",
@@ -243,6 +219,18 @@ rule read_lengths_bam_transcriptome:
         "res/comparisons/comparisons_readLengths_bam_transcriptome.html"
     script:
         "comparisons_read_lengths_bam_transcriptome.Rmd"
+
+
+rule read_lengths_bam_genome:
+    input:
+        collapsed_transcripts = "res/comparisons/countReads/bam_transcripts_collapsed_genome.rds",
+        biomaRt_tx = "annotation/biomaRt_tx.rds",
+        sample_info = "sample_info/sampleInfo.csv",
+        avg_counts = "res/comparisons/comparisons_meanCounts_tx.csv.gz"
+    output:
+        "res/comparisons/comparisons_readLengths_bam_genome.html"
+    script:
+        "comparisons_read_lengths_bam_genome.Rmd"
 
 
 rule compare_dge:
@@ -285,3 +273,28 @@ rule render_GOcomp:
         "res/comparisons/comparisons_go.html"
     script:
         "comparisons_go.Rmd"
+
+
+rule compare_dtu_1:
+    input:
+        drimseq = expand("res/drimseq/{dataset}/{dataset}_drimSeqStageR.csv",
+                         dataset=["illumina", "cdna", "teloprime", "cdna_flair", "teloprime_flair"]),
+        dexseq = expand("res/dexseq/{dataset}/{dataset}_dexseq_results.csv.gz",
+                        dataset=["illumina", "cdna", "teloprime"]),
+        biomaRt_gene = "annotation/biomaRt_gene.rds",
+        counts = "res/comparisons/comparisons_meanCounts_gene.csv.gz"
+    output:
+        signif = "res/comparisons/comparisons_dtu_significant.csv",
+        all = "res/comparisons/comparisons_dtu_all.rds"
+    script:
+        "comparisons_dtu.R"
+
+
+rule compare_dtu_2:
+    input:
+        signif = "res/comparisons/comparisons_dtu_significant.csv",
+        all = "res/comparisons/comparisons_dtu_all.rds"
+    output:
+        "res/comparisons/comparisons_dtu.html"
+    script:
+        "comparisons_dtu.Rmd"

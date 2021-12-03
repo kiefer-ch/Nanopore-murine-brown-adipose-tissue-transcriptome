@@ -152,7 +152,7 @@ df_tx %>%
 <!--     geom_rangeframe(sides = "bl") + -->
 <!--     scale_x_discrete(name = NULL, -->
 <!--         labels = c("primary_with_supplementary" = "pri. w/ sup.", -->
-<!--             "primary_wo_supplementary" = "pri. w/o sup.")) + -->
+<!--             "primary_wo_supplementary" = "pri. w/o sup.")) +  -->
 <!--     ylab("Aligned read length") + -->
 <!--     scale_fill_brewer(palette = "Dark2", name = NULL) + -->
 <!--     theme(legend.key.size = unit(.33, "cm")) -->
@@ -162,30 +162,25 @@ df_tx %>%
 # Mapping of supplementary reads
 
 ```{r, fig.width = 6.85 / 2, fig.asp = .65}
-df_supplementary <- df_tx %>% 
+df_tx %>% 
     filter(category %in% c("primary_with_supplementary", "supplementary")) %>% 
-    tidyr::separate(rname, c("ensembl_transcript_id_version", "ensembl_gene_id_version"),
-        extra = "drop", sep = '\\|') %>% 
     group_by(library, barcode, qname) %>% 
-    summarise(
-        supplementary_type = 
-            if_else(ensembl_transcript_id_version == ensembl_transcript_id_version[type == "primary"]),
-                "same_transcript", 
-            if_else(ensembl_gene_id_version == ensembl_gene_id_version[type == "primary"]),
-                "same_gene",
-                "not_same_gene")),
+    mutate(supplementary_type = if_else(rname != rname[type == "primary"],
+            "different_chrom", 
+            if_else(strand == strand[type == "primary"],
+                "same_chrom_same_strand",
+                "same_chrom_diff_strand")),
         n = n()) %>% 
     ungroup() %>% 
-    mutate(supplementary_type = as.factor(supplementary_type))
-
-df_supplementary %>% 
+    mutate(supplementary_type = as.factor(supplementary_type)) %>%  
     ggplot(aes(n - 1)) +
     geom_histogram(aes(fill = supplementary_type), binwidth = 1) +
     facet_wrap(~library, ncol = 1) +
     theme_tufte(base_size = 8, base_family = "Helvetica") +
     geom_rangeframe(sides = "bl") +
     scale_y_log10(name = "Count", labels = trans_format("log10", math_format(10^.x))) +
-    xlab("Supplementary reads per primary read") +
+    scale_x_continuous(name = "Supplementary reads per primary read",
+        breaks = pretty_breaks()) +
     scale_fill_brewer(palette = "Dark2", name = NULL) +
     theme(legend.key.size = unit(.33, "cm"))
 ```
@@ -195,11 +190,7 @@ df_supplementary %>%
 
 ```{r}
 df_tx <- df_tx %>% 
-    filter(type == "primary") %>% 
-    tidyr::separate(rname, "ensembl_transcript_id_version", sep = '\\|', extra = "drop") %>% 
-    left_join(biomart %>% 
-                  select(ensembl_transcript_id_version, transcript_length),
-        by = "ensembl_transcript_id_version")
+    filter(type == "primary")
 ```
 
 
@@ -222,15 +213,10 @@ df_tx %>%
     xlab("Read Length") + 
     ylab("Aligned Length") +
     theme(legend.key.size = unit(.33, "cm"))
-```
 
-## Aligned length vs expected length
-
-```{r, fig.width = 6.85 / 2, fig.asp = .65}
-df_tx %>%
-    dplyr::select(library, ensembl_transcript_id_version, aligne, transcript_length) %>%
-    filter(!is.na(transcript_length)) %>%
-    ggplot(aes(transcript_length, aligned)) +
+df_tx %>% 
+    dplyr::select(library, qwidth, aligned) %>% 
+    ggplot(aes(qwidth, aligned)) +
     geom_hex(aes(fill = ..density..), binwidth = .025) +
     facet_grid(~library) +
     scale_x_log10(labels = trans_format("log10", math_format(10^.x))) +
@@ -239,27 +225,7 @@ df_tx %>%
     geom_abline(slope = 1, lwd = .25) +
     theme_tufte(base_size = 8, base_family = "Helvetica") +
     geom_rangeframe(sides = "bl") +
-    xlab("Transcript length") +
-    ylab("Aligned length") +
-    theme(legend.key.size = unit(.33, "cm"))
-```
-
-## Read length vs expected length
-
-```{r, fig.width = 6.85 / 2, fig.asp = .65}
-df_tx %>%
-    dplyr::select(library, ensembl_transcript_id_version, qwidth, transcript_length) %>%
-    filter(!is.na(transcript_length)) %>%
-    ggplot(aes(transcript_length, qwidth)) +
-    geom_hex(aes(fill = ..density..), binwidth = .025) +
-    facet_grid(~library) +
-    scale_x_log10(labels = trans_format("log10", math_format(10^.x))) +
-    scale_y_log10(labels = trans_format("log10", math_format(10^.x))) +
-    scale_fill_viridis_c(trans = "log10", labels = trans_format("log10", math_format(10^.x))) +
-    geom_abline(slope = 1, lwd = .25) +
-    theme_tufte(base_size = 8, base_family = "Helvetica") +
-    geom_rangeframe(sides = "bl") +
-    xlab("Transcript length") +
-    ylab("Read length") +
+    xlab("Read Length") + 
+    ylab("Aligned Length") +
     theme(legend.key.size = unit(.33, "cm"))
 ```

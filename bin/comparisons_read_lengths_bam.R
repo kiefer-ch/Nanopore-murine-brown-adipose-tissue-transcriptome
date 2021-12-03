@@ -1,9 +1,11 @@
 
 source(".Rprofile")
-suppressPackageStartupMessages(library("logger"))
-suppressPackageStartupMessages(library("dplyr"))
-suppressPackageStartupMessages(library("purrr"))
-suppressPackageStartupMessages(library("GenomicAlignments"))
+suppressPackageStartupMessages({
+    library("logger")
+    library("dplyr")
+    library("purrr")
+    library("GenomicAlignments")
+})
 
 ################################################################################
 #
@@ -34,6 +36,7 @@ get_cigar <- function(cigar) {
 }
 
 get_opts <- function(cigar, opts) {
+    # the next line is from https://github.com/csoneson/NativeRNAseqComplexTranscriptome/blob/master/Rscripts/get_nbr_reads.R
     sum(as.numeric(gsub(paste0(opts, "$"), "", cigar)), na.rm = TRUE)
 }
 
@@ -50,10 +53,13 @@ bam <- bam %>%
     rowwise() %>%
     mutate(cigar = get_cigar(cigar)) %>%
     mutate(n_I = get_opts(cigar, "I"),
-        n_M = get_opts(cigar, "M")) %>%
+        n_M = get_opts(cigar, "M"),
+        n_D = get_opts(cigar, "D"),
+        n_N = get_opts(cigar, "N")) %>%
     ungroup() %>%
-    mutate(aligned = n_I + n_M) %>%
-    select(-cigar, -n_I, -n_M)
+    mutate(aligned = n_I + n_M,
+           rwidth = n_M + n_D + n_N) %>%
+    select(-cigar, -n_I, -n_M, -n_D, -n_N)
 
 
 log_info(sprintf("Writing %s to disk...", snakemake@output[[1]]))
