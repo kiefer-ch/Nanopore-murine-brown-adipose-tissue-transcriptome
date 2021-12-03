@@ -40,7 +40,8 @@ get_opts <- function(cigar, opts) {
 
 log_info(sprintf("Importing %s...", snakemake@input[[1]]))
 bam <- scanBam(snakemake@input[[1]],
-    param = ScanBamParam(what = c("qname", "flag", "rname", "qwidth", "cigar")))[[1]]
+    param = ScanBamParam(
+        what = c("qname", "flag", "rname", "qwidth", "cigar", "strand", "pos")))[[1]]
 
 
 log_info(sprintf("Processing %s...", snakemake@input[[1]]))

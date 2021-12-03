@@ -285,4 +285,3 @@ rule render_GOcomp:
         "res/comparisons/comparisons_go.html"
     script:
         "comparisons_go.Rmd"
-

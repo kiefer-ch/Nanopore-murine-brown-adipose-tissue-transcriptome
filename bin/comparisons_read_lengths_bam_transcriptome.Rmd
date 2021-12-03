@@ -70,25 +70,6 @@ df_tx %>%
     knitr::kable(format = "html") %>%
     kableExtra::kable_styling()
 
-
-df_tx %>% 
-    group_by(library, barcode, category) %>% 
-    summarise(n = n()) %>% 
-    left_join(sample_info2) %>%
-    ungroup() %>% 
-    filter(category != "supplementary") %>% 
-    mutate(sample_id = if_else(library == "rna", barcode, sample_id)) %>%  
-    ggplot(aes(x = sample_id, y = n,  fill = category)) +
-    geom_bar(stat = "identity") +
-    facet_wrap(~library, scales = "free_x") +
-    scale_y_continuous(labels = label_scientific()) +
-    theme_tufte(base_size = 8, base_family = "Helvetica") +
-    geom_rangeframe(sides = "l") +
-    scale_x_discrete(labels = NULL, breaks = NULL, name = NULL) +
-    ylab("Reads") +
-    scale_fill_brewer(palette = "Dark2", name = NULL) +
-    theme(legend.key.size = unit(.33, "cm"))
-
 df_tx %>% 
     filter(category != "supplementary") %>% 
     group_by(library, barcode, category) %>% 
@@ -104,12 +85,20 @@ df_tx %>%
     theme_tufte(base_size = 8, base_family = "Helvetica") +
     geom_rangeframe(sides = "l") +
     scale_x_discrete(labels = NULL, breaks = NULL, name = NULL) +
-    scale_fill_brewer(palette = "Dark2", name = NULL) +
+    scale_fill_brewer(palette = "Dark2", name = NULL,
+        labels = c("primary_with_supplementary" = "pri. + sup.",
+                   "primary_wo_supplementary" = "pri. - sup.")) +
     theme(legend.key.size = unit(.33, "cm"))
 ```
 
 
 # Length of primary and supplementary reads (against transcriptome)
+
+```{r}
+df_tx <- df_tx %>% 
+    filter(type != "unmapped")
+```
+
 
 ## Grouped read lengths
 
@@ -135,24 +124,6 @@ df_tx %>%
     theme(legend.key.size = unit(.33, "cm"))
 ```
 
-# Mapping of supplementary reads
-
-```{r}
-df_tx %>% 
-    filter(category %in% c("primary_with_supplementary", "supplementary")) %>% 
-    tidyr::separate(rname, "ensembl_transcript_id_version", sep = '|', extra = "drop") %>% 
-    left_join(biomart %>% 
-            select(ensembl_transcript_id_version, ensembl_gene_id_version),
-        by = "ensembl_transcript_id_version") %>% 
-    group_by(library, qname) %>% 
-    summarise(supplementary_type = if_else(all(ensembl_transcript_id_version == ensembl_transcript_id_version), "same_transcript", 
-            if_else(all(ensembl_gene_id_version == ensembl_gene_id_version), "same_gene", "not_same_gene")),
-        n = n()) %>% 
-    mutate(supplementary_type = as.factor(supplementary_type)) %>% 
-    filter(n > 1) %>% 
-    summary()
-```
-
 
 ```{r, fig.width = 6.85 / 2, fig.asp = .65}
 df_tx %>% 
@@ -163,10 +134,13 @@ df_tx %>%
     geom_rangeframe(sides = "bl") +
     xlab(NULL) + 
     ylab("Read length") +
-    scale_fill_brewer(palette = "Dark2", name = NULL) +
+    scale_fill_brewer(palette = "Dark2", name = NULL,
+        labels = c("primary_with_supplementary" = "pri. + sup.",
+            "primary_wo_supplementary" = "pri. - sup.")) +
     theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5)) +
     theme(legend.key.size = unit(.33, "cm"))
 ```
+
 
 ```{r, fig.width = 6.85 / 2, fig.asp = .65}
 df_tx %>% 
@@ -177,20 +151,58 @@ df_tx %>%
     geom_rangeframe(sides = "bl") +
     xlab(NULL) + 
     ylab("Aligned read length") +
-    scale_fill_brewer(palette = "Dark2", name = NULL) +
+    scale_fill_brewer(palette = "Dark2", name = NULL,
+        labels = c("primary_with_supplementary" = "pri. + sup.",
+            "primary_wo_supplementary" = "pri. - sup.")) +
     theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5)) +
     theme(legend.key.size = unit(.33, "cm"))
 ```
 
-## Correlations
 
-```{r}
-df_tx <- df_tx %>% 
-    filter(type == "primary")
+# Mapping of supplementary reads
+
+```{r, fig.width = 6.85 / 2, fig.asp = .65}
+df_supplementary <- df_tx %>% 
+    filter(category %in% c("primary_with_supplementary", "supplementary")) %>% 
+    tidyr::separate(rname, c("ensembl_transcript_id_version", "ensembl_gene_id_version"),
+        extra = "drop", sep = '\\|') %>% 
+    group_by(library, barcode, qname) %>% 
+    summarise(
+        supplementary_type = 
+            if_else(all(ensembl_transcript_id_version == ensembl_transcript_id_version[1]),
+                "same_transcript", 
+            if_else(all(ensembl_gene_id_version == ensembl_gene_id_version), "same_gene",
+                "not_same_gene")),
+        n = n()) %>% 
+    ungroup() %>% 
+    mutate(supplementary_type = as.factor(supplementary_type))
+
+df_supplementary %>% 
+    ggplot(aes(n - 1)) +
+    geom_histogram(aes(fill = supplementary_type), binwidth = 1) +
+    facet_wrap(~library, ncol = 1) +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe(sides = "bl") +
+    scale_y_log10(name = "Count", labels = trans_format("log10", math_format(10^.x))) +
+    xlab("Supplementary reads per primary read") +
+    scale_fill_brewer(palette = "Dark2", name = NULL) +
+    theme(legend.key.size = unit(.33, "cm"))
 ```
 
 
-### Aligned length vs read length
+# Correlations
+
+```{r}
+df_tx <- df_tx %>% 
+    filter(type == "primary") %>% 
+    tidyr::separate(rname, "ensembl_transcript_id_version", sep = '\\|', extra = "drop") %>% 
+    left_join(biomart %>% 
+                  select(ensembl_transcript_id_version, transcript_length),
+        by = "ensembl_transcript_id_version")
+```
+
+
+## Aligned length vs read length
 
 Primary hits only
 
@@ -215,8 +227,7 @@ df_tx %>%
 
 ```{r, fig.width = 6.85 / 2, fig.asp = .65}
 df_tx %>%
-    dplyr::select(library, ensembl_transcript_id_version, aligned) %>%
-    left_join(biomart, by = "ensembl_transcript_id_version") %>%
+    dplyr::select(library, ensembl_transcript_id_version, aligne, transcript_length) %>%
     filter(!is.na(transcript_length)) %>%
     ggplot(aes(transcript_length, aligned)) +
     geom_hex(aes(fill = ..density..), binwidth = .025) +
@@ -236,8 +247,7 @@ df_tx %>%
 
 ```{r, fig.width = 6.85 / 2, fig.asp = .65}
 df_tx %>%
-    dplyr::select(library, ensembl_transcript_id_version, qwidth) %>%
-    left_join(biomart, by = "ensembl_transcript_id_version") %>%
+    dplyr::select(library, ensembl_transcript_id_version, qwidth, transcript_length) %>%
     filter(!is.na(transcript_length)) %>%
     ggplot(aes(transcript_length, qwidth)) +
     geom_hex(aes(fill = ..density..), binwidth = .025) +
