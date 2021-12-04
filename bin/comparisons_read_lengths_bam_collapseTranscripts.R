@@ -43,6 +43,7 @@ df_tx <- df_tx %>%
         if_else(has_supplementary, "primary_with_supplementary", "primary_wo_supplementary"))) %>%
     map(ungroup) %>%
     bind_rows(.id = "sample") %>%
+    select(-has_supplementary) %>%
     tidyr::separate(sample, c("library", "barcode"), sep = '_')
 
 log_info("Writing to disc...")

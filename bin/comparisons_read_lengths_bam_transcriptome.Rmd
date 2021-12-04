@@ -46,11 +46,12 @@ biomart <- snakemake@input[["biomaRt_tx"]] %>%
 
 
 ```{r dataImport_tx_bam}
-df_tx <- read_rds(snakemake@input$collapsed_transcripts) %>% 
+df_tx <- snakemake@input$collapsed_transcripts %>% 
+    read_rds() %>% 
     mutate(library = factor(library, levels = c("illumina", "teloprime", "cdna", "rna")))
 
 tpm <- snakemake@input[["avg_counts"]] %>% 
-    read_csv() %>% 
+    read_csv(show_col_types = FALSE) %>% 
     select(transcript_length, illumina) %>% 
     rename(qwidth = "transcript_length") %>%
     tidyr::drop_na() %>% 
@@ -95,6 +96,16 @@ df_tx %>%
 
 
 # Length of primary and supplementary reads (against transcriptome)
+
+```{r}
+df_tx %>% 
+    group_by(library, category) %>% 
+    summarise(qwidth = mean(qwidth),
+              aligned = mean(aligned)) %>% 
+    knitr::kable(format = "html") %>%
+    kableExtra::kable_styling()
+```
+
 
 ```{r}
 df_tx <- df_tx %>% 
@@ -162,23 +173,36 @@ df_tx %>%
 # Mapping of supplementary reads
 
 ```{r, fig.width = 6.85 / 2, fig.asp = .65}
-df_supplementary <- df_tx %>% 
+df_tx %>% 
+    mutate_if(is.numeric, as.integer) %>% 
     filter(category %in% c("primary_with_supplementary", "supplementary")) %>% 
+    mutate(pos2 = if_else(strand == "-", pos - rwidth, pos + rwidth)) %>% 
     tidyr::separate(rname, c("ensembl_transcript_id_version", "ensembl_gene_id_version"),
         extra = "drop", sep = '\\|') %>% 
-    group_by(library, barcode, qname) %>% 
-    summarise(
-        supplementary_type = 
-            if_else(ensembl_transcript_id_version == ensembl_transcript_id_version[type == "primary"]),
-                "same_transcript", 
-            if_else(ensembl_gene_id_version == ensembl_gene_id_version[type == "primary"]),
-                "same_gene",
-                "not_same_gene")),
-        n = n()) %>% 
+    select(-barcode, -aligned) %>% 
+    group_by(library, qname) %>% 
+    mutate(same_transcript = if_else(ensembl_transcript_id_version == ensembl_transcript_id_version[type == "primary"], TRUE, FALSE),
+           same_gene = if_else(ensembl_gene_id_version == ensembl_gene_id_version[type == "primary"], TRUE, FALSE),
+           same_strand = if_else(strand == strand[type == "primary"], TRUE, FALSE)) %>%
+    mutate(ref_pos = list(sort(c(pos[type == "primary"], pos2[type == "primary"]))),
+           n = n()) %>% 
     ungroup() %>% 
-    mutate(supplementary_type = as.factor(supplementary_type))
-
-df_supplementary %>% 
+    filter(category == "supplementary") %>% 
+    rowwise() %>% 
+    mutate(overlapping = if_else(!same_reference, FALSE,
+        if_else(any(findInterval(c(pos, pos2), unlist(ref_pos)) == 1L)
+            | any(findInterval(unlist(ref_pos), sort(c(pos, pos2))) == 1L), TRUE, FALSE))) %>% 
+    ungroup() %>% 
+    mutate(
+        supplementary_type = if_else(
+            !same_gene, "diff_gene",
+            if_else(!same_transcript, "diff_transcript",
+            if_else(same_strand & overlapping, "overlapping_sense",
+            if_else(same_strand & !overlapping, "overlapping_anti-sense",
+            if_else(!same_strand & overlapping, "non-overlapping_sense",
+            if_else(!same_strand & !overlapping, "non-overlapping_anti-sense",
+                NA_character_))))))) %>%
+    mutate(supplementary_type = as.factor(supplementary_type)) %>% 
     ggplot(aes(n - 1)) +
     geom_histogram(aes(fill = supplementary_type), binwidth = 1) +
     facet_wrap(~library, ncol = 1) +

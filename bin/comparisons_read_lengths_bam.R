@@ -57,8 +57,8 @@ bam <- bam %>%
         n_D = get_opts(cigar, "D"),
         n_N = get_opts(cigar, "N")) %>%
     ungroup() %>%
-    mutate(aligned = n_I + n_M,
-           rwidth = n_M + n_D + n_N) %>%
+    mutate(aligned = as.integer(n_I + n_M),
+           rwidth = as.integer(n_M + n_D + n_N)) %>%
     select(-cigar, -n_I, -n_M, -n_D, -n_N)
 
 
