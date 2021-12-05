@@ -44,9 +44,6 @@ sample_info2 <- sample_info %>%
     dplyr::select(sample_id, illumina, ont, cdna) %>% 
     tidyr::gather("method", "barcode", -sample_id) %>% 
     dplyr::select(-method) 
-
-biomart <- snakemake@input[["biomaRt_tx"]] %>%
-    read_rds()
 ```
 
 
@@ -55,20 +52,9 @@ df_tx <- snakemake@input$collapsed_transcripts %>%
     read_rds() %>% 
     mutate(library = factor(library, levels = c("illumina", "teloprime", "cdna", "rna"))) %>% 
     lazy_dt()
-
-tpm <- snakemake@input[["avg_counts"]] %>% 
-    read_csv(show_col_types = FALSE) %>% 
-    select(transcript_length, illumina) %>% 
-    rename(qwidth = "transcript_length") %>%
-    tidyr::drop_na() %>% 
-    mutate(illumina = 2^illumina - 1) %>% 
-    group_by(qwidth) %>% 
-    summarise(n = sum(illumina, na.rm = TRUE)) %>% 
-    ungroup() %>% 
-    mutate(library = "illumina")
 ```
 
-# Read categories (transcriptome mapping)
+# Read categories (genome mapping)
 
 ```{r, fig.width = 6.85 / 2, fig.asp = .65}
 df_tx %>% 
@@ -103,7 +89,7 @@ df_tx %>%
 ```
 
 
-# Length of primary and supplementary reads (against transcriptome)
+# Length of primary and supplementary reads (against genome)
 
 ```{r}
 df_tx %>% 
@@ -122,30 +108,6 @@ df_tx <- df_tx %>%
 
 
 ## Grouped read lengths
-
-The illumina values are estimated based on the tpm values from salmon. They are
-somewhat a reference, but not actual read lengths.
-
-```{r, fig.width = 6.85 / 2, fig.asp = .65}
-df_tx %>% 
-    filter(type == "primary") %>% 
-    group_by(library, qwidth) %>% 
-    summarise(n = n()) %>%
-    as_tibble() %>% 
-    bind_rows(tpm) %>% 
-    mutate(weight = n / sum(n)) %>% 
-    ungroup() %>% 
-    mutate(library = factor(library, levels = c("illumina", "teloprime", "cdna", "rna"))) %>% 
-    ggplot(aes(library, qwidth, weight = weight)) +
-    geom_violin(lwd = .25) +
-    scale_y_log10(labels = trans_format("log10", math_format(10^.x))) +
-    theme_tufte(base_size = 8, base_family = "Helvetica") +
-    geom_rangeframe(sides = "bl") +
-    xlab(NULL) + 
-    ylab("Read/transcript length") +
-    theme(legend.key.size = unit(.33, "cm"))
-```
-
 
 ```{r, fig.width = 6.85 / 2, fig.asp = .65}
 df_tx %>% 
@@ -232,21 +194,30 @@ df_supp %>%
 
 
 df_supp %>%
-    left_join(sample_info2, by = "barcode") %>% 
-    left_join(sample_info, by = "sample_id") %>% 
     ggplot(aes(n - 1)) +
-    geom_density(aes(colour = condition_temp, group = barcode),
-        adjust = 10,
-        lwd = .25) +
+    geom_histogram(binwidth = 1) +
     facet_wrap(~library, ncol = 1, scales = "free_y") +
     theme_tufte(base_size = 8, base_family = "Helvetica") +
     geom_rangeframe(sides = "bl") +
-    scale_y_log10(name = "Density",
+    scale_y_log10(name = "Count",
         labels = trans_format("log10", math_format(10^.x))) +
     scale_x_continuous(name = "Supplementary reads per primary read",
         breaks = pretty_breaks()) +
-    scale_colour_brewer(palette = "Dark2", name = NULL,
-        labels = c("22" = "22°C", "4" = "4°C")) +
+    theme(legend.key.size = unit(.33, "cm"))
+
+
+df_supp %>% 
+    mutate(library = factor(library, levels = c("illumina", "teloprime", "cdna", "rna"))) %>% 
+    ggplot(aes(supplementary_type, qwidth)) +
+    geom_violin(aes(fill = library), lwd = .25) +
+    scale_y_log10(labels = trans_format("log10", math_format(10^.x))) +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe(sides = "bl") +
+    xlab(NULL) + 
+    ylab("Read length") +
+    scale_fill_brewer(palette = "Dark2", name = NULL,
+        labels = c("primary_with_supplementary" = "pri. w/ sup.",
+                   "primary_wo_supplementary" = "pri. w/o sup.")) +
     theme(legend.key.size = unit(.33, "cm"))
 ```
 

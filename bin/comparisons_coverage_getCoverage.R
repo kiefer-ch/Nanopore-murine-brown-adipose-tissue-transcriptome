@@ -1,22 +1,20 @@
-#!/usr/bin/Rscript --no-restore --no-environ --no-save
 
-# set libpaths to packrat local library
 source(".Rprofile")
-suppressPackageStartupMessages(library("dplyr"))
-suppressPackageStartupMessages(library("GenomicAlignments"))
+suppressPackageStartupMessages({
+    library("dplyr")
+    library("GenomicAlignments")
+})
 
 ################################################################################
 #
 # author: Christoph Kiefer
 # email: christophak@bmb.sdu.dk
 #
-# some code taken from https://github.com/csoneson/NativeRNAseqComplexTranscriptome/blob/master/Rscripts/get_nbr_reads.R
-#
 ################################################################################
 
-# genome
 get_opts <- function(cigar, opts) {
-    sum(as.numeric(gsub(paste0(opts, "$"), "", cigar)), na.rm = TRUE)
+    # the next line is from https://github.com/csoneson/NativeRNAseqComplexTranscriptome/blob/master/Rscripts/get_nbr_reads.R
+    as.integer(sum(suppressWarnings(as.numeric(gsub(paste0(opts, "$"), "", cigar))), na.rm = TRUE))
 }
 
 readGAlignments(snakemake@input[[1]],

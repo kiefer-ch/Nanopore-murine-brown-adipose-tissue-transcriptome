@@ -55,17 +55,6 @@ df_tx <- snakemake@input$collapsed_transcripts %>%
     read_rds() %>% 
     mutate(library = factor(library, levels = c("illumina", "teloprime", "cdna", "rna"))) %>% 
     lazy_dt()
-
-tpm <- snakemake@input[["avg_counts"]] %>% 
-    read_csv(show_col_types = FALSE) %>% 
-    select(transcript_length, illumina) %>% 
-    rename(qwidth = "transcript_length") %>%
-    tidyr::drop_na() %>% 
-    mutate(illumina = 2^illumina - 1) %>% 
-    group_by(qwidth) %>% 
-    summarise(n = sum(illumina, na.rm = TRUE)) %>% 
-    ungroup() %>% 
-    mutate(library = "illumina")
 ```
 
 # Read categories (transcriptome mapping)
@@ -112,30 +101,6 @@ df_tx <- df_tx %>%
 
 
 ## Grouped read lengths
-
-The illumina values are estimated based on the tpm values from salmon. They are
-somewhat a reference, but not actual read lengths.
-
-```{r, fig.width = 6.85 / 2, fig.asp = .65}
-df_tx %>% 
-    filter(type == "primary") %>% 
-    group_by(library, qwidth) %>% 
-    summarise(n = n()) %>% 
-    as_tibble() %>% 
-    bind_rows(tpm) %>% 
-    mutate(weight = n / sum(n)) %>% 
-    ungroup() %>% 
-    mutate(library = factor(library, levels = c("illumina", "teloprime", "cdna", "rna"))) %>% 
-    ggplot(aes(library, qwidth, weight = weight)) +
-    geom_violin(lwd = .25) +
-    scale_y_log10(labels = trans_format("log10", math_format(10^.x))) +
-    theme_tufte(base_size = 8, base_family = "Helvetica") +
-    geom_rangeframe(sides = "bl") +
-    xlab(NULL) + 
-    ylab("Read/transcript length") +
-    theme(legend.key.size = unit(.33, "cm"))
-```
-
 
 ```{r, fig.width = 6.85 / 2, fig.asp = .65}
 df_tx %>% 
@@ -187,20 +152,25 @@ df_supp <- df_tx %>%
     tidyr::separate(rname, c("ensembl_transcript_id_version", "ensembl_gene_id_version"),
         extra = "drop", sep = '\\|') %>% 
     lazy_dt() %>% 
-    mutate(pos2 = if_else(strand == "-", pos - rwidth, pos + rwidth)) %>% 
     select(-aligned) %>% 
     group_by(library, barcode, qname) %>% 
-    mutate(supplementary_type = case_when(
+    mutate(
+        reference = case_when(
             ensembl_transcript_id_version == 
                 ensembl_transcript_id_version[type == "primary"]    ~ "same_transcripts",
             ensembl_gene_id_version == 
                 ensembl_gene_id_version[type == "primary"]          ~ "same_gene",
             TRUE                                                    ~ "other"),
-        same_strand = if_else(strand == strand[type == "primary"], TRUE, FALSE)) %>%
-    mutate(ref_pos = list(sort(c(pos[type == "primary"], pos2[type == "primary"]))),
-           n = n()) %>% 
-    ungroup() %>% 
-    filter(category == "supplementary") %>% 
+        same_strand = if_else(strand == strand[type == "primary"], TRUE, FALSE),
+        n = n()) %>% 
+    ungroup() %>%
+        filter(category == "supplementary") %>% 
+        mutate(supplementary_type = case_when(
+            reference == "other"                            ~ "other",
+            reference == "same_transcript" & same_strand    ~ "same_transcript_sense",
+            reference == "same_transcript" & !same_strand   ~ "same_transcript_anti-sense",
+            reference == "same_gene" & same_strand          ~ "same_gene_sense",
+            reference == "same_gene" & !same_strand         ~ "same_gene_anti-sense")) %>% 
     as_tibble()
 ```
 
@@ -225,12 +195,8 @@ df_supp %>%
 
 
 df_supp %>%
-    left_join(sample_info2, by = "barcode") %>% 
-    left_join(sample_info, by = "sample_id") %>% 
     ggplot(aes(n - 1)) +
-    geom_density(aes(colour = condition_temp, group = barcode),
-        adjust = 10,
-        lwd = .25) +
+    geom_histogram(binwidth = 1) +
     facet_wrap(~library, ncol = 1, scales = "free_y") +
     theme_tufte(base_size = 8, base_family = "Helvetica") +
     geom_rangeframe(sides = "bl") +
@@ -238,8 +204,6 @@ df_supp %>%
         labels = trans_format("log10", math_format(10^.x))) +
     scale_x_continuous(name = "Supplementary reads per primary read",
         breaks = pretty_breaks()) +
-    scale_colour_brewer(palette = "Dark2", name = NULL,
-        labels = c("22" = "22°C", "4" = "4°C")) +
     theme(legend.key.size = unit(.33, "cm"))
 ```
 

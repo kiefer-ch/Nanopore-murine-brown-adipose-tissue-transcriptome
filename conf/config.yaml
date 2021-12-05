@@ -1,6 +1,9 @@
 # GENCODE version
 GENCODE_VERSION: "M22"
 
+# Sample info
+SAMPLE_INFO: "conf/sampleInfo.csv"
+
 # Paths to software
 BEDTOOLS: "/data/bin/bedtools/bedtools-v2.28/bedtools"
 MASHMAP: "/data/home/christophak/bin/mashmap"

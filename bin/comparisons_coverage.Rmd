@@ -40,6 +40,8 @@ sample_info <- read_csv(snakemake@input[["sample_info"]], show_col_types = FALSE
 
 # Gene body coverage
 
+All plots are primary mappings only
+
 ```{r dataImport_geneBodyCoverage}
 read_geneBodyCoverage <- function(file) {
     file %>%
@@ -82,6 +84,45 @@ rna <- snakemake@input[["geneBodyCoverage_rna"]] %>%
     dplyr::select(-waste)
 ```
 
+
+```{r dataImport_tpm}
+tpm <- snakemake@input[["avg_counts"]] %>% 
+    read_csv(show_col_types = FALSE) %>% 
+    select(transcript_length, illumina) %>% 
+    rename(qwidth = "transcript_length") %>%
+    tidyr::drop_na() %>% 
+    mutate(illumina = 2^illumina - 1) %>% 
+    group_by(qwidth) %>% 
+    summarise(n = sum(illumina, na.rm = TRUE)) %>% 
+    ungroup() %>% 
+    mutate(library = "illumina")
+```
+
+
+The illumina values are estimated based on the tpm values from salmon. They are
+somewhat a reference, but not actual read lengths.
+
+```{r, fig.width = 6.85 / 2, fig.asp = .65}
+df_tx %>% 
+    filter(type == "primary") %>% 
+    group_by(library, qwidth) %>% 
+    summarise(n = n()) %>% 
+    as_tibble() %>% 
+    bind_rows(tpm) %>% 
+    mutate(weight = n / sum(n)) %>% 
+    ungroup() %>% 
+    mutate(library = factor(library, levels = c("illumina", "teloprime", "cdna", "rna"))) %>% 
+    ggplot(aes(library, qwidth, weight = weight)) +
+    geom_violin(lwd = .25) +
+    scale_y_log10(labels = trans_format("log10", math_format(10^.x))) +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe(sides = "bl") +
+    xlab(NULL) + 
+    ylab("Read/transcript length") +
+    theme(legend.key.size = unit(.33, "cm"))
+```
+
+
 ```{r plot_geneBodyCoverage, fig.width = 6.85 / 2, fig.asp = .65}
 list(illumina, teloprime, cdna, rna) %>%
     bind_rows() %>%
@@ -122,7 +163,7 @@ df %>%
     geom_rangeframe(sides = 'lb') +
     scale_fill_brewer(palette = "Dark2", name = NULL) +
     scale_y_continuous(labels = scales::percent) +
-    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5))
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5)) +
     theme(legend.key.size = unit(.33, "cm"))
 ```
 

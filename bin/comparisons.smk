@@ -37,7 +37,7 @@ rule counts_pca:
                            dataset=["cdna", "teloprime", "illumina", "rna"]),
         gene_counts = expand("res/deseq/{dataset}/genelevel/{dataset}_genelevel_cm_cts.csv.gz",
                              dataset=["cdna", "teloprime", "illumina", "rna"]),
-        sample_info = "sample_info/sampleInfo.csv"
+        sample_info = config["SAMPLE_INFO"]
     output:
         "res/comparisons/comparisons_countsPCA.html"
     script:
@@ -47,15 +47,15 @@ rule counts_pca:
 rule feature_detection:
     input:
         tx_counts = expand("res/deseq/{dataset}/txlevel/{dataset}_txlevel_cm_cts.csv.gz",
-                           dataset=["cdna", "teloprime", "illumina", "rna"]),
+            dataset=["cdna", "teloprime", "illumina", "rna"]),
         gene_counts = expand("res/deseq/{dataset}/genelevel/{dataset}_genelevel_cm_cts.csv.gz",
-                             dataset=["cdna", "teloprime", "illumina", "rna"]),
+            dataset=["cdna", "teloprime", "illumina", "rna"]),
         gene_tpm = "res/deseq/illumina/genelevel/illumina_genelevel_cm_ntd.csv.gz",
         tx_tpm = "res/deseq/illumina/txlevel/illumina_txlevel_cm_ntd.csv.gz",
         biomaRt_gene = "annotation/biomaRt_gene.rds",
         biomaRt_tx = "annotation/biomaRt_tx.rds",
         biotype_groups = "data/biotype_groups.csv",
-        sample_info = "sample_info/sampleInfo.csv"
+        sample_info = config["SAMPLE_INFO"]
     output:
         "res/comparisons/comparisons_feature_detection.html"
     script:
@@ -64,51 +64,48 @@ rule feature_detection:
 
 def get_input_bam_coverage(wildcards):
     if wildcards.dataset in ["teloprime", "cdna"]:
-        file_name = "bam/{}/{}_transcriptome.bam".format(
+        file_name = "data/bam/{}/{}_transcriptome.bam".format(
             wildcards.dataset, wildcards.barcode)
     elif wildcards.dataset == "rna":
-        file_name = "bam/rna/transcriptome_{}_q7_sort.bam".format(wildcards.barcode)
+        file_name = "data/bam/rna/transcriptome_{}_q7_sort.bam".format(wildcards.barcode)
     return [file_name, file_name + ".bai"]
 
 
-rule bam_getCoverage:
+rule coverage_getCoverage:
     input:
         get_input_bam_coverage
     wildcard_constraints:
         dataset = "teloprime|cdna|rna"
     output:
-        "res/comparisons/coverage/{dataset}/{barcode}.rds"
+        "data/comparisons/coverage/{dataset}/{dataset}_{barcode}_coverage.rds"
     script:
-        "comparisons_bam_getCoverage.R"
+        "comparisons_coverage_getCoverage.R"
 
 
-rule collapse_coverage:
+rule coverage_collapse:
     input:
-        coverage_teloprime = expand("res/comparisons/coverage/teloprime/{barcode}.rds",
-                                    barcode=SAMPLE_INFO_ont["ont"]),
-        coverage_cdna = expand("res/comparisons/coverage/cdna/{barcode}.rds",
-                               barcode=SAMPLE_INFO_ont["cdna"]),
-        coverage_rna = expand("res/comparisons/coverage/rna/{barcode}.rds",
-                               barcode=["rt", "cool"]),
-        biomaRt_tx = "annotation/biomaRt_tx.rds"
+        coverage = [expand("data/comparisons/coverage/teloprime/teloprime_{barcode}_coverage.rds", barcode=SAMPLE_INFO_ont["ont"]),
+                    expand("data/comparisons/coverage/cdna/cdna_{barcode}_coverage.rds", barcode=SAMPLE_INFO_ont["cdna"]),
+                    expand("data/comparisons/coverage/rna/rna_{barcode}_coverage.rds", barcode=["rt", "cool"])],
+        biomaRt_tx = "data/annotation/biomaRt_tx.rds"
     output:
-        "res/comparisons/coverage/collapsed_coverage.rds"
+        "data/comparisons/coverage/collapsed_coverage.rds"
     script:
-        "comparisons_coverage_collapseCoverage"
+        "comparisons_coverage_collapseCoverage.R"
 
 
-rule coverage:
+rule coverage_report:
     input:
         geneBodyCoverage_teloprime = expand("data/comparisons/geneBody_coverage/teloprime/{barcode}.geneBodyCoverage.txt",
-                                            barcode=SAMPLE_INFO_ont["ont"]),
+            barcode=SAMPLE_INFO_ont["ont"]),
         geneBodyCoverage_cdna = expand("data/comparisons/geneBody_coverage/cdna/{barcode}.geneBodyCoverage.txt",
-                                       barcode=SAMPLE_INFO_ont["cdna"]),
+            barcode=SAMPLE_INFO_ont["cdna"]),
         geneBodyCoverage_illumina = expand("data/comparisons/geneBody_coverage/rna/illumina/{sample}.geneBodyCoverage.txt",
-                                           sample=SAMPLES_ont),
+            sample=SAMPLES_ont),
         geneBodyCoverage_rna = expand("data/comparisons/geneBody_coverage/rna/{barcode}.geneBodyCoverage.txt",
-                                       barcode=["rt", "cool"]),
+            barcode=["rt", "cool"]),
         collapsed_coverage = "res/comparisons/coverage/collapsed_coverage.rds",
-        sample_info = "sample_info/sampleInfo.csv"
+        sample_info = config["SAMPLE_INFO"]
     output:
         "res/comparisons/comparisons_coverage.html"
     script:
@@ -137,31 +134,31 @@ def get_fastqnames(wildcards):
     return files
 
 
-rule fastq_readLengthHistogram:
+rule readLength_fastq_histogram:
     input:
         get_fastqnames
     output:
-        "res/comparisons/readLengthDistribution/{dataset}_fastqReadLengths.csv"
+        "data/comparisons/fastq/readLengthDistribution/{dataset}_fastqReadLengths.csv"
     script:
         "comparisons_fastq_readLengthHistogram.py"
 
 
-rule fastq_readQualityHistogram:
+rule readQuality_fastq_histogram:
     input:
         get_fastqnames
     output:
-        "res/comparisons/readQualityDistribution/{dataset}_fastqQualities.csv"
+        "data/comparisons/fastq/readQualityDistribution/{dataset}_fastqQualities.csv"
     script:
-        "comparisons_fastq_readQualityHistogram.py"
+        "comparisons_fastq_readLengthHistogram.py"
 
 
-rule read_lengths_fastq:
+rule readLengths_fastq:
     input:
-        readLengths = expand("res/comparisons/readLengthDistribution/{dataset}_fastqReadLengths.csv",
+        readLengths = expand("data/comparisons/fastq/readLengthDistribution/{dataset}_fastqReadLengths.csv",
                              dataset=["teloprime", "cdna", "rna"]),
-        readQualities = expand("res/comparisons/readQualityDistribution/{dataset}_fastqQualities.csv",
+        readQualities = expand("data/comparisons/fastq/readQualityDistribution/{dataset}_fastqQualities.csv",
                              dataset=["teloprime", "cdna", "rna"]),
-        sample_info = "sample_info/sampleInfo.csv"
+        sample_info = config["SAMPLE_INFO"]
     output:
         "res/comparisons/comparisons_readLengths_fastq.html"
     script:
@@ -212,9 +209,8 @@ rule readLengths_bam_collapseTranscripts:
 rule readLengths_bam_report_transcriptome:
     input:
         collapsed_transcripts = "res/comparisons/countReads/collapsed/bam_countReads_collapsed_transcriptome.rds",
-        biomaRt_tx = "annotation/biomaRt_tx.rds",
-        sample_info = "sample_info/sampleInfo.csv",
-        avg_counts = "res/comparisons/comparisons_meanCounts_tx.csv.gz"
+        biomaRt_tx = "data/annotation/biomaRt_tx.rds",
+        sample_info = config["SAMPLE_INFO"]
     output:
         "res/comparisons/comparisons_readLengths_bam_transcriptome.html"
     script:
@@ -224,9 +220,7 @@ rule readLengths_bam_report_transcriptome:
 rule readLengths_bam_report_genome:
     input:
         collapsed_transcripts = "res/comparisons/countReads/collapsed/bam_countReads_collapsed_genome.rds",
-        biomaRt_tx = "annotation/biomaRt_tx.rds",
-        sample_info = "sample_info/sampleInfo.csv",
-        avg_counts = "res/comparisons/comparisons_meanCounts_tx.csv.gz"
+        sample_info = config["SAMPLE_INFO"]
     output:
         "res/comparisons/comparisons_readLengths_bam_genome.html"
     script:
@@ -251,11 +245,11 @@ rule compare_dge:
 rule compare_reannotation:
     input:
         gffcompare = ["stringtie/illumina/all_gffcompare.stringtie_illumina_merged.gtf.tmap",
-                      expand("flair/{dataset}/all_gffcompare.flair.collapse.{dataset}.isoforms.gtf.tmap",
-                             dataset=["cdna", "teloprime", "rna"])],
+            expand("flair/{dataset}/all_gffcompare.flair.collapse.{dataset}.isoforms.gtf.tmap",
+                dataset=["cdna", "teloprime", "rna"])],
         sqanti = ["stringtie/illumina/sqanti/stringtie_illumina_merged_noUnknownStrand_classification.txt",
-                  expand("flair/{dataset}/sqanti/flair.collapse.{dataset}.isoforms_classification.txt",
-                         dataset=["cdna", "teloprime", "rna"])]
+            expand("flair/{dataset}/sqanti/flair.collapse.{dataset}.isoforms_classification.txt",
+                dataset=["cdna", "teloprime", "rna"])]
     output:
         "res/comparisons/comparisons_reannotation.html"
     script:
@@ -278,9 +272,9 @@ rule render_GOcomp:
 rule compare_dtu_1:
     input:
         drimseq = expand("res/drimseq/{dataset}/{dataset}_drimSeqStageR.csv",
-                         dataset=["illumina", "cdna", "teloprime", "cdna_flair", "teloprime_flair"]),
+            dataset=["illumina", "cdna", "teloprime", "cdna_flair", "teloprime_flair"]),
         dexseq = expand("res/dexseq/{dataset}/{dataset}_dexseq_results.csv.gz",
-                        dataset=["illumina", "cdna", "teloprime"]),
+            dataset=["illumina", "cdna", "teloprime"]),
         biomaRt_gene = "annotation/biomaRt_gene.rds",
         counts = "res/comparisons/comparisons_meanCounts_gene.csv.gz"
     output:

@@ -9,7 +9,7 @@ configfile: "conf/config.yaml"
 
 
 # Sample IDs
-SAMPLE_INFO = pd.read_csv("sample_info/sampleInfo.csv", sep=',')
+SAMPLE_INFO = pd.read_csv(config["SAMPLE_INFO"], sep=',')
 SAMPLE_INFO = SAMPLE_INFO.set_index("sample_id")
 SAMPLE_INFO_illumina = SAMPLE_INFO[SAMPLE_INFO["illumina"].notnull()]
 SAMPLES = SAMPLE_INFO_illumina["illumina"].tolist()
@@ -21,7 +21,7 @@ BARCODES = SAMPLE_INFO_illumina[SAMPLE_INFO_illumina["ont"].notnull()]["ont"].to
 # Include other rules
 include: "bin/annotation.smk"
 include: "bin/process_illumina.smk"
-include: "bin/process_nanopore.smk"
+#include: "bin/process_nanopore.smk"
 include: "bin/rseqc.smk"
 include: "bin/comparisons.smk"
 include: "bin/dexseq.snakefile"

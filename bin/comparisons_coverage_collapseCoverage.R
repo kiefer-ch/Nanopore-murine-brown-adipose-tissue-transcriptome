@@ -1,9 +1,11 @@
 
 source(".Rprofile")
-suppressPackageStartupMessages(library("logger"))
-suppressPackageStartupMessages(library("dplyr"))
-suppressPackageStartupMessages(library("readr"))
-suppressPackageStartupMessages(library("purrr"))
+suppressPackageStartupMessages({
+    library("logger")
+    library("dplyr")
+    library("readr")
+    library("purrr")
+})
 
 ################################################################################
 #
@@ -17,36 +19,29 @@ biomart <- snakemake@input[["biomaRt_tx"]] %>%
     read_rds()
 
 
-get_map_type <- function(flag) {
-    if_else(flag %in% c(0, 16), "primary",
-            if_else(flag %in% c(256, 275), "secondary", "supplementary"))
-}
+df_tx <- c(snakemake@input$coverage) %>%
+    set_names(tools::file_path_sans_ext(basename(.)) %>%
+                  strsplit(., '_') %>%
+                  map(`[`, 1:2) %>%
+                  map(paste, collapse = '_')) %>%
+    map(read_rds)
+
 
 log_info("Collapse data...")
-prepare_dataset2 <- function(files) {
-    files %>%
-        as.list() %>%
-        set_names(basename(files)) %>%
-        map(read_rds) %>%
-        map(mutate, type = get_map_type(flag)) %>%
-        map(dplyr::select, -qname, -flag, -qwidth) %>%
-        map(tidyr::separate, col = seqnames, into = "ensembl_transcript_id_version",
-            sep = "\\|", extra = "drop") %>%
-        map(left_join, y = biomart, by = "ensembl_transcript_id_version") %>%
-        bind_rows(.id = "sample") %>%
-        mutate(coverage = coverage / transcript_length)
-}
-
-
-df <- list(snakemake@input[["coverage_teloprime"]],
-           snakemake@input[["coverage_cdna"]],
-           snakemake@input[["coverage_rna"]]) %>%
-    map(prepare_dataset2) %>%
-    map(dplyr::select, coverage, transcript_length, type, ensembl_transcript_id_version) %>%
+df_tx <- df_tx %>%
+    map(mutate, type = case_when(
+        flag %in% c(0L, 16L)    ~ "primary",
+        flag %in% c(256L, 275L) ~ "secondary",
+        TRUE                    ~ "supplementary")) %>%
     map(filter, type == "primary") %>%
-    set_names(c("teloprime", "cdna", "rna")) %>%
-    bind_rows(.id = "dataset") %>%
-    tidyr::drop_na()
+    map(dplyr::select, -qname, -flag) %>%
+    map(tidyr::separate, col = seqnames, into = "ensembl_transcript_id_version",
+        sep = "\\|", extra = "drop") %>%
+    map(left_join, y = biomart, by = "ensembl_transcript_id_version") %>%
+    map(mutate, coverage = coverage / transcript_length) %>%
+    map(dplyr::select, coverage, transcript_length, type, qwidth) %>%
+    bind_rows(.id = "sample") %>%
+    tidyr::separate(sample, c("library", "barcode"))
 
 
 log_info("Writing to disc...")
@@ -55,4 +50,3 @@ df %>%
 
 
 log_success("Done.")
-

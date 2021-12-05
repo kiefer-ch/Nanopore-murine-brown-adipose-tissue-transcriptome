@@ -14,15 +14,8 @@ suppressPackageStartupMessages({
 #
 ################################################################################
 
-get_map_type <- function(flag) {
-    if_else(flag == 4, "unmapped",
-            if_else(flag %in% c(0, 16), "primary",
-                    if_else(flag %in% c(256, 275), "secondary", "supplementary")))
-}
-
-
 log_info("Importing data...")
-df_tx <- c(snakemake@input) %>%
+df_tx <- c(snakemake@input[[1]]) %>%
     set_names(tools::file_path_sans_ext(basename(.)) %>%
         strsplit(., '_') %>%
         map(`[`, 1:3) %>%
