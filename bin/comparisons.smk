@@ -99,13 +99,13 @@ rule collapse_coverage:
 
 rule coverage:
     input:
-        geneBodyCoverage_teloprime = expand("res/comparisons/geneBody_coverage/teloprime/{barcode}.geneBodyCoverage.txt",
+        geneBodyCoverage_teloprime = expand("data/comparisons/geneBody_coverage/teloprime/{barcode}.geneBodyCoverage.txt",
                                             barcode=SAMPLE_INFO_ont["ont"]),
-        geneBodyCoverage_cdna = expand("res/comparisons/geneBody_coverage/cdna/{barcode}.geneBodyCoverage.txt",
+        geneBodyCoverage_cdna = expand("data/comparisons/geneBody_coverage/cdna/{barcode}.geneBodyCoverage.txt",
                                        barcode=SAMPLE_INFO_ont["cdna"]),
-        geneBodyCoverage_illumina = expand("qc/RSeQC/geneBody_coverage/{sample}.geneBodyCoverage.txt",
+        geneBodyCoverage_illumina = expand("data/comparisons/geneBody_coverage/rna/illumina/{sample}.geneBodyCoverage.txt",
                                            sample=SAMPLES_ont),
-        geneBodyCoverage_rna = expand("res/comparisons/geneBody_coverage/rna/{barcode}.geneBodyCoverage.txt",
+        geneBodyCoverage_rna = expand("data/comparisons/geneBody_coverage/rna/{barcode}.geneBodyCoverage.txt",
                                        barcode=["rt", "cool"]),
         collapsed_coverage = "res/comparisons/coverage/collapsed_coverage.rds",
         sample_info = "sample_info/sampleInfo.csv"
@@ -170,48 +170,48 @@ rule read_lengths_fastq:
 
 def get_input_bam_AlignedLength(wildcards):
     if wildcards.dataset == "teloprime":
-        file_name = "bam/teloprime/{}_{}.bam".format(
-            wildcards.file, wildcards.type)
+        file_name = "data/bam/teloprime/{}/{}_{}.bam".format(
+            wildcards.type, wildcards.file, wildcards.type)
     elif wildcards.dataset == "cdna":
-        file_name = "bam/cdna/{}_{}.bam".format(
-            wildcards.file, wildcards.type)
+        file_name = "data/bam/cdna/{}/{}_{}.bam".format(
+            wildcards.type, wildcards.file, wildcards.type)
     elif wildcards.dataset == "rna":
-        file_name = "bam/rna/{}_{}_q7_sort.bam".format(
-            wildcards.type, wildcards.file)
+        file_name = "data/bam/rna/{}/{}_{}_q7_sort.bam".format(
+            wildcards.type, wildcards.type, wildcards.file)
     return [file_name, file_name + ".bai"]
 
 
-rule bam_getAlignedLength:
+rule readLengths_bam:
     input:
         get_input_bam_AlignedLength
     wildcard_constraints:
         type = "genome|transcriptome",
         dataset = "teloprime|cdna|rna"
     output:
-        "res/comparisons/countReads/{dataset}/{dataset}_{file}_bam_{type}.rds"
+        "res/comparisons/countReads/{dataset}/{type}/{dataset}_{type}_{file}_bam_countReads.rds"
     script:
         "comparisons_read_lengths_bam.R"
 
 
-rule read_lengths_bam_collapseTranscripts:
+rule readLengths_bam_collapseTranscripts:
     input:
-        teloprime_bam_tx = expand("res/comparisons/countReads/teloprime/teloprime_{barcode}_bam_{{type}}.rds",
+        expand("res/comparisons/countReads/teloprime/{{type}}/teloprime_{{type}}_{barcode}_bam_countReads.rds",
             barcode=SAMPLE_INFO_ont["ont"]),
-        cdna_bam_tx = expand("res/comparisons/countReads/cdna/cdna_{barcode}_bam_{{type}}.rds",
+        expand("res/comparisons/countReads/cdna/{{type}}/cdna_{{type}}_{barcode}_bam_countReads.rds",
             barcode=SAMPLE_INFO_ont["cdna"]),
-        rna_bam_tx = expand("res/comparisons/countReads/rna/rna_{barcode}_bam_{{type}}.rds",
+        expand("res/comparisons/countReads/rna/{{type}}/rna_{{type}}_{barcode}_bam_countReads.rds",
             barcode=["rt", "cool"])
     wildcard_constraints:
         type = "genome|transcriptome"
     output:
-        "res/comparisons/countReads/bam_transcripts_collapsed_{type}.rds"
+        "res/comparisons/countReads/collapsed/bam_countReads_collapsed_{type}.rds"
     script:
         "comparisons_read_lengths_bam_collapseTranscripts.R"
 
 
-rule read_lengths_bam_transcriptome:
+rule readLengths_bam_report_transcriptome:
     input:
-        collapsed_transcripts = "res/comparisons/countReads/bam_transcripts_collapsed_transcriptome.rds",
+        collapsed_transcripts = "res/comparisons/countReads/collapsed/bam_countReads_collapsed_transcriptome.rds",
         biomaRt_tx = "annotation/biomaRt_tx.rds",
         sample_info = "sample_info/sampleInfo.csv",
         avg_counts = "res/comparisons/comparisons_meanCounts_tx.csv.gz"
@@ -221,9 +221,9 @@ rule read_lengths_bam_transcriptome:
         "comparisons_read_lengths_bam_transcriptome.Rmd"
 
 
-rule read_lengths_bam_genome:
+rule readLengths_bam_report_genome:
     input:
-        collapsed_transcripts = "res/comparisons/countReads/bam_transcripts_collapsed_genome.rds",
+        collapsed_transcripts = "res/comparisons/countReads/collapsed/bam_countReads_collapsed_genome.rds",
         biomaRt_tx = "annotation/biomaRt_tx.rds",
         sample_info = "sample_info/sampleInfo.csv",
         avg_counts = "res/comparisons/comparisons_meanCounts_tx.csv.gz"

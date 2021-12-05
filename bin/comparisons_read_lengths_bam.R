@@ -3,6 +3,8 @@ source(".Rprofile")
 suppressPackageStartupMessages({
     library("logger")
     library("dplyr")
+    library("dtplyr")
+    library("data.table")
     library("purrr")
     library("GenomicAlignments")
 })
@@ -28,7 +30,7 @@ get_cigar <- function(cigar) {
         lengths = explodeCigarOpLengths(cigar)
         values = explodeCigarOps(cigar)
 
-        out <- relist(paste0(unlist(lengths), unlist(values)), values)
+        out <- unlist(relist(paste0(unlist(lengths), unlist(values)), values))
     }
 
     out
@@ -37,26 +39,24 @@ get_cigar <- function(cigar) {
 
 get_opts <- function(cigar, opts) {
     # the next line is from https://github.com/csoneson/NativeRNAseqComplexTranscriptome/blob/master/Rscripts/get_nbr_reads.R
-    sum(as.numeric(gsub(paste0(opts, "$"), "", cigar)), na.rm = TRUE)
+    as.integer(sum(suppressWarnings(as.numeric(gsub(paste0(opts, "$"), "", cigar))), na.rm = TRUE))
 }
 
 
 log_info(sprintf("Importing %s...", snakemake@input[[1]]))
 bam <- scanBam(snakemake@input[[1]],
     param = ScanBamParam(
-        what = c("qname", "flag", "rname", "qwidth", "cigar", "strand", "pos")))[[1]]
+        what = c("qname", "flag", "rname", "qwidth", "cigar", "strand", "pos")))[[1]] %>%
+    lazy_dt()
 
 
 log_info(sprintf("Processing %s...", snakemake@input[[1]]))
 bam <- bam %>%
-    as_tibble() %>%
-    rowwise() %>%
-    mutate(cigar = get_cigar(cigar)) %>%
-    mutate(n_I = get_opts(cigar, "I"),
-        n_M = get_opts(cigar, "M"),
-        n_D = get_opts(cigar, "D"),
-        n_N = get_opts(cigar, "N")) %>%
-    ungroup() %>%
+    mutate(cigar = map(cigar, get_cigar)) %>%
+    mutate(n_I = map_int(cigar, get_opts, opts = "I"),
+           n_M = map_int(cigar, get_opts, opts = "M"),
+           n_D = map_int(cigar, get_opts, opts = "D"),
+           n_N = map_int(cigar, get_opts, opts = "N")) %>%
     mutate(aligned = as.integer(n_I + n_M),
            rwidth = as.integer(n_M + n_D + n_N)) %>%
     select(-cigar, -n_I, -n_M, -n_D, -n_N)

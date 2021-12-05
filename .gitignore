@@ -26,14 +26,14 @@
 
 # Root directory
 !Snakefile
-!config.sh
 !README.md
 !LICENSE
 !renv.lock
 !.renvignore
 !.Rprofile
-!config.yaml
 
-# Don't ignore sample info
-!sample_info/illumina_sample_id.txt
-!sample_info/sampleInfo.csv
+# Don't ignore config
+!conf/illumina_sample_id.txt
+!conf/sampleInfo.csv
+!conf/config.yaml
+
