@@ -167,37 +167,61 @@ rule coverage_report:
         "comparisons_coverage.Rmd"
 
 
-# comparisons
-rule quantification_averageCounts_tables:
+# quantification_correlation
+rule quantification_getAverageCountsTables:
     input:
-        tx_counts = expand("res/deseq/{dataset}/txlevel/{dataset}_txlevel_cm_ntd.csv.gz",
-                           dataset=["cdna", "teloprime", "rna"]),
-        tx_tpm = "res/deseq/illumina/txlevel/illumina_txlevel_cm_ntd.csv.gz",
-        gene_counts = expand("res/deseq/{dataset}/genelevel/{dataset}_genelevel_cm_ntd.csv.gz",
-                             dataset=["cdna", "teloprime", "rna"]),
-        gene_tpm = "res/deseq/illumina/genelevel/illumina_genelevel_cm_ntd.csv.gz",
-        biomaRt_gene = "annotation/biomaRt_gene.rds",
-        biomaRt_tx = "annotation/biomaRt_tx.rds",
-        biotype_groups = "data/biotype_groups.csv"
+        ont_quant = [expand("data/quantification/teloprime/merged/teloprime_merged_{barcode}_quant.tsv", barcode=SAMPLE_INFO_ont["ont"]),
+                     expand("data/quantification/cdna/merged/cdna_merged_{barcode}_quant.tsv", barcode=SAMPLE_INFO_ont["cdna"]),
+                     expand("data/quantification/rna/merged/rna_merged_{barcode}_quant.tsv", barcode=["rt", "cool"])],
+        illumina_quant = expand("data/quantification/salmon/{sample}/quant.sf", sample=SAMPLES_ont),
+        txdb = "data/annotation/annotation_txdb.sqlite"
     output:
-        gene_avg = "res/comparisons/comparisons_meanCounts_gene.csv.gz",
-        tx_avg = "res/comparisons/comparisons_meanCounts_tx.csv.gz",
-        gene = "res/comparisons/comparisons_counts_gene.csv.gz",
-        tx = "res/comparisons/comparisons_counts_tx.csv.gz"
+        gene = "data/comparisons/counts/comparisons_meanCounts_gene.tsv.gz",
+        tx = "data/comparisons/counts/comparisons_meanCounts_tx.tsv.gz"
     script:
         "comparisons_quantification_averageCountsTable.R"
 
 
 rule quantification_correlation:
     input:
-        gene_avg = "res/comparisons/comparisons_meanCounts_gene.csv.gz",
-        tx_avg = "res/comparisons/comparisons_meanCounts_tx.csv.gz",
-        gene = "res/comparisons/comparisons_counts_gene.csv.gz",
-        tx = "res/comparisons/comparisons_counts_tx.csv.gz"
+        biomaRt_gene = "data/annotation/biomaRt_gene.rds",
+        biomaRt_tx = "data/annotation/biomaRt_tx.rds",
+        biotype_groups = "data/biotype_groups.csv",
+        gene = "data/comparisons/counts/comparisons_meanCounts_gene.tsv.gz",
+        tx = "data/comparisons/counts/comparisons_meanCounts_tx.tsv.gz"
     output:
         "res/comparisons/comparisons_quantification_correlation.html"
     script:
         "comparisons_quantification_correlation.Rmd"
+
+
+rule quantification_getCountsTables:
+    input:
+        ont_quant = [expand("data/quantification/teloprime/{flowcell}/teloprime_{flowcell}_{barcode}_quant.tsv",
+                         flowcell=["flowcell1", "flowcell2"], barcode=SAMPLE_INFO_ont["ont"]),
+                     expand("data/quantification/cdna/{flowcell}/cdna_{flowcell}_{barcode}_quant.tsv",
+                         flowcell=["flowcell1", "flowcell2"], barcode=SAMPLE_INFO_ont["cdna"])],
+    output:
+        "data/comparisons/counts/comparisons_counts.tsv.gz"
+    script:
+        "comparisons_quantification_countsTable.R"
+
+
+rule quantification_correlationWithinSamples:
+    input:
+        biomaRt_gene = "data/annotation/biomaRt_gene.rds",
+        biomaRt_tx = "data/annotation/biomaRt_tx.rds",
+        biotype_groups = "data/biotype_groups.csv",
+        gene = "data/comparisons/counts/comparisons_counts_gene.tsv.gz",
+        tx = "data/comparisons/counts/comparisons_counts_tx.tsv.gz"
+    output:
+        "res/comparisons/comparisons_quantification_correlation.html"
+    script:
+        "comparisons_quantification_correlationWithinSamples.Rmd"
+
+
+
+
 
 
 rule counts_pca:

@@ -36,6 +36,6 @@ log_info(sprintf("Writing %s to disk...", snakemake@output[[1]]))
 bam %>%
     as_tibble() %>%
     dplyr::rename(Name = "rname") %>%
-    saveRDS(snakemake@output[[1]])
+    readr::write_tsv(snakemake@output[[1]])
 
 log_success("Done.")

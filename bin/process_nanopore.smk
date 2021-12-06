@@ -83,7 +83,7 @@ rule samtools_merge:
         dataset = "teloprime|cdna",
         type = "genome|transcriptome"
     shell:
-        "samtools merge -o {output} -@ {threads} {input}"
+        "samtools merge -@ {threads} {output} {input}"
 
 
 rule move_rnaMerge:
@@ -95,9 +95,18 @@ rule move_rnaMerge:
         type = "genome|transcriptome"
 
 
+def get_minimapQuantifyInput(wildcards):
+    if wildcards.flowcell in ["flowcell1", "flowcell2"]:
+        file_name = "data/bam/{}/{}/{}_{}_transcriptome_{}_q7_sort.bam".format(
+            wildcards.dataset, wildcards.flowcell, wildcards.dataset, wildcards.flowcell, wildcards.barcode)
+    elif wildcards.flowcell == "merged":
+        file_name = "data/bam/{}/merged/{}_{}_transcriptome.bam".format(wildcards.dataset, wildcards.dataset, wildcards.barcode)
+    return file_name
+
+
 rule quantify_minimap:
     input:
-        "data/bam/{dataset}/{flowcell}/{dataset}_{barcode}_transcriptome.bam"
+        get_minimapQuantifyInput
     output:
         "data/quantification/{dataset}/{flowcell}/{dataset}_{flowcell}_{barcode}_quant.tsv"
     wildcard_constraints:

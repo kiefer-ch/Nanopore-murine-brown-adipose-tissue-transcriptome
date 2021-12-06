@@ -15,21 +15,19 @@ suppressPackageStartupMessages({
 #
 ################################################################################
 
-log_info("Reading transcript to gene mapping...")
-tx2g <- AnnotationDbi::loadDb(snakemake@input$"txdb")  %>%
-    AnnotationDbi::select(.,
-                          keys =  AnnotationDbi::keys(., keytype = "GENEID"),
-                          keytype = "GENEID",
-                          columns = "TXNAME") %>%
-    dplyr::select(TXNAME, GENEID)
-
-
 log_info("Reading ONT transcript quantification...")
 df_ont_tx <- snakemake@input$ont_quant %>%
     set_names(basename(.) %>%
-                  sub("_merged.+", "", .)) %>%
-    map(read_tsv, col_types = "ci") %>%
-    bind_rows(.id = "library") %>%
+                  sub("_merged", "", .) %>%
+                  sub("_quant.tsv", "", .)) %>%
+    map(read_tsv, col_types = "ci")
+
+df_ont_tx %>%
+    bind_rows(.id = "id") %>%
+    tidyr::separate("id", c("library", "barcode"))
+
+
+%>%
     group_by(library, Name) %>%
     summarise(NumReads = sum(NumReads)) %>%
     tidyr::pivot_wider(names_from = library,
