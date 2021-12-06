@@ -31,7 +31,7 @@ df_ont_tx <- snakemake@input$ont_quant %>%
     map(read_tsv, col_types = "ci") %>%
     bind_rows(.id = "library") %>%
     group_by(library, Name) %>%
-    summarise(NumReads = sum(NumReads)) %>%
+    summarise(NumReads = expm1(mean(log1p(NumReads)))) %>%
     tidyr::pivot_wider(names_from = library,
         values_from = NumReads,
         values_fill = 0L)
@@ -59,7 +59,8 @@ df_ont_gene <- df_ont_tx %>%
 log_info("Combining ONT and Illumina...")
 df_tx <- df_illuma_tx$abundance %>%
     as_tibble(rownames = "ensembl_transcript_id_version") %>%
-    mutate(illumina = rowSums(dplyr::select(., starts_with("V")))) %>%
+    mutate_at(vars(starts_with("V")), log1p) %>%
+    mutate(illumina = expm1(rowMeans(dplyr::select(., starts_with("V"))))) %>%
     dplyr::select(ensembl_transcript_id_version, illumina) %>%
     full_join(df_ont_tx, by = c("ensembl_transcript_id_version" = "Name")) %>%
     mutate_if(is.numeric, tidyr::replace_na, 0) %>%
@@ -67,7 +68,8 @@ df_tx <- df_illuma_tx$abundance %>%
 
 df_gene <- df_illuma_gene$abundance %>%
     as_tibble(rownames = "ensembl_gene_id_version") %>%
-    mutate(illumina = rowSums(dplyr::select(., starts_with("V")))) %>%
+    mutate_at(vars(starts_with("V")), log1p) %>%
+    mutate(illumina = expm1(rowMeans(dplyr::select(., starts_with("V"))))) %>%
     dplyr::select(ensembl_gene_id_version, illumina) %>%
     full_join(df_ont_gene, by = c("ensembl_gene_id_version" = "GENEID")) %>%
     mutate_if(is.numeric, tidyr::replace_na, 0) %>%

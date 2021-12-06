@@ -1,0 +1,232 @@
+---
+title: "Nanopore iBAT, expression levels by technology"
+author: "Christoph Kiefer"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+    html_document:
+        toc: true
+        toc_float: true
+        toc_depth: 2
+        fig_caption: false
+        dev: "png"
+editor_options:
+    chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
+    cache = FALSE)
+```
+
+```{r loadPackages}
+source(".Rprofile")
+suppressPackageStartupMessages({
+    library("dplyr")
+    library("readr")
+    library("purrr")
+    library("ggplot2")
+    library("ggthemes")
+    library("ggpmisc")
+    library("scales")
+    library("ggpubr")
+    library("GGally")
+})
+
+rename <- dplyr::rename
+select <- dplyr::select
+```
+
+```{r importData}
+grouped_biotypes <- read_csv(snakemake@input$biotype_groups,
+    show_col_types = FALSE)
+
+
+df_gene <- snakemake@input$gene %>% 
+    set_names(basename(dirname(.))) %>% 
+    map(read_csv, show_col_types = FALSE) %>% 
+    map(as.data.frame) %>%
+    map(tibble::column_to_rownames, "id") %>% 
+    map(rowMeans) %>% 
+    map(tibble::enframe) %>% 
+    bind_rows(.id = "dataset") %>% 
+    tidyr::pivot_wider(names_from = dataset, values_from = value, values_fill = 0) %>% 
+    rename(ensembl_gene_id_version = "name") %>% 
+    mutate_if(is.numeric, function(x) {2^x-1}) %>% 
+    left_join(read_rds(snakemake@input$biomaRt_gene),
+        by = "ensembl_gene_id_version") %>% 
+    left_join(grouped_biotypes, by = c("gene_biotype" = "transcript_biotype")) %>% 
+    mutate(grouped_biotype = factor(grouped_biotype, 
+            levels = c("coding", "processed_others", "long ncRNA",
+                "pseudogenes", "others", "small ncRNA")))
+
+df_tx <- snakemake@input$tx %>% 
+    set_names(basename(dirname(.))) %>% 
+    map(read_csv, show_col_types = FALSE) %>% 
+    map(as.data.frame) %>%
+    map(tibble::column_to_rownames, "id") %>% 
+    map(rowMeans) %>% 
+    map(tibble::enframe) %>% 
+    bind_rows(.id = "dataset") %>% 
+    tidyr::pivot_wider(names_from = dataset, values_from = value, values_fill = 0) %>% 
+    rename(ensembl_transcript_id_version = "name") %>% 
+    mutate_if(is.numeric, function(x) {2^x-1}) %>%
+    left_join(read_rds(snakemake@input$biomaRt_tx),
+        by = "ensembl_transcript_id_version") %>% 
+        left_join(grouped_biotypes, by = "transcript_biotype") %>% 
+    mutate(grouped_biotype = factor(grouped_biotype, 
+            levels = c("coding", "processed_others", "long ncRNA",
+                "pseudogenes", "others", "small ncRNA")))
+```
+
+
+# Setup
+
+Normalised by deseq. Primary reads only.
+
+# Average expression over all datasets
+
+## Genes
+```{r, fig.width = 6.85, fig.asp = .65, dpi = 300}
+df_axis <- tibble(x = rep(c("cdna", "illumina", "rna"), c(3, 2, 1)),
+    y = c("illumina", "rna", "teloprime", "rna", "teloprime", "teloprime"))
+
+pl_list <- vector("list", nrow(df_axis))
+
+for (i in 1:nrow(df_axis)) {
+    x <- df_axis$x[i]
+    y <- df_axis$y[i]
+    
+    if (x == "illumina") {
+        x_lab <- "illumina [TPM]"
+    } else {
+        x_lab <- sprintf("%s [counts]", x)
+    }
+    
+    if (y == "illumina") {
+        y_lab <- "illumina [TPM]"
+    } else {
+        y_lab <- sprintf("%s [counts]", y)
+    }
+    
+    x <- sym(x)
+    y <- sym(y)
+    
+    pl_list[[i]] <- df_gene %>% 
+        ggplot(aes(x = !! x, y = !! y)) +
+        geom_point(aes(colour = grouped_biotype),
+            size = .5,
+            alpha = .25) +
+        geom_abline(slope = 1, lty = 2, lwd = .25) +
+        stat_poly_eq(formula = y ~ x,
+            aes(label = paste(..rr.label.., sep = "~~~")),
+            parse = TRUE, family = "Helvetica", size = 3, colour = "grey30",
+            label.x.npc = "left", label.y.npc = "top") +
+        scale_x_continuous(
+            breaks = 10^seq(0:5),
+            labels = trans_format("log10", math_format(10^.x)),
+            trans = "log1p") +
+        scale_y_continuous(
+            breaks = 10^seq(0:5),
+            labels = trans_format("log10", math_format(10^.x)),
+            trans = "log1p") +
+        scale_colour_brewer(palette = "Dark2", name = NULL, drop = FALSE) +
+        theme_tufte(base_size = 8, base_family = "Helvetica") +
+        geom_rangeframe(sides = 'bl', na.rm = FALSE) +
+        xlab(x_lab) +
+        ylab(y_lab) +
+        theme(legend.key.size = unit(.33, "cm"))
+}
+
+
+pl_gene <- ggmatrix(pl_list, ncol = 3, nrow = 3,
+    xAxisLabels = c("cDNA [counts]", "illumina [TPM]", "rna [counts]"),
+    yAxisLabels = c("illumina [TPM]", "rna [counts]", "teloprime [counts]"),
+    legend = NULL)
+pl_gene[1, 2] <- NULL
+pl_gene[1, 3] <- NULL
+pl_gene[2, 3] <- NULL
+pl_gene[2, 1] <- pl_list[[2]]
+pl_gene[3, 1] <- pl_list[[3]]
+pl_gene[2, 2] <- pl_list[[4]]
+pl_gene[3, 2] <- pl_list[[5]]
+pl_gene[3, 3] <- pl_list[[6]]
+pl_gene
+```
+
+## Transcripts
+
+```{r, fig.width = 6.85, fig.asp = .65, dpi = 300}
+pl_list <- vector("list", nrow(df_axis))
+
+for (i in 1:nrow(df_axis)) {
+    x <- df_axis$x[i]
+    y <- df_axis$y[i]
+
+    if (x == "illumina") {
+        x_lab <- "illumina [TPM]"
+    } else {
+        x_lab <- sprintf("%s [counts]", x)
+    }
+
+    if (y == "illumina") {
+        y_lab <- "illumina [TPM]"
+    } else {
+        y_lab <- sprintf("%s [counts]", y)
+    }
+
+    x <- sym(x)
+    y <- sym(y)
+
+    pl_list[[i]] <- df_tx %>%
+        tidyr::drop_na() %>%
+        ggplot(aes(x = !! x, y = !! y)) +
+        geom_point(aes(colour = grouped_biotype),
+            size = .5,
+            alpha = .25) +
+        geom_abline(slope = 1, lty = 2, lwd = .25) +
+        stat_poly_eq(formula = y ~ x,
+            aes(label = paste(..rr.label.., sep = "~~~")),
+            parse = TRUE, family = "Helvetica", size = 3, colour = "grey30",
+            label.x.npc = "left", label.y.npc = "top") +
+        scale_x_continuous(
+            breaks = 10^seq(0:5),
+            labels = trans_format("log10", math_format(10^.x)),
+            trans = "log1p") +
+        scale_y_continuous(
+            breaks = 10^seq(0:5),
+            labels = trans_format("log10", math_format(10^.x)),
+            trans = "log1p") +
+        scale_colour_brewer(palette = "Dark2", name = NULL) +
+        theme_tufte(base_size = 8, base_family = "Helvetica") +
+        geom_rangeframe(sides = 'bl', na.rm = FALSE) +
+        xlab(x_lab) +
+        ylab(y_lab) +
+        theme(legend.key.size = unit(.33, "cm"))
+}
+
+pl_tx <- ggmatrix(pl_list, ncol = 3, nrow = 3,
+    xAxisLabels = c("cDNA [counts]", "illumina [TPM]", "rna [counts]"),
+    yAxisLabels = c("illumina [TPM]", "rna [counts]", "teloprime [counts]"),
+    legend = NULL)
+pl_tx[1, 2] <- NULL
+pl_tx[1, 3] <- NULL
+pl_tx[2, 3] <- NULL
+pl_tx[2, 1] <- pl_list[[2]]
+pl_tx[3, 1] <- pl_list[[3]]
+pl_tx[2, 2] <- pl_list[[4]]
+pl_tx[3, 2] <- pl_list[[5]]
+pl_tx[3, 3] <- pl_list[[6]]
+pl_tx
+```
+
+## Legend
+
+```{r, dev = "svg", fig.width = 6.85, fig.asp = .65, dpi = 600}
+legend <- pl_list[[1]] +
+    guides(colour = guide_legend(nrow = 1)) +
+    theme(legend.position = "top",
+        legend.margin = margin(t = 0, r = 0, b = -.5, l = 0, unit = "cm"))
+
+get_legend(legend) %>% 
+    as_ggplot()
+```

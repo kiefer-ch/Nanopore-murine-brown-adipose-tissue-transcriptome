@@ -89,14 +89,14 @@ rule readLengths_bam_collapseTranscripts:
     wildcard_constraints:
         type = "genome|transcriptome"
     output:
-        "res/comparisons/mapping/collapsed/bam_countReads_collapsed_{type}.rds"
+        "data/comparisons/mapping/collapsed/bam_countReads_collapsed_{type}.rds"
     script:
         "comparisons_read_lengths_bam_collapseTranscripts.R"
 
 
 rule readLengths_bam_report_transcriptome:
     input:
-        collapsed_transcripts = "res/comparisons/mapping/collapsed/bam_countReads_collapsed_transcriptome.rds",
+        collapsed_transcripts = "data/comparisons/mapping/collapsed/bam_countReads_collapsed_transcriptome.rds",
         biomaRt_tx = "data/annotation/biomaRt_tx.rds",
         sample_info = config["SAMPLE_INFO"]
     output:
@@ -107,7 +107,7 @@ rule readLengths_bam_report_transcriptome:
 
 rule readLengths_bam_report_genome:
     input:
-        collapsed_transcripts = "res/comparisons/mapping/collapsed/bam_countReads_collapsed_genome.rds",
+        collapsed_transcripts = "data/comparisons/mapping/collapsed/bam_countReads_collapsed_genome.rds",
         sample_info = config["SAMPLE_INFO"]
     output:
         "res/comparisons/comparisons_readLengths_bam_genome.html"
@@ -216,7 +216,20 @@ rule quantification_correlationWithinSamples:
         "comparisons_quantification_correlationWithinSamples.Rmd"
 
 
-# unnormalised quantification correlation
+# normalised quantification correlation
+rule quantification_correlation_normalised:
+    input:
+        biomaRt_gene = "data/annotation/biomaRt_gene.rds",
+        biomaRt_tx = "data/annotation/biomaRt_tx.rds",
+        biotype_groups = "data/biotype_groups.csv",
+        gene =  expand("data/deseq/{dataset}/{dataset}_gene_cm_ntd.csv.gz", dataset=["illumina", "cdna", "rna", "teloprime"]),
+        tx = expand("data/deseq/{dataset}/{dataset}_transcript_cm_ntd.csv.gz", dataset=["illumina", "cdna", "rna", "teloprime"])
+    output:
+        "res/comparisons/comparisons_quantification_correlation_normalised.html"
+    script:
+        "comparisons_quantification_correlation_normalised.Rmd"
+
+
 
 
 

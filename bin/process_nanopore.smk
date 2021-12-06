@@ -114,3 +114,29 @@ rule quantify_minimap:
         type = "genome|transcriptome"
     script:
         "quantify_minimap.R"
+
+
+def get_deseqONTinput(wildcards):
+    if wildcards.dataset == "teloprime":
+        files = expand("data/quantification/teloprime/merged/teloprime_merged_{barcode}_quant.tsv", barcode=SAMPLE_INFO_ont["ont"])
+    elif wildcards.dataset == "cdna":
+        files = expand("data/quantification/cdna/merged/cdna_merged_{barcode}_quant.tsv", barcode=SAMPLE_INFO_ont["cdna"])
+    elif wildcards.dataset == "rna":
+        files = expand("data/quantification/rna/merged/rna_merged_{barcode}_quant.tsv", barcode=["cool", "rt"])
+    return files
+
+
+rule make_deseqDataSet_ONT:
+    input:
+        counts = get_deseqONTinput,
+        txdb = "data/annotation/annotation_txdb.sqlite",
+        sample_info = config["SAMPLE_INFO"]
+    params:
+        type = "{type}"
+    wildcard_constraints:
+        type = "gene|transcript",
+        dataset = "cdna|rna|teloprime"
+    output:
+        "data/deseq/{dataset}/{dataset}_dds_{type}.rds"
+    script:
+        "deseq_importONT.R"

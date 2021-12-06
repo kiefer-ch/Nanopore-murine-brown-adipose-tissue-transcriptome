@@ -1,94 +1,36 @@
-rule import_deseq_teloprime_gene:
+rule deseq_exportCmONT:
     input:
-        counts = "res/wien/teloprime/DE/ONT_newbasecalling/6samples_counts.tsv",
-        sample_info = "sample_info/sampleInfo.csv"
+        dds = "data/deseq/{dataset}/{dataset}_dds_{type}.rds"
     params:
-        txOut = 0,
-        design = "~condition_temp"
+        type = "{type}"
+    wildcard_constraints:
+        level = "gene|transcript",
+        dataset = "rna|cdna|teloprime"
     output:
-        dds = "res/deseq/teloprime/genelevel/teloprime_genelevel_dds.rds"
+        cts = "data/deseq/{dataset}/{dataset}_{type}_cm_cts.csv.gz",
+        ntd = "data/deseq/{dataset}/{dataset}_{type}_cm_ntd.csv.gz"
     script:
-        "deseq_teloprime.R"
+        "deseq_exportCm.R"
 
 
-rule import_deseq_teloprime_transcript:
+rule deseq_exportCmIllumina:
     input:
-        counts = "res/wien/teloprime/DE/ONT_newbasecalling/6samples_counts.tsv",
-        sample_info = "sample_info/sampleInfo.csv"
+        dds = "data/deseq/{dataset}/{dataset}_dds_{type}.rds"
     params:
-        txOut = 1,
-        design = "~condition_temp"
+        type = "{type}"
+    wildcard_constraints:
+        level = "gene|transcript",
+        dataset = "illumina"
     output:
-        dds = "res/deseq/teloprime/txlevel/teloprime_txlevel_dds.rds"
+        cts = "data/deseq/{dataset}/{dataset}_{type}_cm_cts.csv.gz",
+        ntd = "data/deseq/{dataset}/{dataset}_{type}_cm_ntd.csv.gz",
+        tpm = "data/deseq/{dataset}/{dataset}_{type}_cm_tpm.csv.gz"
     script:
-        "deseq_teloprime.R"
+        "deseq_exportCm.R"
 
 
-rule import_deseq_cdna_gene:
-    input:
-        counts = expand("res/wien/direct_cDNA/pool{pool}/20200108_pool{pool}_transcriptome_barcode{barcode}_q7_counts.tsv.gz",
-            barcode=["07","08","09","10","11","12"], pool=[1,2]),
-        sample_info = "sample_info/sampleInfo.csv"
-    params:
-        txOut = 0,
-        design = "~condition_temp"
-    output:
-        dds = "res/deseq/cdna/genelevel/cdna_genelevel_dds.rds"
-    script:
-        "deseq_cDNA.R"
 
-
-rule import_deseq_cdna_tx:
-    input:
-        counts = expand("res/wien/direct_cDNA/pool{pool}/20200108_pool{pool}_transcriptome_barcode{barcode}_q7_counts.tsv.gz",
-            barcode=["07","08","09","10","11","12"], pool=[1,2]),
-        sample_info = "sample_info/sampleInfo.csv"
-    params:
-        txOut = 1,
-        design = "~condition_temp"
-    output:
-        dds = "res/deseq/cdna/txlevel/cdna_txlevel_dds.rds"
-    script:
-        "deseq_cDNA.R"
-
-
-rule import_deseq_rna_gene:
-    input:
-        counts = expand("res/wien/direct_RNA/ChrKiefer_20200306/counts_per_transcript/transcriptome_{temp}_q7_counts.tsv.gz",
-            temp=["cool", "rt"])
-    params:
-        txOut = 0,
-        design = "~condition_temp"
-    output:
-        dds = "res/deseq/rna/genelevel/rna_genelevel_dds.rds"
-    script:
-        "deseq_rna.R"
-
-
-rule import_deseq_rna_tx:
-    input:
-        counts = expand("res/wien/direct_RNA/ChrKiefer_20200306/counts_per_transcript/transcriptome_{temp}_q7_counts.tsv.gz",
-            temp=["cool", "rt"])
-    params:
-        txOut = 1,
-        design = "~condition_temp"
-    output:
-        dds = "res/deseq/rna/txlevel/rna_txlevel_dds.rds"
-    script:
-        "deseq_rna.R"
-
-
-# qc
-rule deseq_qc:
-    input:
-        dds = "{method}_dds.rds"
-    output:
-        "{method}_qc.html"
-    script:
-        "deseq_qc.Rmd"
-
-
-# cm export
+# DGE
 def get_biomart(wildcards):
     if wildcards.level == "genelevel":
         return "annotation/biomaRt_gene.rds"
@@ -96,65 +38,6 @@ def get_biomart(wildcards):
         return "annotation/biomaRt_tx.rds"
 
 
-rule deseq_exportCm_illumina:
-    input:
-        dds = "{file_path}/illumina_{level}_dds.rds",
-        biomart = get_biomart
-    params:
-        tpm = 1,
-        level = "{level}",
-        vst = 0,
-        repl = 1
-    output:
-        cts = "{file_path}/illumina_{level}_cm_cts.csv.gz",
-        ntd = "{file_path}/illumina_{level}_cm_ntd.csv.gz",
-        rld = "{file_path}/illumina_{level}_cm_rld.csv.gz",
-        tpm = "{file_path}/illumina_{level}_cm_tpm.csv.gz"
-    wildcard_constraints:
-        level = "genelevel|txlevel",
-    script:
-        "deseq_exportCm.R"
-
-
-rule deseq_exportCm_ont:
-    input:
-        dds = "{file_path}/{dataset}_{level}_dds.rds",
-        biomart = get_biomart
-    params:
-        tpm = 0,
-        level = "{level}",
-        vst = 0,
-        repl = 1
-    wildcard_constraints:
-        dataset = "teloprime|cdna",
-        level = "genelevel|txlevel",
-        repl = 1
-    output:
-        cts = "{file_path}/{dataset}_{level}_cm_cts.csv.gz",
-        ntd = "{file_path}/{dataset}_{level}_cm_ntd.csv.gz",
-        rld = "{file_path}/{dataset}_{level}_cm_rld.csv.gz"
-    script:
-        "deseq_exportCm.R"
-
-rule deseq_exportCm_rna:
-    input:
-        dds = "{file_path}/{dataset}_{level}_dds.rds",
-        biomart = get_biomart
-    params:
-        tpm = 0,
-        level = "{level}",
-        vst = 0,
-        repl = 0
-    wildcard_constraints:
-        dataset = "rna",
-        level = "genelevel|txlevel"
-    output:
-        cts = "{file_path}/{dataset}_{level}_cm_cts.csv.gz",
-        ntd = "{file_path}/{dataset}_{level}_cm_ntd.csv.gz"
-    script:
-        "deseq_exportCm.R"
-
-# DGE
 def get_threshold(wildcards):
     if wildcards.shrink == "apeglm":
         return 1

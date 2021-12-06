@@ -32,7 +32,7 @@ sample_info <- read_csv(snakemake@input[["sample_info"]],
         show_col_types = FALSE) %>%
     mutate_at(vars(matches("condition")), as.factor) %>%
     filter(!is.na(ont)) %>%
-    select(sample_id, condition_temp, illumina) %>%
+    dplyr::select(sample_id, condition_temp, illumina) %>%
     left_join(files, "illumina")
 
 

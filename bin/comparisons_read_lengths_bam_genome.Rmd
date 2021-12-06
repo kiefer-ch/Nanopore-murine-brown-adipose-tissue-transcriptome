@@ -167,8 +167,8 @@ df_supp <- df_tx %>%
     mutate(supplementary_type = case_when(
         !same_reference                 ~ "diff_chrom",
         same_strand & overlapping       ~ "overlapping_sense",
-        same_strand & !overlapping      ~ "overlapping_anti-sense",
-        !same_strand & overlapping      ~ "non-overlapping_sense",
+        same_strand & !overlapping      ~ "non-overlapping_sense",
+        !same_strand & overlapping      ~ "overlapping_anti-sense",
         !same_strand & !overlapping     ~ "non-overlapping_anti-sense")) %>% 
     as_tibble()
 ```
