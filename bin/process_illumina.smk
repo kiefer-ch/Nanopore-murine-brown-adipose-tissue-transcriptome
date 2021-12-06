@@ -163,3 +163,23 @@ rule salmon_align:
             -p {threads} \
             --validateMappings \
             -o {params.outputDir}"
+
+
+rule sam_to_sortBam:
+    input:
+        "{file}.sam"
+    output:
+        "{file}_sort.bam"
+    threads:
+        5
+    shell:
+        "samtools sort -l 5 -o {output} -O bam -@ {threads} {input}"
+
+
+rule samtools_index:
+    input:
+        "{file}.bam"
+    output:
+        "{file}.bam.bai"
+    shell:
+        "samtools index {input}"

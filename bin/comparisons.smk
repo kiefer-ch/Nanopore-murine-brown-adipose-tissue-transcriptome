@@ -1,3 +1,172 @@
+# fastq read characterisation
+def get_fastqnames(wildcards):
+    files = list()
+    if wildcards.dataset == "teloprime":
+        for barcode in SAMPLE_INFO_ont["ont"]:
+            for flowcell in ["X1_flowcell", "X3_flowcell"]:
+                filename = "fastq/{}/{}/{}_q7.fastq.gz".format(
+                    wildcards.dataset, flowcell, barcode)
+                files.append(filename)
+    elif wildcards.dataset == "cdna":
+        for barcode in SAMPLE_INFO_ont["cdna"]:
+            for pool in ["pool1", "pool2"]:
+                filename = "fastq/{}/{}/{}_q7.fastq.gz".format(
+                    wildcards.dataset, pool, barcode)
+                files.append(filename)
+    elif wildcards.dataset == "rna":
+        for temperature in ["rt", "cool"]:
+            filename = "fastq/{}/{}_q7.fastq.gz".format(
+                wildcards.dataset, temperature)
+            files.append(filename)
+    return files
+
+
+rule readLength_fastq_histogram:
+    input:
+        get_fastqnames
+    output:
+        "data/comparisons/fastq/readLengthDistribution/{dataset}_fastqReadLengths.csv"
+    script:
+        "comparisons_fastq_readLengthHistogram.py"
+
+
+rule readQuality_fastq_histogram:
+    input:
+        get_fastqnames
+    output:
+        "data/comparisons/fastq/readQualityDistribution/{dataset}_fastqQualities.csv"
+    script:
+        "comparisons_fastq_readLengthHistogram.py"
+
+
+rule readLengths_fastq:
+    input:
+        readLengths = expand("data/comparisons/fastq/readLengthDistribution/{dataset}_fastqReadLengths.csv",
+                             dataset=["teloprime", "cdna", "rna"]),
+        readQualities = expand("data/comparisons/fastq/readQualityDistribution/{dataset}_fastqQualities.csv",
+                             dataset=["teloprime", "cdna", "rna"]),
+        sample_info = config["SAMPLE_INFO"]
+    output:
+        "res/comparisons/comparisons_readLengths_fastq.html"
+    script:
+        "comparisons_read_lengths_fastq.Rmd"
+
+
+# Mapping characterisation
+def get_input_bam_AlignedLength(wildcards):
+    if wildcards.dataset == "teloprime":
+        file_name = "data/bam/teloprime/{}/{}_{}.bam".format(
+            wildcards.type, wildcards.file, wildcards.type)
+    elif wildcards.dataset == "cdna":
+        file_name = "data/bam/cdna/{}/{}_{}.bam".format(
+            wildcards.type, wildcards.file, wildcards.type)
+    elif wildcards.dataset == "rna":
+        file_name = "data/bam/rna/{}/{}_{}_q7_sort.bam".format(
+            wildcards.type, wildcards.type, wildcards.file)
+    return [file_name, file_name + ".bai"]
+
+
+rule readLengths_bam:
+    input:
+        get_input_bam_AlignedLength
+    wildcard_constraints:
+        type = "genome|transcriptome",
+        dataset = "teloprime|cdna|rna"
+    output:
+        "res/comparisons/mapping/{dataset}/{type}/{dataset}_{type}_{file}_bam_countReads.rds"
+    script:
+        "comparisons_read_lengths_bam.R"
+
+
+rule readLengths_bam_collapseTranscripts:
+    input:
+        expand("res/comparisons/mapping/teloprime/{{type}}/teloprime_{{type}}_{barcode}_bam_countReads.rds",
+            barcode=SAMPLE_INFO_ont["ont"]),
+        expand("res/comparisons/mapping/cdna/{{type}}/cdna_{{type}}_{barcode}_bam_countReads.rds",
+            barcode=SAMPLE_INFO_ont["cdna"]),
+        expand("res/comparisons/mapping/rna/{{type}}/rna_{{type}}_{barcode}_bam_countReads.rds",
+            barcode=["rt", "cool"])
+    wildcard_constraints:
+        type = "genome|transcriptome"
+    output:
+        "res/comparisons/mapping/collapsed/bam_countReads_collapsed_{type}.rds"
+    script:
+        "comparisons_read_lengths_bam_collapseTranscripts.R"
+
+
+rule readLengths_bam_report_transcriptome:
+    input:
+        collapsed_transcripts = "res/comparisons/mapping/collapsed/bam_countReads_collapsed_transcriptome.rds",
+        biomaRt_tx = "data/annotation/biomaRt_tx.rds",
+        sample_info = config["SAMPLE_INFO"]
+    output:
+        "res/comparisons/comparisons_readLengths_bam_transcriptome.html"
+    script:
+        "comparisons_read_lengths_bam_transcriptome.Rmd"
+
+
+rule readLengths_bam_report_genome:
+    input:
+        collapsed_transcripts = "res/comparisons/mapping/collapsed/bam_countReads_collapsed_genome.rds",
+        sample_info = config["SAMPLE_INFO"]
+    output:
+        "res/comparisons/comparisons_readLengths_bam_genome.html"
+    script:
+        "comparisons_read_lengths_bam_genome.Rmd"
+
+
+# Coverage
+def get_input_bam_coverage(wildcards):
+    if wildcards.dataset in ["teloprime", "cdna"]:
+        file_name = "data/bam/{}/{}_transcriptome.bam".format(
+            wildcards.dataset, wildcards.barcode)
+    elif wildcards.dataset == "rna":
+        file_name = "data/bam/rna/transcriptome_{}_q7_sort.bam".format(wildcards.barcode)
+    return [file_name, file_name + ".bai"]
+
+
+rule coverage_getCoverage:
+    input:
+        get_input_bam_coverage
+    wildcard_constraints:
+        dataset = "teloprime|cdna|rna"
+    output:
+        "data/comparisons/coverage/{dataset}/{dataset}_{barcode}_coverage.rds"
+    script:
+        "comparisons_coverage_getCoverage.R"
+
+
+rule coverage_collapse:
+    input:
+        coverage = [expand("data/comparisons/coverage/teloprime/teloprime_{barcode}_coverage.rds", barcode=SAMPLE_INFO_ont["ont"]),
+                    expand("data/comparisons/coverage/cdna/cdna_{barcode}_coverage.rds", barcode=SAMPLE_INFO_ont["cdna"]),
+                    expand("data/comparisons/coverage/rna/rna_{barcode}_coverage.rds", barcode=["rt", "cool"])],
+        biomaRt_tx = "data/annotation/biomaRt_tx.rds"
+    output:
+        "data/comparisons/coverage/collapsed_coverage.rds"
+    script:
+        "comparisons_coverage_collapseCoverage.R"
+
+
+rule coverage_report:
+    input:
+        geneBodyCoverage_teloprime = expand("data/comparisons/geneBody_coverage/teloprime/{barcode}.geneBodyCoverage.txt",
+            barcode=SAMPLE_INFO_ont["ont"]),
+        geneBodyCoverage_cdna = expand("data/comparisons/geneBody_coverage/cdna/{barcode}.geneBodyCoverage.txt",
+            barcode=SAMPLE_INFO_ont["cdna"]),
+        geneBodyCoverage_illumina = expand("data/comparisons/geneBody_coverage/illumina/{sample}.geneBodyCoverage.txt",
+            sample=SAMPLES_ont),
+        geneBodyCoverage_rna = expand("data/comparisons/geneBody_coverage/rna/{barcode}.geneBodyCoverage.txt",
+            barcode=["rt", "cool"]),
+        collapsed_coverage = "data/comparisons/coverage/collapsed_coverage.rds",
+        tpm = "res/deseq/illumina/txlevel/illumina_txlevel_cm_tpm.csv.gz",
+        sample_info = config["SAMPLE_INFO"]
+    output:
+        "res/comparisons/comparisons_coverage.html"
+    script:
+        "comparisons_coverage.Rmd"
+
+
 # comparisons
 rule quantification_averageCounts_tables:
     input:
@@ -62,170 +231,10 @@ rule feature_detection:
         "comparisons_featureDetection.Rmd"
 
 
-def get_input_bam_coverage(wildcards):
-    if wildcards.dataset in ["teloprime", "cdna"]:
-        file_name = "data/bam/{}/{}_transcriptome.bam".format(
-            wildcards.dataset, wildcards.barcode)
-    elif wildcards.dataset == "rna":
-        file_name = "data/bam/rna/transcriptome_{}_q7_sort.bam".format(wildcards.barcode)
-    return [file_name, file_name + ".bai"]
 
 
-rule coverage_getCoverage:
-    input:
-        get_input_bam_coverage
-    wildcard_constraints:
-        dataset = "teloprime|cdna|rna"
-    output:
-        "data/comparisons/coverage/{dataset}/{dataset}_{barcode}_coverage.rds"
-    script:
-        "comparisons_coverage_getCoverage.R"
 
 
-rule coverage_collapse:
-    input:
-        coverage = [expand("data/comparisons/coverage/teloprime/teloprime_{barcode}_coverage.rds", barcode=SAMPLE_INFO_ont["ont"]),
-                    expand("data/comparisons/coverage/cdna/cdna_{barcode}_coverage.rds", barcode=SAMPLE_INFO_ont["cdna"]),
-                    expand("data/comparisons/coverage/rna/rna_{barcode}_coverage.rds", barcode=["rt", "cool"])],
-        biomaRt_tx = "data/annotation/biomaRt_tx.rds"
-    output:
-        "data/comparisons/coverage/collapsed_coverage.rds"
-    script:
-        "comparisons_coverage_collapseCoverage.R"
-
-
-rule coverage_report:
-    input:
-        geneBodyCoverage_teloprime = expand("data/comparisons/geneBody_coverage/teloprime/{barcode}.geneBodyCoverage.txt",
-            barcode=SAMPLE_INFO_ont["ont"]),
-        geneBodyCoverage_cdna = expand("data/comparisons/geneBody_coverage/cdna/{barcode}.geneBodyCoverage.txt",
-            barcode=SAMPLE_INFO_ont["cdna"]),
-        geneBodyCoverage_illumina = expand("data/comparisons/geneBody_coverage/illumina/{sample}.geneBodyCoverage.txt",
-            sample=SAMPLES_ont),
-        geneBodyCoverage_rna = expand("data/comparisons/geneBody_coverage/rna/{barcode}.geneBodyCoverage.txt",
-            barcode=["rt", "cool"]),
-        collapsed_coverage = "data/comparisons/coverage/collapsed_coverage.rds",
-        tpm = "res/deseq/illumina/txlevel/illumina_txlevel_cm_tpm.csv.gz",
-        sample_info = config["SAMPLE_INFO"]
-    output:
-        "res/comparisons/comparisons_coverage.html"
-    script:
-        "comparisons_coverage.Rmd"
-
-
-def get_fastqnames(wildcards):
-    files = list()
-    if wildcards.dataset == "teloprime":
-        for barcode in SAMPLE_INFO_ont["ont"]:
-            for flowcell in ["X1_flowcell", "X3_flowcell"]:
-                filename = "fastq/{}/{}/{}_q7.fastq.gz".format(
-                    wildcards.dataset, flowcell, barcode)
-                files.append(filename)
-    elif wildcards.dataset == "cdna":
-        for barcode in SAMPLE_INFO_ont["cdna"]:
-            for pool in ["pool1", "pool2"]:
-                filename = "fastq/{}/{}/{}_q7.fastq.gz".format(
-                    wildcards.dataset, pool, barcode)
-                files.append(filename)
-    elif wildcards.dataset == "rna":
-        for temperature in ["rt", "cool"]:
-            filename = "fastq/{}/{}_q7.fastq.gz".format(
-                wildcards.dataset, temperature)
-            files.append(filename)
-    return files
-
-
-rule readLength_fastq_histogram:
-    input:
-        get_fastqnames
-    output:
-        "data/comparisons/fastq/readLengthDistribution/{dataset}_fastqReadLengths.csv"
-    script:
-        "comparisons_fastq_readLengthHistogram.py"
-
-
-rule readQuality_fastq_histogram:
-    input:
-        get_fastqnames
-    output:
-        "data/comparisons/fastq/readQualityDistribution/{dataset}_fastqQualities.csv"
-    script:
-        "comparisons_fastq_readLengthHistogram.py"
-
-
-rule readLengths_fastq:
-    input:
-        readLengths = expand("data/comparisons/fastq/readLengthDistribution/{dataset}_fastqReadLengths.csv",
-                             dataset=["teloprime", "cdna", "rna"]),
-        readQualities = expand("data/comparisons/fastq/readQualityDistribution/{dataset}_fastqQualities.csv",
-                             dataset=["teloprime", "cdna", "rna"]),
-        sample_info = config["SAMPLE_INFO"]
-    output:
-        "res/comparisons/comparisons_readLengths_fastq.html"
-    script:
-        "comparisons_read_lengths_fastq.Rmd"
-
-
-def get_input_bam_AlignedLength(wildcards):
-    if wildcards.dataset == "teloprime":
-        file_name = "data/bam/teloprime/{}/{}_{}.bam".format(
-            wildcards.type, wildcards.file, wildcards.type)
-    elif wildcards.dataset == "cdna":
-        file_name = "data/bam/cdna/{}/{}_{}.bam".format(
-            wildcards.type, wildcards.file, wildcards.type)
-    elif wildcards.dataset == "rna":
-        file_name = "data/bam/rna/{}/{}_{}_q7_sort.bam".format(
-            wildcards.type, wildcards.type, wildcards.file)
-    return [file_name, file_name + ".bai"]
-
-
-rule readLengths_bam:
-    input:
-        get_input_bam_AlignedLength
-    wildcard_constraints:
-        type = "genome|transcriptome",
-        dataset = "teloprime|cdna|rna"
-    output:
-        "res/comparisons/countReads/{dataset}/{type}/{dataset}_{type}_{file}_bam_countReads.rds"
-    script:
-        "comparisons_read_lengths_bam.R"
-
-
-rule readLengths_bam_collapseTranscripts:
-    input:
-        expand("res/comparisons/countReads/teloprime/{{type}}/teloprime_{{type}}_{barcode}_bam_countReads.rds",
-            barcode=SAMPLE_INFO_ont["ont"]),
-        expand("res/comparisons/countReads/cdna/{{type}}/cdna_{{type}}_{barcode}_bam_countReads.rds",
-            barcode=SAMPLE_INFO_ont["cdna"]),
-        expand("res/comparisons/countReads/rna/{{type}}/rna_{{type}}_{barcode}_bam_countReads.rds",
-            barcode=["rt", "cool"])
-    wildcard_constraints:
-        type = "genome|transcriptome"
-    output:
-        "res/comparisons/countReads/collapsed/bam_countReads_collapsed_{type}.rds"
-    script:
-        "comparisons_read_lengths_bam_collapseTranscripts.R"
-
-
-rule readLengths_bam_report_transcriptome:
-    input:
-        collapsed_transcripts = "res/comparisons/countReads/collapsed/bam_countReads_collapsed_transcriptome.rds",
-        biomaRt_tx = "data/annotation/biomaRt_tx.rds",
-        sample_info = config["SAMPLE_INFO"]
-    output:
-        "res/comparisons/comparisons_readLengths_bam_transcriptome.html"
-    script:
-        "comparisons_read_lengths_bam_transcriptome.Rmd"
-
-
-rule readLengths_bam_report_genome:
-    input:
-        collapsed_transcripts = "res/comparisons/countReads/collapsed/bam_countReads_collapsed_genome.rds",
-        sample_info = config["SAMPLE_INFO"]
-    output:
-        "res/comparisons/comparisons_readLengths_bam_genome.html"
-    script:
-        "comparisons_read_lengths_bam_genome.Rmd"
 
 
 rule compare_dge:

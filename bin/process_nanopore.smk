@@ -22,51 +22,86 @@ def get_minimapInput(wildcards):
 
 def get_minimapGenomeOutput(wildcards):
     if wildcards.dataset in ["teloprime", "cdna"]:
-        file_name = "data/bam/{}/genome/{}/{}_genome.bam".format(
-            wildcards.dataset, wildcards.flowcell, wildcards.barcode)
+        file_name = "data/bam/{}/{}/{}_{}_genome_{}_q7.sam".format(
+            wildcards.dataset, wildcards.flowcell, wildcards.dataset, wildcards.flowcell, wildcards.barcode)
     elif wildcards.dataset == "rna":
-        file_name = "data/bam/rna/genome/{}_genome.bam".format(wildcards.barcode)
+        file_name = "data/bam/rna/rna_genome_{}_q7.sam".format(wildcards.barcode)
     return file_name
 
 
 def get_minimapTranscriptomeOutput(wildcards):
     if wildcards.dataset in ["teloprime", "cdna"]:
-        file_name = "data/bam/{}/transcriptome/{}/{}_genomtranscriptome.bam".format(
-            wildcards.dataset, wildcards.flowcell, wildcards.barcode)
+        file_name = "data/bam/{}/{}/{}_{}_transcriptome_{}_q7.sam".format(
+            wildcards.dataset, wildcards.flowcell, wildcards.dataset, wildcards.flowcell, wildcards.barcode)
     elif wildcards.dataset == "rna":
-        file_name = "data/bam/rna/transcriptome/{}_transcriptome.bam".format(wildcards.barcode)
+        file_name = "data/bam/rna/rna_transcriptome_{}_q7.sam".format(wildcards.barcode)
     return file_name
 
 
-rule minimap_mapGenome:
-    input:
-        index = "indices/minimap2/genome_minimap2.mmi",
-        fastq = get_minimapInput
-    output:
-        sam = get_minimapGenomeOutput
-    threads: 24
-    shell:
-        "minimap2 \
-            -ax splice \
-            -t {threads} \
-            --secondary=no \
-            -uf \
-            {input.index} \
-            {input.fastq} > {output.sam}"
+#rule minimap_mapGenome:
+#    input:
+#        index = "indices/minimap2/genome_minimap2.mmi",
+#        fastq = get_minimapInput
+#    output:
+#        sam = Only input files can be specified as functions
+#    threads: 24
+#    shell:
+#        "minimap2 \
+#            -ax splice \
+#            -t {threads} \
+#            --secondary=no \
+#            -uf \
+#            {input.index} \
+#            {input.fastq} > {output.sam}"
 
 
-rule minimap_mapTranscriptome:
+#rule minimap_mapTranscriptome:
+#    input:
+#        index = "indices/minimap2/transcriptome_minimap2.mmi",
+#        fastq = get_minimapInput
+#    output:
+#        sam = get_minimapTranscriptomeOutput
+#    threads: 24
+#    shell:
+#        "minimap2 \
+#            -ax map-ont \
+#            -t {threads} \
+#            --secondary=no \
+#            -uf \
+#            {input.index} \
+#            {input.fastq} > {output.sam}"
+
+
+rule samtools_merge:
     input:
-        index = "indices/minimap2/transcriptome_minimap2.mmi"
-        fastq = get_minimapInput
+        "data/bam/{dataset}/flowcell1/{dataset}_flowcell1_transcriptome_{barcode}_q7_sort.bam",
+        "data/bam/{dataset}/flowcell1/{dataset}_flowcell1_transcriptome_{barcode}_q7_sort.bam"
     output:
-        sam = get_minimapTranscriptomeOutput
-    threads: 24
+        "data/bam/{dataset}/merged/{dataset}_{barcode}_{type}.bam"
+    threads: 4
+    wildcard_constraints:
+        dataset = "teloprime|cdna",
+        type = "genome|transcriptome"
     shell:
-        "minimap2 \
-            -ax map-ont \
-            -t {threads} \
-            --secondary=no \
-            -uf \
-            {input.index} \
-            {input.fastq} > {output.sam}"
+        "samtools merge -o {output} -@ {threads} {input}"
+
+
+rule move_rnaMerge:
+    input:
+        "data/bam/rna/rna_{type}_{barcode}_q7_sort.bam"
+    output:
+        "data/bam/rna/merged/rna_{barcode}_{type}.bam"
+    wildcard_constraints:
+        type = "genome|transcriptome"
+
+
+rule quantify_minimap:
+    input:
+        "data/bam/{dataset}/{flowcell}/{dataset}_{barcode}_transcriptome.bam"
+    output:
+        "data/quantification/{dataset}/{flowcell}/{dataset}_{flowcell}_{barcode}_quant.tsv"
+    wildcard_constraints:
+        dataset = "teloprime|cdna|rna",
+        type = "genome|transcriptome"
+    script:
+        "quantify_minimap.R"

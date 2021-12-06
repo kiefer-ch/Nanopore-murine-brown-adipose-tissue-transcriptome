@@ -21,7 +21,7 @@ BARCODES = SAMPLE_INFO_illumina[SAMPLE_INFO_illumina["ont"].notnull()]["ont"].to
 # Include other rules
 include: "bin/annotation.smk"
 include: "bin/process_illumina.smk"
-#include: "bin/process_nanopore.smk"
+include: "bin/process_nanopore.smk"
 include: "bin/rseqc.smk"
 include: "bin/comparisons.smk"
 include: "bin/dexseq.snakefile"
