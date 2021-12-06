@@ -39,13 +39,14 @@ df_tx <- df_tx %>%
         sep = "\\|", extra = "drop") %>%
     map(left_join, y = biomart, by = "ensembl_transcript_id_version") %>%
     map(mutate, coverage = coverage / transcript_length) %>%
-    map(dplyr::select, coverage, transcript_length, type, qwidth) %>%
+    map(dplyr::select, coverage, transcript_length, type, qwidth, ensembl_transcript_id_version) %>%
     bind_rows(.id = "sample") %>%
-    tidyr::separate(sample, c("library", "barcode"))
+    tidyr::separate(sample, c("library", "barcode")) %>%
+    tidyr::drop_na()
 
 
 log_info("Writing to disc...")
-df %>%
+df_tx %>%
     saveRDS(snakemake@output[[1]])
 
 

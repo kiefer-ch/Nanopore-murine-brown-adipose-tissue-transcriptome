@@ -20,7 +20,7 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
 
 
 ```{r loadPackages}
-source(".Rprofile")
+#source(".Rprofile")
 suppressPackageStartupMessages({
     library("dplyr")
     library("dtplyr")
@@ -157,20 +157,20 @@ df_supp <- df_tx %>%
     mutate(
         reference = case_when(
             ensembl_transcript_id_version == 
-                ensembl_transcript_id_version[type == "primary"]    ~ "same_transcripts",
-            ensembl_gene_id_version == 
+                ensembl_transcript_id_version[type == "primary"]    ~ "same_transcript",
+            ensembl_gene_id_version ==
                 ensembl_gene_id_version[type == "primary"]          ~ "same_gene",
             TRUE                                                    ~ "other"),
         same_strand = if_else(strand == strand[type == "primary"], TRUE, FALSE),
         n = n()) %>% 
     ungroup() %>%
-        filter(category == "supplementary") %>% 
-        mutate(supplementary_type = case_when(
-            reference == "other"                            ~ "other",
-            reference == "same_transcript" & same_strand    ~ "same_transcript_sense",
-            reference == "same_transcript" & !same_strand   ~ "same_transcript_anti-sense",
-            reference == "same_gene" & same_strand          ~ "same_gene_sense",
-            reference == "same_gene" & !same_strand         ~ "same_gene_anti-sense")) %>% 
+    filter(category == "supplementary") %>% 
+    mutate(supplementary_type = case_when(
+        reference == "other"                            ~ "other",
+        reference == "same_transcript" & same_strand    ~ "same_transcript_sense",
+        reference == "same_transcript" & !same_strand   ~ "same_transcript_anti-sense",
+        reference == "same_gene" & same_strand          ~ "same_gene_sense",
+        reference == "same_gene" & !same_strand         ~ "same_gene_anti-sense")) %>% 
     as_tibble()
 ```
 

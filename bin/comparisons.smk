@@ -100,11 +100,12 @@ rule coverage_report:
             barcode=SAMPLE_INFO_ont["ont"]),
         geneBodyCoverage_cdna = expand("data/comparisons/geneBody_coverage/cdna/{barcode}.geneBodyCoverage.txt",
             barcode=SAMPLE_INFO_ont["cdna"]),
-        geneBodyCoverage_illumina = expand("data/comparisons/geneBody_coverage/rna/illumina/{sample}.geneBodyCoverage.txt",
+        geneBodyCoverage_illumina = expand("data/comparisons/geneBody_coverage/illumina/{sample}.geneBodyCoverage.txt",
             sample=SAMPLES_ont),
         geneBodyCoverage_rna = expand("data/comparisons/geneBody_coverage/rna/{barcode}.geneBodyCoverage.txt",
             barcode=["rt", "cool"]),
-        collapsed_coverage = "res/comparisons/coverage/collapsed_coverage.rds",
+        collapsed_coverage = "data/comparisons/coverage/collapsed_coverage.rds",
+        tpm = "res/deseq/illumina/txlevel/illumina_txlevel_cm_tpm.csv.gz",
         sample_info = config["SAMPLE_INFO"]
     output:
         "res/comparisons/comparisons_coverage.html"
