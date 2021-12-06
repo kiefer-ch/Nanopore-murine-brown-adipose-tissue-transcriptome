@@ -183,3 +183,18 @@ rule samtools_index:
         "{file}.bam.bai"
     shell:
         "samtools index {input}"
+
+
+rule make_deseqDataSet_illumina:
+    input:
+        salmon_out = expand("data/quantification/salmon/{sample}/quant.sf", sample=SAMPLES_ont),
+        txdb = "data/annotation/annotation_txdb.sqlite",
+        sample_info = config["SAMPLE_INFO"]
+    params:
+        type = "{type}"
+    wildcard_constraints:
+        type = "gene|transcript"
+    output:
+        "data/deseq/illumina/illumina_dds_{type}.rds"
+    script:
+        "deseq_importIllumina.R"

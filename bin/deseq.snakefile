@@ -1,32 +1,3 @@
-# data import
-rule tximport_deseq_illumina_gene:
-    input:
-        salmon_out = expand("salmon/{sample}/quant.sf", sample=SAMPLES),
-        txdb = "annotation/annotation_txdb.sqlite",
-        sample_info = "sample_info/sampleInfo.csv"
-    params:
-        txOut = 0,
-        design = "~condition_temp"
-    output:
-        "res/deseq/illumina/genelevel/illumina_genelevel_dds.rds"
-    script:
-        "deseq_txImport.R"
-
-
-rule tximport_deseq_illumina_transcript:
-    input:
-        salmon_out = expand("salmon/{sample}/quant.sf", sample=SAMPLES),
-        txdb = "annotation/annotation_txdb.sqlite",
-        sample_info = "sample_info/sampleInfo.csv"
-    params:
-        txOut = 1,
-        design = "~condition_temp"
-    output:
-        "res/deseq/illumina/txlevel/illumina_txlevel_dds.rds"
-    script:
-        "deseq_txImport.R"
-
-
 rule import_deseq_teloprime_gene:
     input:
         counts = "res/wien/teloprime/DE/ONT_newbasecalling/6samples_counts.tsv",

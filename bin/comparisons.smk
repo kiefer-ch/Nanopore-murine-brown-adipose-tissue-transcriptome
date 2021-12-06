@@ -167,7 +167,7 @@ rule coverage_report:
         "comparisons_coverage.Rmd"
 
 
-# quantification_correlation
+# unnormalised quantification correlation
 rule quantification_getAverageCountsTables:
     input:
         ont_quant = [expand("data/quantification/teloprime/merged/teloprime_merged_{barcode}_quant.tsv", barcode=SAMPLE_INFO_ont["ont"]),
@@ -209,18 +209,14 @@ rule quantification_getCountsTables:
 
 rule quantification_correlationWithinSamples:
     input:
-        biomaRt_gene = "data/annotation/biomaRt_gene.rds",
-        biomaRt_tx = "data/annotation/biomaRt_tx.rds",
-        biotype_groups = "data/biotype_groups.csv",
-        gene = "data/comparisons/counts/comparisons_counts_gene.tsv.gz",
-        tx = "data/comparisons/counts/comparisons_counts_tx.tsv.gz"
+        "data/comparisons/counts/comparisons_counts.tsv.gz"
     output:
-        "res/comparisons/comparisons_quantification_correlation.html"
+        "res/comparisons/comparisons_quantification_correlationWithinSamples.html"
     script:
         "comparisons_quantification_correlationWithinSamples.Rmd"
 
 
-
+# unnormalised quantification correlation
 
 
 
@@ -288,19 +284,6 @@ rule compare_reannotation:
         "res/comparisons/comparisons_reannotation.html"
     script:
         "comparisons_reannotation.Rmd"
-
-
-rule render_GOcomp:
-    input:
-        go = expand("res/deseq/{dataset}/{level}/{dataset}_{level}_apeglm_topgo.rds",
-            dataset=["illumina", "cdna", "teloprime"],
-            level=["txlevel", "genelevel"])
-    params:
-        cutoff = .01
-    output:
-        "res/comparisons/comparisons_go.html"
-    script:
-        "comparisons_go.Rmd"
 
 
 rule compare_dtu_1:
