@@ -48,13 +48,13 @@ bam <- bam %>%
     mutate(cigar = map(cigar, get_cigar)) %>%
     mutate(n_M = map_int(cigar, get_opts, opts = "M"),
            n_D = map_int(cigar, get_opts, opts = "D")) %>%
-    mutate(coverage = n_D + n_M) %>%
-    select(-cigar, -n_M)
+    mutate(coverage = as.integer(n_D + n_M)) %>%
+    select(-cigar, -n_M) %>%
+    as_tibble()
 
 
 log_info(sprintf("Writing %s to disk...", snakemake@output[[1]]))
 bam %>%
-    as_tibble() %>%
     saveRDS(snakemake@output[[1]])
 
 log_success("Done.")

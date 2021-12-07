@@ -42,6 +42,7 @@ df_tx <- df_tx %>%
     tidyr::separate(sample, c("library", "type", "barcode"), sep = '_') %>%
     select(-type)
 
+
 log_info("Writing to disc...")
 df_tx %>%
     saveRDS(snakemake@output[[1]])

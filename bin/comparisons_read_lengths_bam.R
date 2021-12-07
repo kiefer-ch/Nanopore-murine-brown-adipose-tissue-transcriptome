@@ -52,12 +52,12 @@ bam <- bam %>%
            n_N = map_int(cigar, get_opts, opts = "N")) %>%
     mutate(aligned = as.integer(n_I + n_M),
            rwidth = as.integer(n_M + n_D + n_N)) %>%
-    select(-cigar, -n_I, -n_M, -n_D, -n_N)
+    select(-cigar, -n_I, -n_M, -n_D, -n_N) %>%
+    as_tibble()
 
 
 log_info(sprintf("Writing %s to disk...", snakemake@output[[1]]))
 bam %>%
-    as_tibble() %>%
     saveRDS(snakemake@output[[1]])
 
 log_success("Done.")

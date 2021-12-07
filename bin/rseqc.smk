@@ -31,7 +31,7 @@ rule samtools_filterPrimary:
     input:
         "{file}.bam"
     output:
-        temp("{file}_genome_primaryOnly.bam")
+        temp("{file}_primaryOnly.bam")
     threads: 4
     shell:
         "samtools view -b -F 0x904 -@ {threads} {input} > {output}"
