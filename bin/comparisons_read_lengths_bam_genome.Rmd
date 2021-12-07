@@ -103,7 +103,8 @@ df_tx %>%
 
 ```{r}
 df_tx <- df_tx %>% 
-    filter(type != "unmapped")
+    filter(type != "unmapped") %>% 
+    as_tibble()
 ```
 
 
@@ -111,7 +112,6 @@ df_tx <- df_tx %>%
 
 ```{r, fig.width = 6.85 / 2, fig.asp = .65}
 df_tx %>% 
-    as_tibble() %>% 
     ggplot(aes(category, qwidth)) + 
     geom_violin(aes(fill = library), lwd = .25) +
     scale_y_log10(labels = trans_format("log10", math_format(10^.x))) +
@@ -146,16 +146,16 @@ df_tx %>%
 
 ```{r}
 get_overlap <- function(same_reference, pos, pos2, ref_pos) {
-    
     same_reference &
-        (any(findInterval(c(pos, pos2), unlist(ref_pos), rightmost.closed = TRUE) == 1L) |
-            any(findInterval(unlist(ref_pos), sort(c(pos, pos2)), ), rightmost.closed = TRUE) == 1L)
+        (any(findInterval(c(pos, pos2), unlist(ref_pos)) == 1L) |
+            any(findInterval(unlist(ref_pos), sort(c(pos, pos2)), )) == 1L)
 }
 
-df_supp <- df_tx %>% 
+df_supp <- df_tx %>%
+    lazy_dt() %>% 
     filter(category %in% c("primary_with_supplementary", "supplementary")) %>% 
     # Coordinates are ‘left-most’, i.e., at the 3' end of a read on the '-' strand, and 1-based. 
-    mutate(pos2 = pos + rwidth) %>% 
+    mutate(pos2 = as.integer(pos + rwidth)) %>% 
     select(-aligned) %>% 
     group_by(library, barcode, qname) %>% 
     mutate(same_reference = if_else(rname == rname[type == "primary"], TRUE, FALSE),

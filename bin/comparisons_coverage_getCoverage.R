@@ -39,7 +39,7 @@ log_info(sprintf("Importing %s...", snakemake@input[[1]]))
 bam <- scanBam(snakemake@input[[1]],
         param = ScanBamParam(
             scanBamFlag(isUnmappedQuery = FALSE),
-            what = c("flag", "rname", "cigar")))[[1]] %>%
+            what = c("qname", "flag", "rname", "cigar")))[[1]] %>%
     lazy_dt()
 
 
@@ -49,7 +49,7 @@ bam <- bam %>%
     mutate(n_M = map_int(cigar, get_opts, opts = "M"),
            n_D = map_int(cigar, get_opts, opts = "D")) %>%
     mutate(coverage = as.integer(n_D + n_M)) %>%
-    select(-cigar, -n_M) %>%
+    select(-cigar, -n_M, -n_D) %>%
     as_tibble()
 
 

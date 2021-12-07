@@ -1,17 +1,24 @@
-# RSeQC rules
-rule rseqc_junctionBED:
+rule rseqc_getBed:
+# https://www.biostars.org/p/299573/
+# from Devon Ryan
     input:
-        "data/mm10_Gencode_vM20_gencode.bed.gz"
+        "data/annotation/annotation.gtf"
     output:
-        "data/mm10_Gencode_vM20_gencode.bed"
+        temp("data/annotation/annotation.bed")
     shell:
-        "gunzip {input}"
-#??? where is this file from?
+        """
+        awk '{{if ($$3 != "gene") print $$0;}}' {input} \
+            | grep -v '^#' \
+            | gtfToGenePred /dev/stdin /dev/stdout \
+            | genePredToBed stdin {output}
+        """
+
 
 rule rseqc_genebodyCoverage_illumina:
     input:
+        "data/bam/illumina/{sample}_Aligned.sortedByCoord.out.bam.bai",
         bam = "data/bam/illumina/{sample}_Aligned.sortedByCoord.out.bam",
-        bed = "data/mm10_Gencode_vM20_gencode.bed"
+        bed = "data/annotation/annotation.bed"
     output:
         "data/comparisons/geneBody_coverage/illumina/{sample}.geneBodyCoverage.curves.pdf",
         "data/comparisons/geneBody_coverage/illumina/{sample}.geneBodyCoverage.r",
@@ -39,8 +46,9 @@ rule samtools_filterPrimary:
 
 rule rseqc_genebodyCoverage:
     input:
+        "data/bam/{dataset}/merged/{dataset}_{barcode}_genome_primaryOnly.bam.bai",
         bam = "data/bam/{dataset}/merged/{dataset}_{barcode}_genome_primaryOnly.bam",
-        bed = "data/mm10_Gencode_vM20_gencode.bed"
+        bed = "data/annotation/annotation.bed"
     output:
         "data/comparisons/geneBody_coverage/{dataset}/{barcode}.geneBodyCoverage.curves.pdf",
         "data/comparisons/geneBody_coverage/{dataset}/{barcode}.geneBodyCoverage.r",

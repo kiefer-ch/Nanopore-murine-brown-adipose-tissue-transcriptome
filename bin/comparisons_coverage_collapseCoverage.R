@@ -3,6 +3,8 @@ source(".Rprofile")
 suppressPackageStartupMessages({
     library("logger")
     library("dplyr")
+    library("dtplyr")
+    library("data.table")
     library("readr")
     library("purrr")
 })
@@ -28,17 +30,26 @@ df_tx <- c(snakemake@input$coverage) %>%
 
 log_info("Collapse data...")
 df_tx <- df_tx %>%
-    map(mutate, type = case_when(
-        flag %in% c(0L, 16L)    ~ "primary",
-        flag %in% c(256L, 275L) ~ "secondary",
-        TRUE                    ~ "supplementary")) %>%
-    map(dplyr::select, -flag) %>%
-    map(tidyr::separate, col = seqnames, into = "ensembl_transcript_id_version",
-        sep = "\\|", extra = "drop") %>%
-    map(left_join, y = biomart, by = "ensembl_transcript_id_version") %>%
-    map(mutate, coverage = coverage / transcript_length) %>%
-    map(dplyr::select, coverage, transcript_length, type, qwidth) %>%
     bind_rows(.id = "sample") %>%
+    lazy_dt() %>%
+    mutate(
+        rname = sub("\\|.+", "", rname),
+        type = case_when(
+            flag %in% c(0L, 16L)    ~ "primary",
+            flag %in% c(256L, 275L) ~ "secondary",
+            TRUE                    ~ "supplementary")) %>%
+    dplyr::select(-flag, -n_D) %>%
+    group_by(sample, qname) %>%
+    mutate(has_supplementary = any(type == "supplementary")) %>%
+    mutate(category = case_when(
+        type %in% c("supplementary", "unmapped")    ~ type,
+        has_supplementary                           ~ "primary_with_supplementary",
+        TRUE                                        ~ "primary_wo_supplementary")) %>%
+    ungroup() %>%
+    left_join(biomart, by = c("rname" = "ensembl_transcript_id_version")) %>%
+    mutate(coverage = coverage / transcript_length) %>%
+    select(-has_supplementary) %>%
+    as_tibble() %>%
     tidyr::separate(sample, c("library", "barcode"))
 
 
