@@ -20,56 +20,41 @@ def get_minimapInput(wildcards):
     return file_name
 
 
-def get_minimapGenomeOutput(wildcards):
-    if wildcards.dataset in ["teloprime", "cdna"]:
-        file_name = "data/bam/{}/{}/{}_{}_genome_{}_q7.sam".format(
-            wildcards.dataset, wildcards.flowcell, wildcards.dataset, wildcards.flowcell, wildcards.barcode)
-    elif wildcards.dataset == "rna":
-        file_name = "data/bam/rna/rna_genome_{}_q7.sam".format(wildcards.barcode)
-    return file_name
 
 
-def get_minimapTranscriptomeOutput(wildcards):
-    if wildcards.dataset in ["teloprime", "cdna"]:
-        file_name = "data/bam/{}/{}/{}_{}_transcriptome_{}_q7.sam".format(
-            wildcards.dataset, wildcards.flowcell, wildcards.dataset, wildcards.flowcell, wildcards.barcode)
-    elif wildcards.dataset == "rna":
-        file_name = "data/bam/rna/rna_transcriptome_{}_q7.sam".format(wildcards.barcode)
-    return file_name
+
+rule minimap_mapGenome:
+    input:
+        index = "indices/minimap2/genome_minimap2.mmi",
+        fastq = get_minimapInput
+    output:
+        sam = "data/bam/{dataset}/{dataset}_{flowcell}_genome_{barcode}_q7.sam"
+    threads: 24
+    shell:
+        "minimap2 \
+            -ax splice \
+            -t {threads} \
+            --secondary=no \
+            -uf \
+            {input.index} \
+            {input.fastq} > {output.sam}"
 
 
-#rule minimap_mapGenome:
-#    input:
-#        index = "indices/minimap2/genome_minimap2.mmi",
-#        fastq = get_minimapInput
-#    output:
-#        sam = Only input files can be specified as functions
-#    threads: 24
-#    shell:
-#        "minimap2 \
-#            -ax splice \
-#            -t {threads} \
-#            --secondary=no \
-#            -uf \
-#            {input.index} \
-#            {input.fastq} > {output.sam}"
-
-
-#rule minimap_mapTranscriptome:
-#    input:
-#        index = "indices/minimap2/transcriptome_minimap2.mmi",
-#        fastq = get_minimapInput
-#    output:
-#        sam = get_minimapTranscriptomeOutput
-#    threads: 24
-#    shell:
-#        "minimap2 \
-#            -ax map-ont \
-#            -t {threads} \
-#            --secondary=no \
-#            -uf \
-#            {input.index} \
-#            {input.fastq} > {output.sam}"
+rule minimap_mapTranscriptome:
+    input:
+        index = "indices/minimap2/transcriptome_minimap2.mmi",
+        fastq = get_minimapInput
+    output:
+        sam = "data/bam/{dataset}/{dataset}_{flowcell}_transcriptome_{barcode}_q7.sam"
+    threads: 24
+    shell:
+        "minimap2 \
+            -ax map-ont \
+            -t {threads} \
+            --secondary=no \
+            -uf \
+            {input.index} \
+            {input.fastq} > {output.sam}"
 
 
 rule samtools_merge:

@@ -1,3 +1,4 @@
+# count matrix export
 rule deseq_exportCmONT:
     input:
         dds = "data/deseq/{dataset}/{dataset}_dds_{type}.rds"
@@ -29,7 +30,6 @@ rule deseq_exportCmIllumina:
         "deseq_exportCm.R"
 
 
-
 # DGE
 def get_biomart(wildcards):
     if wildcards.level == "genelevel":
@@ -38,22 +38,15 @@ def get_biomart(wildcards):
         return "annotation/biomaRt_tx.rds"
 
 
-def get_threshold(wildcards):
-    if wildcards.shrink == "apeglm":
-        return 1
-    elif wildcards.shrink == "noShrink":
-        return 0
-
 rule deseq_dge:
     input:
-        dds = "{file_path}/{dataset}_{level}_dds.rds",
+        dds = "data/deseq/{dataset}/{dataset}_dds_{type}.rds",
         biomart = get_biomart
     output:
-        "{file_path}/{dataset}_{level}_{shrink}_results.csv.gz",
+        "data/deseq/{dataset}/{dataset}_deseqResults_{type}.tsv.gz",
     params:
-        level = "{level}",
-        shrink = "{shrink}",
-        lfcThreshold = get_threshold,
+        level = "{type}",
+        lfcThreshold = 0.5,
         alpha = 0.05
     wildcard_constraints:
         level = "genelevel|txlevel",
@@ -61,59 +54,3 @@ rule deseq_dge:
     threads: 4
     script:
         "deseq_dge.R"
-
-
-# pathway analysis
-rule topgo_analysis:
-    input:
-        "{file}_{level}_{shrink}_results.csv.gz"
-    output:
-        "{file}_{level}_{shrink}_topgo.rds"
-    params:
-        level = "{level}",
-        shrink = "{shrink}"
-    wildcard_constraints:
-        level = "genelevel|txlevel",
-        shrink = "apeglm|noShrink"
-    script:
-        "deseq_topgo.R"
-
-
-rule reactome_analysis:
-    input:
-        "{file}_{level}_{shrink}_results.csv.gz"
-    output:
-        "{file}_{level}_{shrink}_reactome.rds",
-        "{file}_{level}_{shrink}_reactomeGL.rds"
-    params:
-        level = "{level}",
-        shrink = "{shrink}"
-    wildcard_constraints:
-        level = "genelevel|txlevel",
-        shrink = "apeglm|noShrink"
-    script:
-        "deseq_reactome.R"
-
-
-# report
-rule deseq_report:
-    input:
-        dds = "{file}_{level}_dds.rds",
-        rld = "{file}_{level}_cm_rld.csv.gz",
-        res = "{file}_{level}_{shrink}_results.csv.gz",
-        topgo = "{file}_{level}_{shrink}_topgo.rds",
-        reactome = "{file}_{level}_{shrink}_reactome.rds",
-        reactome_genelist = "{file}_{level}_{shrink}_reactomeGL.rds",
-        grouped_biotypes = "data/biotype_groups.csv"
-    params:
-        level = "{level}",
-        shrink = "{shrink}",
-        lfcThreshold = get_threshold,
-        alpha = .05
-    wildcard_constraints:
-        level = "genelevel|txlevel",
-        shrink = "apeglm|noShrink"
-    output:
-        "{file}_{level}_{shrink}_report.html"
-    script:
-        "deseq_report.Rmd"

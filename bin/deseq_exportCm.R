@@ -5,7 +5,6 @@ suppressPackageStartupMessages({
     library("dplyr")
     library("DESeq2")
     library("logger")
-    library("org.Mm.eg.db")
 })
 
 ################################################################################
@@ -17,18 +16,25 @@ suppressPackageStartupMessages({
 
 # import data
 log_info("Import data...")
-dds <- readRDS(snakemake@input[["dds"]])
+dds <- readRDS(snakemake@input[["dds"]]) %>%
+     estimateSizeFactors()
 
-# simple log2(x+1) + median gene normalisation
-log_info("Exporting log2(x+1) normalised data...")
-ntd <- normTransform(dds)
 
-assay(ntd) %>%
+log_info("Exporting raw counts...")
+counts(dds, normalized = FALSE) %>%
+    as_tibble(rownames = "id") %>%
+    write_csv(snakemake@output[["cts"]])
+
+
+# simple median gene normalisation
+log_info("Exporting normalised data...")
+counts(dds, normalized = TRUE) %>%
     as_tibble(rownames = "id") %>%
     write_csv(snakemake@output[["ntd"]])
 
+
+# tpm
 if(snakemake@wildcards$dataset == "illumina") {
-    # tpm
     # https://haroldpimentel.wordpress.com/2014/05/08/what-the-fpkm-a-review-rna-seq-expression-units/
     fpkmToTpm <- function(fpkm) {
         exp(log(fpkm) - log(sum(fpkm)) + log(1e6))
@@ -43,9 +49,5 @@ if(snakemake@wildcards$dataset == "illumina") {
         write_csv(snakemake@output[["tpm"]])
 }
 
-log_info("Exporting raw counts...")
-counts(dds, normalized = FALSE) %>%
-    as_tibble(rownames = "id") %>%
-    write_csv(snakemake@output[["cts"]])
 
 log_success("Done.")

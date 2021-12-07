@@ -1,0 +1,110 @@
+---
+title: "Nanopore iBAT, correlation by flowcell"
+author: "Christoph Kiefer"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+    html_document:
+        toc: true
+        toc_float: true
+        toc_depth: 2
+        fig_caption: false
+        dev: "png"
+editor_options:
+    chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
+    cache = FALSE)
+```
+
+```{r loadPackages}
+source(".Rprofile")
+suppressPackageStartupMessages({
+    library("dplyr")
+    library("readr")
+    library("purrr")
+    library("ggplot2")
+    library("ggthemes")
+    library("ggpmisc")
+    library("scales")
+    library("ggpubr")
+})
+
+rename <- dplyr::rename
+select <- dplyr::select
+```
+
+
+# Setup
+
+Thisis done on unnormalised data. Neither the counts nor the tpm are normalised!
+
+
+# Sample wise comparison
+
+```{r importData2}
+df <- read_tsv(snakemake@input[[1]], show_col_types = FALSE) %>% 
+    tidyr::pivot_longer(cols = starts_with(c("cdn", "telo")),
+        names_to = "sample", values_to = "counts") %>% 
+    tidyr::separate(sample, c("library", "flowcell", "barcode"))
+
+```
+
+## Teloprime
+
+```{r, fig.width = 6.85 / 2, fig.asp = .65, dpi = 300}
+df %>% 
+    filter(library == "teloprime") %>%
+    tidyr::pivot_wider(names_from = flowcell, values_from = counts) %>% 
+    mutate_if(is.numeric, tidyr::replace_na, 0) %>% 
+    filter(rowSums(dplyr::select(., flowcell1, flowcell2)) > 0) %>% 
+    ggplot(aes(flowcell1, flowcell2)) +
+    geom_point(size = .5, alpha = .25) +
+    facet_wrap(~barcode) +
+    geom_abline(slope = 1, lty = 2, lwd = .25) +
+    stat_poly_eq(formula = y ~ x,
+        aes(label = paste(..rr.label.., sep = "~~~")),
+        parse = TRUE, family = "Helvetica", size = 2, colour = "grey30",
+        label.x.npc = "left", label.y.npc = "top") +
+    scale_x_continuous(
+        breaks = 10^seq(0:5),
+        labels = trans_format("log10", math_format(10^.x)),
+        trans = "log1p") +
+    scale_y_continuous(
+        breaks = 10^seq(0:5),
+        labels = trans_format("log10", math_format(10^.x)),
+        trans = "log1p") +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe(sides = 'bl', na.rm = FALSE) +
+    theme(legend.key.size = unit(.33, "cm"))
+```
+
+## cDNA
+
+```{r, fig.width = 6.85/2, fig.asp = .65, dpi = 300}
+df %>% 
+    filter(library == "cdna") %>%
+    tidyr::pivot_wider(names_from = flowcell, values_from = counts) %>% 
+    mutate_if(is.numeric, tidyr::replace_na, 0) %>% 
+    filter(rowSums(dplyr::select(., flowcell1, flowcell2)) > 0) %>% 
+    ggplot(aes(flowcell1, flowcell2)) +
+    geom_point(size = .5, alpha = .25) +
+    facet_wrap(~barcode) +
+    geom_abline(slope = 1, lty = 2, lwd = .25) +
+    stat_poly_eq(formula = y ~ x,
+        aes(label = paste(..rr.label.., sep = "~~~")),
+        parse = TRUE, family = "Helvetica", size = 2, colour = "grey30",
+        label.x.npc = "left", label.y.npc = "top") +
+    scale_x_continuous(
+        breaks = 10^seq(0:5),
+        labels = trans_format("log10", math_format(10^.x)),
+        trans = "log1p") +
+    scale_y_continuous(
+        breaks = 10^seq(0:5),
+        labels = trans_format("log10", math_format(10^.x)),
+        trans = "log1p") +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe(sides = 'bl', na.rm = FALSE) +
+    theme(legend.key.size = unit(.33, "cm"))
+```

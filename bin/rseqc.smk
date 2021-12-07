@@ -24,7 +24,7 @@ rule rseqc_genebodyCoverage_illumina:
         "data/comparisons/geneBody_coverage/illumina/{sample}.geneBodyCoverage.r",
         "data/comparisons/geneBody_coverage/illumina/{sample}.geneBodyCoverage.txt"
     params:
-        outputDir = "data/comparisons/geneBody_coverage/{sample}"
+        outputDir = "data/comparisons/geneBody_coverage/illumina/{sample}"
     shell:
         "geneBody_coverage.py \
             -r {input.bed} \

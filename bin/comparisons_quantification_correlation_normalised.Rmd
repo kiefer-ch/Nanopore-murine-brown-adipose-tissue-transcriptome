@@ -51,7 +51,6 @@ df_gene <- snakemake@input$gene %>%
     bind_rows(.id = "dataset") %>% 
     tidyr::pivot_wider(names_from = dataset, values_from = value, values_fill = 0) %>% 
     rename(ensembl_gene_id_version = "name") %>% 
-    mutate_if(is.numeric, function(x) {2^x-1}) %>% 
     left_join(read_rds(snakemake@input$biomaRt_gene),
         by = "ensembl_gene_id_version") %>% 
     left_join(grouped_biotypes, by = c("gene_biotype" = "transcript_biotype")) %>% 
@@ -69,7 +68,6 @@ df_tx <- snakemake@input$tx %>%
     bind_rows(.id = "dataset") %>% 
     tidyr::pivot_wider(names_from = dataset, values_from = value, values_fill = 0) %>% 
     rename(ensembl_transcript_id_version = "name") %>% 
-    mutate_if(is.numeric, function(x) {2^x-1}) %>%
     left_join(read_rds(snakemake@input$biomaRt_tx),
         by = "ensembl_transcript_id_version") %>% 
         left_join(grouped_biotypes, by = "transcript_biotype") %>% 
