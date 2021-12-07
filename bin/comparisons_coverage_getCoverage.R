@@ -1,7 +1,10 @@
 
 source(".Rprofile")
 suppressPackageStartupMessages({
+    library("logger")
     library("dplyr")
+    library("dtplyr")
+    library("data.table")
     library("GenomicAlignments")
 })
 
@@ -12,10 +15,29 @@ suppressPackageStartupMessages({
 #
 ################################################################################
 
+# function definitions
+get_cigar <- function(cigar) {
+    if(is.na(cigar)) {
+        out <- list(NA_character_)
+    } else {
+        lengths = explodeCigarOpLengths(cigar)
+        values = explodeCigarOps(cigar)
+        out <- unlist(relist(paste0(unlist(lengths), unlist(values)), values))
+    }
+    out
+}
+
 get_opts <- function(cigar, opts) {
     # the next line is from https://github.com/csoneson/NativeRNAseqComplexTranscriptome/blob/master/Rscripts/get_nbr_reads.R
     as.integer(sum(suppressWarnings(as.numeric(gsub(paste0(opts, "$"), "", cigar))), na.rm = TRUE))
 }
+
+
+log_info(sprintf("Importing %s...", snakemake@input[[1]]))
+bam <- scanBam(snakemake@input[[1]],
+        param = ScanBamParam(
+           what = c("qname", "flag", "rname", "pos")))[[1]] %>%
+    lazy_dt()
 
 readGAlignments(snakemake@input[[1]],
     use.names = TRUE,

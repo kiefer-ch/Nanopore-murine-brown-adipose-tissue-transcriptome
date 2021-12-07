@@ -148,13 +148,14 @@ df_tx %>%
 get_overlap <- function(same_reference, pos, pos2, ref_pos) {
     
     same_reference &
-        (any(findInterval(c(pos, pos2), unlist(ref_pos)) == 1L) |
-            any(findInterval(unlist(ref_pos), sort(c(pos, pos2))) == 1L))
+        (any(findInterval(c(pos, pos2), unlist(ref_pos), rightmost.closed = TRUE) == 1L) |
+            any(findInterval(unlist(ref_pos), sort(c(pos, pos2)), ), rightmost.closed = TRUE) == 1L)
 }
 
 df_supp <- df_tx %>% 
     filter(category %in% c("primary_with_supplementary", "supplementary")) %>% 
-    mutate(pos2 = if_else(strand == "-", pos - rwidth, pos + rwidth)) %>% 
+    # Coordinates are ‘left-most’, i.e., at the 3' end of a read on the '-' strand, and 1-based. 
+    mutate(pos2 = pos + rwidth) %>% 
     select(-aligned) %>% 
     group_by(library, barcode, qname) %>% 
     mutate(same_reference = if_else(rname == rname[type == "primary"], TRUE, FALSE),

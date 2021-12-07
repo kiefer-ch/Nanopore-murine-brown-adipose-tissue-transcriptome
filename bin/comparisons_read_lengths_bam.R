@@ -20,21 +20,14 @@ suppressPackageStartupMessages({
 
 # function definitions
 get_cigar <- function(cigar) {
-
     if(is.na(cigar)) {
-
         out <- list(NA_character_)
-
     } else {
-
         lengths = explodeCigarOpLengths(cigar)
         values = explodeCigarOps(cigar)
-
         out <- unlist(relist(paste0(unlist(lengths), unlist(values)), values))
     }
-
     out
-
 }
 
 get_opts <- function(cigar, opts) {
