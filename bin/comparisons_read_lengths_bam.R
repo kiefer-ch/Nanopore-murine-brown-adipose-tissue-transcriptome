@@ -57,6 +57,7 @@ bam <- bam %>%
 
 log_info(sprintf("Writing %s to disk...", snakemake@output[[1]]))
 bam %>%
+    as_tibble() %>%
     saveRDS(snakemake@output[[1]])
 
 log_success("Done.")

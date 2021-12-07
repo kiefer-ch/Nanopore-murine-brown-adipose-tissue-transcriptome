@@ -5,6 +5,7 @@ suppressPackageStartupMessages({
     library("dplyr")
     library("dtplyr")
     library("data.table")
+    library("purrr")
     library("GenomicAlignments")
 })
 
@@ -34,26 +35,26 @@ get_opts <- function(cigar, opts) {
 
 
 log_info(sprintf("Importing %s...", snakemake@input[[1]]))
+# skip unmapped reads
 bam <- scanBam(snakemake@input[[1]],
         param = ScanBamParam(
-           what = c("qname", "flag", "rname", "pos")))[[1]] %>%
+            scanBamFlag(isUnmappedQuery = FALSE),
+            what = c("flag", "rname", "cigar")))[[1]] %>%
     lazy_dt()
 
-readGAlignments(snakemake@input[[1]],
-    use.names = TRUE,
-    param = ScanBamParam(tag = c("NM"),
-        scanBamFlag(isUnmappedQuery = NA),
-        what = c("qname","flag", "rname", "pos"))) %>%
-    as_tibble() %>%
-    select(qname, flag, qwidth, cigar, seqnames) %>%
-    mutate(lengths = explodeCigarOpLengths(cigar),
-        values = explodeCigarOps(cigar)) %>%
-    mutate(cigar = relist(paste0(unlist(lengths), unlist(values)), values)) %>%
-    select(-lengths, -values) %>%
-    rowwise() %>%
-    mutate(n_D = get_opts(cigar, "D"),
-        n_M = get_opts(cigar, "M")) %>%
-    ungroup() %>%
+
+log_info(sprintf("Processing %s...", snakemake@input[[1]]))
+bam <- bam %>%
+    mutate(cigar = map(cigar, get_cigar)) %>%
+    mutate(n_M = map_int(cigar, get_opts, opts = "M"),
+           n_D = map_int(cigar, get_opts, opts = "D")) %>%
     mutate(coverage = n_D + n_M) %>%
-    select(-cigar, -n_D, -n_M) %>%
+    select(-cigar, -n_M)
+
+
+log_info(sprintf("Writing %s to disk...", snakemake@output[[1]]))
+bam %>%
+    as_tibble() %>%
     saveRDS(snakemake@output[[1]])
+
+log_success("Done.")

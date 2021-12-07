@@ -34,7 +34,7 @@ df_tx <- df_tx %>%
         flag %in% c(256L, 275L) ~ "secondary",
         TRUE                    ~ "supplementary")) %>%
     map(filter, type == "primary") %>%
-    map(dplyr::select, -qname, -flag) %>%
+    map(dplyr::select, -flag) %>%
     map(tidyr::separate, col = seqnames, into = "ensembl_transcript_id_version",
         sep = "\\|", extra = "drop") %>%
     map(left_join, y = biomart, by = "ensembl_transcript_id_version") %>%

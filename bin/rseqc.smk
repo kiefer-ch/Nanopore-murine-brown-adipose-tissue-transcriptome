@@ -10,7 +10,7 @@ rule rseqc_junctionBED:
 
 rule rseqc_genebodyCoverage_illumina:
     input:
-        bam = "bam/illumina/{sample}_Aligned.sortedByCoord.out.bam",
+        bam = "data/bam/illumina/{sample}_Aligned.sortedByCoord.out.bam",
         bed = "data/mm10_Gencode_vM20_gencode.bed"
     output:
         "data/comparisons/geneBody_coverage/illumina/{sample}.geneBodyCoverage.curves.pdf",
@@ -25,18 +25,21 @@ rule rseqc_genebodyCoverage_illumina:
             -o {params.outputDir}"
 
 
-def get_genebodyCoverageInput(wildcards):
-    if wildcards.dataset in ["teloprime", "cdna"]:
-        file_name = "data/bam/{}/{}_genome.bam".format(
-            wildcards.dataset, wildcards.barcode)
-    elif wildcards.dataset == "rna":
-        file_name = "data/bam/rna/genome_{}_q7_sort.bam".format(wildcards.barcode)
-    return file_name
+rule samtools_filterPrimary:
+    # remove 0x4 = "unmapped", 0x100 = "not primary alingmend" == "secondary",
+    # 0x800 = "supplementary"
+    input:
+        "{file}.bam"
+    output:
+        temp("{file}_genome_primaryOnly.bam")
+    threads: 4
+    shell:
+        "samtools view -b -F 0x904 -@ {threads} {input} > {output}"
 
 
 rule rseqc_genebodyCoverage:
     input:
-        bam = get_genebodyCoverageInput,
+        bam = "data/bam/{dataset}/merged/{dataset}_{barcode}_genome_primaryOnly.bam",
         bed = "data/mm10_Gencode_vM20_gencode.bed"
     output:
         "data/comparisons/geneBody_coverage/{dataset}/{barcode}.geneBodyCoverage.curves.pdf",

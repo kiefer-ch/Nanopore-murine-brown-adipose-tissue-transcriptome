@@ -116,31 +116,22 @@ rule readLengths_bam_report_genome:
 
 
 # Coverage
-def get_input_bam_coverage(wildcards):
-    if wildcards.dataset in ["teloprime", "cdna"]:
-        file_name = "data/bam/{}/{}_transcriptome.bam".format(
-            wildcards.dataset, wildcards.barcode)
-    elif wildcards.dataset == "rna":
-        file_name = "data/bam/rna/transcriptome_{}_q7_sort.bam".format(wildcards.barcode)
-    return [file_name, file_name + ".bai"]
-
-
 rule coverage_getCoverage:
     input:
-        get_input_bam_coverage
+        "data/bam/{dataset}/merged/{dataset}_{barcode}_transcriptome.bam"
     wildcard_constraints:
         dataset = "teloprime|cdna|rna"
     output:
-        "data/comparisons/coverage/{dataset}/{dataset}_{barcode}_coverage.rds"
+        "data/comparisons/coverage/{dataset}/merged/{dataset}_{barcode}_coverage.rds"
     script:
         "comparisons_coverage_getCoverage.R"
 
 
 rule coverage_collapse:
     input:
-        coverage = [expand("data/comparisons/coverage/teloprime/teloprime_{barcode}_coverage.rds", barcode=SAMPLE_INFO_ont["ont"]),
-                    expand("data/comparisons/coverage/cdna/cdna_{barcode}_coverage.rds", barcode=SAMPLE_INFO_ont["cdna"]),
-                    expand("data/comparisons/coverage/rna/rna_{barcode}_coverage.rds", barcode=["rt", "cool"])],
+        coverage = [expand("data/comparisons/coverage/teloprime/merged/teloprime_{barcode}_coverage.rds", barcode=SAMPLE_INFO_ont["ont"]),
+                    expand("data/comparisons/coverage/cdna/merged/cdna_{barcode}_coverage.rds", barcode=SAMPLE_INFO_ont["cdna"]),
+                    expand("data/comparisons/coverage/rna/merged/rna_{barcode}_coverage.rds", barcode=["rt", "cool"])],
         biomaRt_tx = "data/annotation/biomaRt_tx.rds"
     output:
         "data/comparisons/coverage/collapsed_coverage.rds"
