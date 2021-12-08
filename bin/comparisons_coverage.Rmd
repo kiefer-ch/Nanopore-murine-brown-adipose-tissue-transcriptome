@@ -27,8 +27,6 @@ suppressPackageStartupMessages({
     library("ggplot2")
     library("ggthemes")
     library("ggpmisc")
-    library("quantreg")
-    library("AnnotationDbi")
     library("scales")
 })
 ```
@@ -70,14 +68,14 @@ illumina <- snakemake@input[["geneBodyCoverage_illumina"]] %>%
     dplyr::select(-sample, -ont)
 
 teloprime <- snakemake@input[["geneBodyCoverage_teloprime"]] %>%
-    prepare_dataset(name = "teloprime") %>%
-    mutate(sample = substr(sample, 1, 9)) %>%
+    prepare_dataset(name = "teloprime") %>% 
+    tidyr::separate(sample, c("library", "sample"), extra = "drop") %>%
     left_join(sample_info, by = c("sample" = "ont")) %>%
     dplyr::select(-sample, -illumina)
 
 cdna <- snakemake@input[["geneBodyCoverage_cdna"]] %>%
     prepare_dataset(name = "cdna") %>%
-    mutate(sample = substr(sample, 1, 9)) %>%
+    tidyr::separate(sample, c("library", "sample"), extra = "drop") %>%
     left_join(sample_info, by = c("sample" = "cdna")) %>%
     dplyr::select(-sample, -illumina)
 
@@ -114,28 +112,35 @@ From here on it is only primary reads
 ```{r import_coverage}
 df <- snakemake@input[["collapsed_coverage"]] %>% 
     read_rds()
-```
 
-```{r dataImport_tpm}
+biomart <- read_rds(snakemake@input$biomaRt_tx) %>% 
+    dplyr::select(ensembl_transcript_id_version, transcript_length, transcript_biotype)
+
 tpm <- snakemake@input$tpm %>% 
     read_csv(show_col_types = FALSE) %>% 
-    mutate(tpm = rowMeans(dplyr::select(., starts_with("190220")))) %>% 
-    dplyr::select(qwidth = "transcript_length", tpm) %>% 
+    mutate(tpm = expm1((rowMeans(log1p(dplyr::select(., starts_with("190220"))))))) %>% 
+    dplyr::select(id, tpm) %>% 
     filter(tpm != 0) %>% 
     arrange(desc(tpm)) %>% 
     tidyr::drop_na() %>% 
-    group_by(qwidth) %>% 
+    left_join(biomart, by = c("id" = "ensembl_transcript_id_version")) %>% 
+    group_by(transcript_length) %>% 
     summarise(n = sum(tpm, na.rm = TRUE)) %>% 
     ungroup() %>% 
+    dplyr::rename(qwidth = "transcript_length") %>% 
     mutate(library = "illumina")
 ```
 
 The illumina values are estimated based on the tpm values from salmon. They are
 somewhat a reference, but not actual read lengths.
 
+Primary mappings only!
+
 ```{r, fig.width = 6.85 / 2, fig.asp = .65}
 df %>% 
+    filter(type == "primary") %>% 
     filter(!is.na(transcript_length)) %>% 
+    mutate(qwidth = as.integer(transcript_length * coverage)) %>% 
     group_by(library, qwidth) %>% 
     summarise(n = n()) %>% 
     bind_rows(tpm) %>% 
@@ -155,14 +160,18 @@ df %>%
 
 # Coverage
 
+## grouped coverage distribution
+
 ```{r, fig.width = 6.85, fig.asp = .65 / 2}
 df %>%
+    filter(!is.na(transcript_length)) %>% 
     mutate(grouped_transcript_length = cut(transcript_length,
         breaks = c(0, 1000, 2000, 3000, 4000, 5000, 7500, max(transcript_length)),
         labels = as.character(c(1000, 2000, 3000, 4000, 5000, 7500, max(transcript_length))))) %>%
     mutate(library = factor(library, levels = c("illumina", "teloprime", "cdna", "rna"))) %>%
     ggplot(aes(grouped_transcript_length, coverage)) +
     geom_violin(aes(fill = library), lwd = .25) +
+    facet_wrap(~type, nrow = 2) +
     xlab(NULL) +
     ylab("Fraction of transcript covered by read") +
     theme_tufte(base_size = 8, base_family = "Helvetica") +
@@ -174,37 +183,80 @@ df %>%
 ```
 
 
+```{r, fig.width = 6.85 / 2, fig.asp = .65}
+df %>% 
+    filter(!is.na(transcript_length)) %>% 
+    filter(transcript_length > 350) %>% 
+    group_by(library, barcode, type, transcript_length) %>% 
+    summarise(coverage = mean(coverage)) %>% 
+    mutate(library = factor(library, levels = c("illumina", "teloprime", "cdna", "rna"))) %>%
+    ggplot(aes(transcript_length, coverage)) +
+    geom_smooth(aes(colour = library, lty = type, group = paste(barcode, type, library)),
+        lwd = .25, se = FALSE, method = "loess", span = 0.1) +
+    scale_x_log10(name = "Transcript Length",
+        labels = trans_format("log10", math_format(10^.x))) +
+    scale_y_continuous(name = "Coverage", labels = label_percent()) +
+    scale_colour_brewer(palette = "Dark2", name = NULL) +
+    scale_linetype(name = NULL) +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe(sides = "bl") +
+    theme(legend.key.size = unit(.33, "cm"))
+```
+
+
 # Full length
 
 mehr als 90 % 
 
-This plot shows the average read coverage for every transcript in the reference
-for which at least 1 read has been observed compared to the transcript length.
+Primary reads only
 
 ```{r, fig.width = 6.85 / 2, fig.asp = .65}
 df %>%
+    filter(!is.na(transcript_length)) %>% 
+    filter(transcript_length > 350) %>% 
     mutate(is_fullLength = if_else(coverage > .9, TRUE, FALSE)) %>%
-    group_by(library, ensembl_transcript_id_version) %>%
+    group_by(library, barcode, type, transcript_length) %>% 
     summarise(
         n = n(),
-        n_fullLength = sum(is_fullLength),
-        transcript_length = unique(transcript_length)) %>% 
-    ungroup() %>%
+        n_fullLength = sum(is_fullLength)) %>% 
+    ungroup() %>% 
     mutate(rate = n_fullLength / n) %>%
-    mutate(library = factor(library, 
-        levels = c("illumina", "teloprime", "cdna", "rna"))) %>%
+    mutate(library = factor(library, levels = c("illumina", "teloprime", "cdna", "rna"))) %>%
     ggplot(aes(transcript_length, rate)) +
-    geom_hex(aes(fill = ..density..), bins = 50) +
-    geom_quantile(colour = "red", lwd = .25) +
-    facet_wrap(~library) +
-    scale_x_log10(labels = trans_format("log10", math_format(10^.x))) +
-    scale_y_continuous(trans = "logit",
-         breaks = c(.0001, .001, .01, .1, .25, .5, .75, .9, .99),
-         labels = function(x) signif(x, 2)) +
+    geom_smooth(aes(colour = library, lty = type, group = paste(barcode, type, library)),
+        lwd = .25, se = FALSE, method = "loess", span = 0.1) +
+    scale_x_log10(name = "Transcript Length",
+        labels = trans_format("log10", math_format(10^.x))) +
+    scale_y_continuous(name = "Fraction of full length reads", labels = label_percent()) +
+    scale_colour_brewer(palette = "Dark2", name = NULL) +
+    scale_linetype(name = NULL) +
     theme_tufte(base_size = 8, base_family = "Helvetica") +
     geom_rangeframe(sides = "bl") +
-    xlab("Transcript length") +
-    ylab("Fraction of full length reads") +
-    scale_fill_viridis_c() +
     theme(legend.key.size = unit(.33, "cm"))
 ```
+
+# Abundance of supplementary mappings
+
+```{r, fig.width = 6.85 / 2, fig.asp = .65}
+df %>% 
+    filter(!is.na(transcript_length)) %>% 
+    group_by(library, transcript_length, rname, type) %>% 
+    summarise(counts = n()) %>% 
+    summarise(ratio = counts[type == "supplementary"] / counts[type == "primary"]) %>% 
+    ungroup() %>% 
+    mutate(library = factor(library, levels = c("illumina", "teloprime", "cdna", "rna"))) %>%
+    ggplot(aes(transcript_length, ratio)) +
+    geom_hex(aes(fill = ..density..), bins = 50) +
+    geom_hline(yintercept = 1, lwd = .25, lty = 2) +
+    geom_smooth(method = "lm", colour = "red", lwd = .25, se = FALSE) +
+    facet_wrap(~library) +
+    scale_x_log10(name = "Transcript Length",
+        labels = trans_format("log10", math_format(10^.x))) +
+    scale_y_log10(name = "Supplementary / primary alignments",
+        labels = trans_format("log10", math_format(10^.x))) +
+    scale_fill_viridis_c() +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe(sides = "bl") +
+    theme(legend.key.size = unit(.33, "cm"))
+```
+

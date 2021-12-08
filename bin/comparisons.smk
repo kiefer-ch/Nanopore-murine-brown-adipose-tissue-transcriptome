@@ -150,8 +150,9 @@ rule coverage_report:
         geneBodyCoverage_rna = expand("data/comparisons/geneBody_coverage/rna/{barcode}.geneBodyCoverage.txt",
             barcode=["rt", "cool"]),
         collapsed_coverage = "data/comparisons/coverage/collapsed_coverage.rds",
-        tpm = "res/deseq/illumina/txlevel/illumina_txlevel_cm_tpm.csv.gz",
-        sample_info = config["SAMPLE_INFO"]
+        tpm = "data/deseq/illumina/illumina_transcript_cm_tpm.csv.gz",
+        sample_info = config["SAMPLE_INFO"],
+        biomaRt_tx = "data/annotation/biomaRt_tx.rds"
     output:
         "res/comparisons/comparisons_coverage.html"
     script:
@@ -213,7 +214,7 @@ rule quantification_correlation_normalised:
         biomaRt_gene = "data/annotation/biomaRt_gene.rds",
         biomaRt_tx = "data/annotation/biomaRt_tx.rds",
         biotype_groups = "data/biotype_groups.csv",
-        gene =  [expand("data/deseq/{dataset}/{dataset}_gene_cm_ntd.csv.gz",
+        gene = [expand("data/deseq/{dataset}/{dataset}_gene_cm_ntd.csv.gz",
                     dataset=["cdna", "rna", "teloprime"]),
                  "data/deseq/illumina/illumina_gene_cm_tpm.csv.gz"],
         tx = [expand("data/deseq/{dataset}/{dataset}_transcript_cm_ntd.csv.gz",
@@ -247,14 +248,14 @@ rule quantification_correlationWithinSamples_normalised:
         "comparisons_quantification_correlationWithinSamples_normalised.Rmd"
 
 
-
-
 rule counts_pca:
     input:
-        tx_counts = expand("res/deseq/{dataset}/txlevel/{dataset}_txlevel_cm_cts.csv.gz",
-                           dataset=["cdna", "teloprime", "illumina", "rna"]),
-        gene_counts = expand("res/deseq/{dataset}/genelevel/{dataset}_genelevel_cm_cts.csv.gz",
-                             dataset=["cdna", "teloprime", "illumina", "rna"]),
+        gene = [expand("data/deseq/{dataset}/{dataset}_gene_cm_ntd.csv.gz",
+                    dataset=["cdna", "rna", "teloprime"]),
+                 "data/deseq/illumina/illumina_gene_cm_tpm.csv.gz"],
+        tx = [expand("data/deseq/{dataset}/{dataset}_transcript_cm_ntd.csv.gz",
+                  dataset=["cdna", "rna", "teloprime"]),
+              "data/deseq/illumina/illumina_transcript_cm_tpm.csv.gz"],
         sample_info = config["SAMPLE_INFO"]
     output:
         "res/comparisons/comparisons_countsPCA.html"
@@ -264,12 +265,12 @@ rule counts_pca:
 
 rule feature_detection:
     input:
-        tx_counts = expand("res/deseq/{dataset}/txlevel/{dataset}_txlevel_cm_cts.csv.gz",
+        tx_counts = expand("data/deseq/{dataset}/{dataset}_transcript_cm_cts.csv.gz",
             dataset=["cdna", "teloprime", "illumina", "rna"]),
-        gene_counts = expand("res/deseq/{dataset}/genelevel/{dataset}_genelevel_cm_cts.csv.gz",
+        gene_counts = expand("res/deseq/{dataset}/{dataset}_gene_cm_cts.csv.gz",
             dataset=["cdna", "teloprime", "illumina", "rna"]),
-        gene_tpm = "res/deseq/illumina/genelevel/illumina_genelevel_cm_ntd.csv.gz",
-        tx_tpm = "res/deseq/illumina/txlevel/illumina_txlevel_cm_ntd.csv.gz",
+        gene_tpm = "res/deseq/illumina/illumina_gene_cm_tpm.csv.gz",
+        tx_tpm = "res/deseq/illumina/illumina_transcript_cm_tpm.csv.gz",
         biomaRt_gene = "annotation/biomaRt_gene.rds",
         biomaRt_tx = "annotation/biomaRt_tx.rds",
         biotype_groups = "data/biotype_groups.csv",

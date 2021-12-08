@@ -18,7 +18,8 @@ suppressPackageStartupMessages({
 
 log_info("Importing data...")
 biomart <- snakemake@input[["biomaRt_tx"]] %>%
-    read_rds()
+    read_rds() %>%
+    select(ensembl_transcript_id_version, transcript_length)
 
 df_tx <- c(snakemake@input$coverage) %>%
     set_names(tools::file_path_sans_ext(basename(.)) %>%
@@ -38,7 +39,7 @@ df_tx <- df_tx %>%
             flag %in% c(0L, 16L)    ~ "primary",
             flag %in% c(256L, 275L) ~ "secondary",
             TRUE                    ~ "supplementary")) %>%
-    dplyr::select(-flag, -n_D) %>%
+    dplyr::select(-flag) %>%
     group_by(sample, qname) %>%
     mutate(has_supplementary = any(type == "supplementary")) %>%
     mutate(category = case_when(
@@ -46,6 +47,7 @@ df_tx <- df_tx %>%
         has_supplementary                           ~ "primary_with_supplementary",
         TRUE                                        ~ "primary_wo_supplementary")) %>%
     ungroup() %>%
+    select(-qname)
     left_join(biomart, by = c("rname" = "ensembl_transcript_id_version")) %>%
     mutate(coverage = coverage / transcript_length) %>%
     select(-has_supplementary) %>%
