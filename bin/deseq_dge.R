@@ -1,10 +1,12 @@
-#!/usr/bin/Rscript --no-restore --no-environ --no-save
 
 source(".Rprofile")
-library("readr")
-library("dplyr")
-library("DESeq2")
-library("apeglm")
+suppressPackageStartupMessages({
+    library("logger")
+    library("readr")
+    library("dplyr")
+    library("DESeq2")
+    library("apeglm")
+})
 BPPARAM = BiocParallel::MulticoreParam(snakemake@threads[[1]])
 
 ################################################################################
@@ -14,45 +16,40 @@ BPPARAM = BiocParallel::MulticoreParam(snakemake@threads[[1]])
 #
 ################################################################################
 
-# tx and gene level
-if (snakemake@params[["level"]] == "txlevel") {
-    id <- "ensembl_transcript_id_version"
-} else if (snakemake@params[["level"]] == "genelevel") {
-    id <- "ensembl_gene_id_version"
-}
-
-# import data
+log_info("Importing data...")
 dds <- readRDS(snakemake@input[["dds"]])
 biomart <- readRDS(snakemake@input[["biomart"]])
 
 # set reference
 colData(dds)$condition_temp <- relevel(colData(dds)$condition_temp, ref = "22")
 
-# filtering lowly expressed genes and fitting models
-dds <- dds[rowSums(counts(dds)) > 10, ] %>%
-    DESeq(., parallel = TRUE, BPPARAM = BPPARAM)
+# filtering lowly expressed genes
+dds <- dds[rowSums(counts(dds)) > 10, ]
 
-# calculating results table
-res <- results(dds,
-    contrast = c("condition_temp", "4", "22"),
-    lfcThreshold = snakemake@params[["lfcThreshold"]],
-    alpha = snakemake@params[["alpha"]],
-    parallel = TRUE, BPPARAM = BPPARAM)
+log_info("Fitting models...")
+dds <- dds %>%
+    DESeq(parallel = TRUE, BPPARAM = BPPARAM)
 
-# shrinking log2 fold change
-if (snakemake@params[["shrink"]] == "apeglm") {
-    res <- lfcShrink(dds,
+log_info("Calculating results tables...")
+# results table contains s value and log2FC for the coef
+res <- dds %>%
+    lfcShrink(.,
         coef = "condition_temp_4_vs_22",
-        res = res,
         lfcThreshold = snakemake@params[["lfcThreshold"]],
         type = "apeglm",
         parallel = TRUE, BPPARAM = BPPARAM)
-}
 
-# export
+
+log_info("Writing to disc...")
+id <- if_else(snakemake@params$type == "gene",
+        "ensembl_gene_id_version", "ensembl_transcript_id_version")
+
 res %>%
     as_tibble(rownames = id) %>%
     left_join(biomart, by = id) %>%
     dplyr::select(starts_with("ensembl_"), mgi_symbol, description,
         gene_biotype, everything()) %>%
     write_csv(snakemake@output[[1]])
+
+
+log_success("Done.")

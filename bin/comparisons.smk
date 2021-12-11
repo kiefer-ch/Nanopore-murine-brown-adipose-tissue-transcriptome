@@ -284,25 +284,36 @@ rule feature_detection:
         "comparisons_featureDetection.Rmd"
 
 
-
-
-
-
-
-
+# dge
 rule compare_dge:
     input:
-        dte = expand("res/deseq/{dataset}/txlevel/{dataset}_txlevel_apeglm_results.csv.gz",
+        dte = expand("data/deseq/{dataset}/{dataset}_deseqResults_transcript.csv.gz",
                      dataset=["illumina", "teloprime", "cdna"]),
-        dge = expand("res/deseq/{dataset}/genelevel/{dataset}_genelevel_apeglm_results.csv.gz",
+        dge = expand("data/deseq/{dataset}/{dataset}_deseqResults_gene.csv.gz",
                      dataset=["illumina", "teloprime", "cdna"]),
-        gene_avg = "res/comparisons/comparisons_meanCounts_gene.csv.gz",
-        tx_avg = "res/comparisons/comparisons_meanCounts_tx.csv.gz",
+        gene_counts = [expand("data/deseq/{dataset}/{dataset}_gene_cm_ntd.csv.gz",
+                    dataset=["cdna", "teloprime"]),
+                 "data/deseq/illumina/illumina_gene_cm_tpm.csv.gz"],
+        tx_counts = [expand("data/deseq/{dataset}/{dataset}_transcript_cm_ntd.csv.gz",
+                  dataset=["cdna", "teloprime"]),
+              "data/deseq/illumina/illumina_transcript_cm_tpm.csv.gz"],
         grouped_biotypes = "data/biotype_groups.csv"
     output:
         "res/comparisons/comparisons_dgeDte.html"
+    params:
+        cutoff = .05
     script:
         "comparisons_dgeDte.Rmd"
+
+
+
+
+
+
+
+
+
+
 
 
 rule compare_reannotation:

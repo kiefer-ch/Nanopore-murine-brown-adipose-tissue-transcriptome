@@ -32,10 +32,10 @@ rule deseq_exportCmIllumina:
 
 # DGE
 def get_biomart(wildcards):
-    if wildcards.level == "genelevel":
-        return "annotation/biomaRt_gene.rds"
-    elif wildcards.level == "txlevel":
-        return "annotation/biomaRt_tx.rds"
+    if wildcards.type == "gene":
+        return "data/annotation/biomaRt_gene.rds"
+    elif wildcards.type == "transcript":
+        return "data/annotation/biomaRt_tx.rds"
 
 
 rule deseq_dge:
@@ -43,14 +43,13 @@ rule deseq_dge:
         dds = "data/deseq/{dataset}/{dataset}_dds_{type}.rds",
         biomart = get_biomart
     output:
-        "data/deseq/{dataset}/{dataset}_deseqResults_{type}.tsv.gz",
+        "data/deseq/{dataset}/{dataset}_deseqResults_{type}.csv.gz"
     params:
-        level = "{type}",
+        type = "{type}",
         lfcThreshold = 0.5,
         alpha = 0.05
     wildcard_constraints:
-        level = "genelevel|txlevel",
-        shrink = "apeglm|noShrink"
+        type = "gene|transcript"
     threads: 4
     script:
         "deseq_dge.R"
