@@ -3,23 +3,12 @@ FLAIR = config["FLAIR"]
 
 rule flair_convert_bed12:
     input:
-        bam = "bam/{dataset}/{barcode}_genome.bam",
-        bai = "bam/{dataset}/{barcode}_genome.bam.bai"
+        "data/bam/{dataset}/merged/{dataset}_{barcode}_genome_primaryOnly.bam.bai",
+        bam = "data/bam/{dataset}/merged/{dataset}_{barcode}_genome_primaryOnly.bam"
     wildcard_constraints:
-        dataset = "teloprime|cdna"
+        dataset = "teloprime|cdna|rna"
     output:
-        "flair/{dataset}/bed/raw/{barcode}.bed"
-    shell:
-        "python2 {FLAIR}/bin/bam2Bed12.py -i {input.bam} \
-            > {output}"
-
-
-rule flair_convert_bed12_rna:
-    input:
-        bam = "bam/rna/genome_{barcode}_q7_sort.bam",
-        bai = "bam/rna/genome_{barcode}_q7_sort.bam.bai"
-    output:
-        "flair/rna/bed/raw/{barcode}.bed"
+        temp("data/reannotation/flair/bed/raw/{dataset}/{dataset}_{barcode}.bed")
     shell:
         "python2 {FLAIR}/bin/bam2Bed12.py -i {input.bam} \
             > {output}"
@@ -27,51 +16,42 @@ rule flair_convert_bed12_rna:
 
 rule filter_SJout:
     input:
-        "bam/illumina/{sample}_SJ.out.tab"
+        "data/bam/illumina/{sample}_SJ.out.tab"
     output:
-        "flair/SJout/{sample}_SJ.out_filtered.tab"
+        temp("data/reannotation/flair/SJout/{sample}_SJ.out_filtered.tab")
     params:
-        threshold = 10
+        threshold = config["SJ_cutoff"]
     script:
-        "flair_filterSJout.R"
-
-
-def get_flair_bednames(wildcards):
-    if wildcards.dataset == "cdna":
-        barcode = SAMPLE_INFO.loc[wildcards.sample]["cdna"]
-        filename = "flair/cdna/bed/raw/{}.bed".format(barcode)
-    elif wildcards.dataset == "teloprime":
-        barcode = SAMPLE_INFO.loc[wildcards.sample]["ont"]
-        filename = "flair/teloprime/bed/raw/{}.bed".format(barcode)
-    elif wildcards.dataset == "rna":
-        filename = "flair/rna/bed/raw/{}.bed".format(wildcards.sample)
-    return filename
+        "reannotation_filterSJout.R"
 
 
 def get_flair_junctions(wildcards):
-    if wildcards.dataset in ["cdna", "teloprime"]:
-        illumina = SAMPLE_INFO.loc[wildcards.sample]["illumina"]
-        filename = "flair/SJout/{}_SJ.out_filtered.tab".format(illumina)
+    if wildcards.dataset == "cdna":
+        illumina = SAMPLE_INFO_ont.set_index("cdna").loc[wildcards.barcode, "illumina"]
+        filename = "data/reannotation/flair/SJout/{}_SJ.out_filtered.tab".format(illumina)
+    elif wildcards.dataset == "teloprime":
+        illumina = SAMPLE_INFO_ont.set_index("ont").loc[wildcards.barcode, "illumina"]
+        filename = "data/reannotation/flair/SJout/{}_SJ.out_filtered.tab".format(illumina)
     elif wildcards.dataset == "rna":
-        if wildcards.sample == "rt":
-            filename = "flair/SJout/5034_S33_SJ.out_filtered.tab"
-        if wildcards.sample == "cool":
-            filename = "flair/SJout/5035_S34_SJ.out_filtered.tab"
+        if wildcards.barcode == "rt":
+            filename = "data/reannotation/flair/SJout/5034_S33_SJ.out_filtered.tab"
+        if wildcards.barcode == "cool":
+            filename = "data/reannotation/flair/SJout/5035_S34_SJ.out_filtered.tab"
     return filename
 
 
 rule flair_correct:
     input:
-        bed = get_flair_bednames,
+        bed = "data/reannotation/flair/bed/raw/{dataset}/{dataset}_{barcode}.bed",
         junctions = get_flair_junctions,
-        genome = "annotation/genome.fa",
-        chromsizes = "annotation/genome.fa.fai"
+        genome = "data/annotation/genome.fa",
+        chromsizes = "data/annotation/genome.fa.fai"
     output:
-        "flair/{dataset}/bed/corrected/{sample}_all_corrected.bed",
-        "flair/{dataset}/bed/corrected/{sample}_all_corrected.psl",
-        "flair/{dataset}/bed/corrected/{sample}_all_inconsistent.bed"
+        temp(multiext("data/reannotation/flair/bed/corrected/{dataset}/{dataset}_{barcode}_all_corrected",
+            ".bed", ".psl")),
+        temp("data/reannotation/flair/bed/corrected/{dataset}/{dataset}_{barcode}_all_inconsistent.bed")
     params:
-        out_prefix = "flair/{dataset}/bed/corrected/{sample}"
+        out_prefix = "data/reannotation/flair/bed/corrected/{dataset}/{dataset}_{barcode}"
     wildcard_constraints:
         dataset = "teloprime|cdna|rna"
     threads:
@@ -88,13 +68,18 @@ rule flair_correct:
 
 def get_concatNames(wildcards):
     files = list()
-    if wildcards.dataset in ["teloprime", "cdna"]:
-        for id in SAMPLE_INFO_ont.index:
-            filename = "flair/{}/bed/corrected/{}_all_corrected.psl".format(
-                wildcards.dataset, id)
+    if wildcards.dataset == "teloprime":
+        for id in SAMPLE_INFO_ont["ont"]:
+            filename = "data/reannotation/flair/bed/corrected/{}/{}_{}_all_corrected.psl".format(
+                wildcards.dataset, wildcards.dataset, id)
+            files.append(filename)
+    elif wildcards.dataset == "cdna":
+        for id in SAMPLE_INFO_ont["cdna"]:
+            filename = "data/reannotation/flair/bed/corrected/{}/{}_{}_all_corrected.psl".format(
+                wildcards.dataset, wildcards.dataset, id)
             files.append(filename)
     elif wildcards.dataset == "rna":
-        files = expand("flair/rna/bed/corrected/{sample}_all_corrected.psl",
+        files = expand("data/reannotation/flair/bed/corrected/rna/rna_{sample}_all_corrected.psl",
             sample = ["rt", "cool"])
     return files
 
@@ -103,7 +88,7 @@ rule flair_concatenate:
     input:
         get_concatNames
     output:
-        "flair/{dataset}/bed/corrected/concatenated_all_corrected.psl"
+        "data/reannotation/flair/bed/corrected/{dataset}/{dataset}_concatenated_all_corrected.psl"
     wildcard_constraints:
         dataset = "teloprime|cdna|rna"
     shell:
@@ -143,25 +128,29 @@ rule bedtools_combineH3k4me3Cage:
         rm -r $TDIR
         """
 
+
 def get_flair_fastqnames(wildcards):
     files = list()
     if wildcards.dataset == "teloprime":
         for barcode in SAMPLE_INFO_ont["ont"]:
-            filename = "fastq/{}/merged/{}_merged.fastq.gz".format(
-                wildcards.dataset, barcode)
-            files.append(filename)
+            for flowcell in ["flowcell1", "flowcell2"]:
+                filename = "data/fastq/{}/{}/{}_q7.fastq.gz".format(
+                    wildcards.dataset, flowcell, barcode)
+                files.append(filename)
     elif wildcards.dataset == "cdna":
         for barcode in SAMPLE_INFO_ont["cdna"]:
-            filename = "fastq/{}/merged/{}_merged.fastq.gz".format(
-                wildcards.dataset, barcode)
-            files.append(filename)
+            for flowcell in ["flowcell1", "flowcell2"]:
+                filename = "data/fastq/{}/{}/{}_q7.fastq.gz".format(
+                    wildcards.dataset, flowcell, barcode)
+                files.append(filename)
     elif wildcards.dataset == "rna":
-        files = expand("fastq/rna/{sample}_q7.fastq.gz",
+        files = expand("data/fastq/rna/{sample}_q7.fastq.gz",
             sample = ["cool", "rt"])
     return files
 
 
 def ends_switch(wildcards):
+    par = ""
     if wildcards.dataset == "teloprime":
         par = "--trust_ends"
     elif wildcards.dataset == "cdna":
@@ -172,15 +161,15 @@ def ends_switch(wildcards):
 rule flair_collapse:
     input:
         fastq = get_flair_fastqnames,
-        genome = "annotation/genome.fa",
-        annotation = "annotation/annotation.gtf",
-        psl = "flair/{dataset}/bed/corrected/concatenated_all_corrected.psl",
+        genome = "data/annotation/genome.fa",
+        annotation = "data/annotation/annotation.gtf",
+        psl = "data/reannotation/flair/bed/corrected/{dataset}/{dataset}_concatenated_all_corrected.psl",
         promoters = "data/chip/h3k4_cage_combined.bed"
     output:
-        multiext("flair/{dataset}/flair.collapse.{dataset}.isoforms",
+        multiext("data/reannotation/flair/annotation/{dataset}_flair.isoforms",
             ".fa", ".gtf", ".psl")
     params:
-        out_prefix = "flair/{dataset}/flair.collapse.{dataset}",
+        out_prefix = "data/reannotation/flair/annotation/{dataset}_flair",
         ends = ends_switch
     wildcard_constraints:
         dataset = "teloprime|cdna|rna"
@@ -200,24 +189,17 @@ rule flair_collapse:
             --temp_dir ./"
 
 
-rule merge_fastq_teloprime:
-    input:
-        X1 = "fastq/teloprime/X1_flowcell/{barcode}_q7.fastq.gz",
-        X3 = "fastq/teloprime/X3_flowcell/{barcode}_q7.fastq.gz"
-    output:
-        "fastq/teloprime/merged/{barcode}_merged.fastq.gz"
-    shell:
-        "cat {input.X1} {input.X3} > {output}"
 
 
-rule merge_fastq_cdna:
-    input:
-        X1 = "fastq/cdna/pool1/{barcode}_q7.fastq.gz",
-        X3 = "fastq/cdna/pool2/{barcode}_q7.fastq.gz"
-    output:
-        "fastq/cdna/merged/{barcode}_merged.fastq.gz"
-    shell:
-        "cat {input.X1} {input.X3} > {output}"
+
+
+
+
+
+
+
+
+
 
 
 rule flair_quantify:
@@ -241,18 +223,3 @@ rule flair_quantify:
             -t {threads} \
             {params.ends} \
             --temp_dir ./"
-
-
-rule flair_example_browser_track:
-    input:
-        txdb = "annotation/annotation_txdb.sqlite",
-        txdb_flair = "flair/cdna/flair.collapse.cdna.isoforms_txdb.sqlite",
-        illumina_warm = "bam/illumina/5034_S33_Aligned.sortedByCoord.out.bam",
-        illumina_cold = "bam/illumina/5035_S34_Aligned.sortedByCoord.out.bam",
-        cdna_warm = "bam/cdna/barcode07_genome.bam",
-        cdna_cold = "bam/cdna/barcode08_genome.bam",
-        genome = "annotation/genome.fa",
-    output:
-        "res/comparisons/flair_browser_examples.html"
-    script:
-        "flair_example_browser_track.Rmd"
