@@ -26,9 +26,10 @@ include: "bin/rseqc.smk"
 include: "bin/comparisons.smk"
 include: "bin/deseq.smk"
 include: "bin/reannotation.smk"
+include: "bin/gffcompare.smk"
+
 
 include: "bin/dexseq.snakefile"
 include: "bin/drimseq.snakefile"
-include: "bin/gffcompare.snakefile"
 include: "bin/qpcr.snakefile"
 include: "bin/browserTracks.smk"

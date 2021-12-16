@@ -7,7 +7,7 @@ SAMPLE_INFO: "conf/sampleInfo.csv"
 # Paths to software
 BEDTOOLS: "/data/bin/bedtools/bedtools-v2.28/bedtools"
 MASHMAP: "/data/home/christophak/bin/mashmap"
-STRINGTIE: "/data/home/christophak/src/stringtie-2.1.4.Linux_x86_64/stringtie"
+STRINGTIE: "/data/home/christophak/src/stringtie-2.2.0.Linux_x86_64/stringtie"
 FLAIR: "/data/home/christophak/src/flair-1.5/"
 
 # Reannotation parameters
