@@ -1,3 +1,4 @@
+# FLAIR
 FLAIR = config["FLAIR"]
 
 
@@ -88,7 +89,7 @@ rule flair_concatenate:
     input:
         get_concatNames
     output:
-        "data/reannotation/flair/bed/corrected/{dataset}/{dataset}_concatenated_all_corrected.psl"
+        temp("data/reannotation/flair/bed/corrected/{dataset}/{dataset}_concatenated_all_corrected.psl")
     wildcard_constraints:
         dataset = "teloprime|cdna|rna"
     shell:
@@ -184,42 +185,110 @@ rule flair_collapse:
             -t {threads} \
             -p {input.promoters} \
             -o {params.out_prefix} \
-            -s 5 --stringent \
+            -s conf["SUPPORT_cutoff"] --stringent \
             {params.ends} \
             --temp_dir ./"
 
 
+# stringtie
+STRINGTIE = config["STRINGTIE"]
 
 
-
-
-
-
-
-
-
-
-
-
-
-rule flair_quantify:
+rule stringtie_illumina:
     input:
-        get_flair_fastqnames,
-        reads_manifest = "sample_info/flair_{dataset}_readsManifest.tsv",
-        isoforms_fasta = "flair/{dataset}/flair.collapse.{dataset}.isoforms.fa"
+        bam = "data/bam/illumina/{sample}_Aligned.sortedByCoord.out.bam",
+        annotation = "data/annotation/annotation.gtf"
     output:
-        "flair/{dataset}/flair_{dataset}_counts_matrix.tsv"
-    wildcard_constraints:
-        dataset = "teloprime|cdna"
-    params:
-        ends = ends_switch
+        "data/reannotation/stringtie/illumina/illumina_{sample}_stringtie.gtf"
     threads:
-        40
+        4
+    params:
+        label = "{sample}"
     shell:
-        "python2 {FLAIR}/flair.py quantify \
-            -r {input.reads_manifest} \
-            -i {input.isoforms_fasta} \
+        """
+        {STRINGTIE} \
+            {input.bam} \
+            --rf \
+            -p {threads} \
+            -l {params.label} \
+            -G {input.annotation} \
             -o {output} \
-            -t {threads} \
-            {params.ends} \
-            --temp_dir ./"
+            -j 10 -c 1.5 -f 0.05
+        """
+
+
+def get_illumina_bam(wildcards):
+    if wildcards.dataset == "cdna":
+        illumina = SAMPLE_INFO_ont.set_index("cdna").loc[wildcards.barcode, "illumina"]
+        filename = "data/bam/illumina/{}_Aligned.sortedByCoord.out.bam".format(illumina)
+    elif wildcards.dataset == "teloprime":
+        illumina = SAMPLE_INFO_ont.set_index("ont").loc[wildcards.barcode, "illumina"]
+        filename = "data/bam/illumina/{}_Aligned.sortedByCoord.out.bam".format(illumina)
+    elif wildcards.dataset == "rna":
+        if wildcards.barcode == "rt":
+            filename = "data/bam/illumina/5034_S33_Aligned.sortedByCoord.out.bam
+        if wildcards.barcode == "cool":
+            filename = "data/bam/illumina/5035_S34_Aligned.sortedByCoord.out.bam
+    return filename
+
+
+rule stringtie_ont:
+    input:
+        bam_long = "data/bam/{dataset}/merged/{dataset}_{barcode}_genome_primaryOnly.bam",
+        bam_short = ,
+        annotation = "data/annotation/annotation.gtf"
+    output:
+        "data/reannotation/stringtie/{dataset}/{dataset}_{barcode}_stringtie.gtf"
+    threads:
+        4
+    params:
+        label = "{barcode}"
+    shell:
+        """
+        {STRINGTIE} \
+            {input.bam_short} {input.bam_long} \
+            --mix \
+            -p {threads} \
+            -l {params.label} \
+            -G {input.annotation} \
+            -o {output} \
+            -j conf["SUPPORT_cutoff"] \
+            -c 1.5 \
+            -f 0.05
+        """
+
+
+def get_stringtie_merge_gtf_names(wildcards):
+    if wildcards.dataset == "illumina":
+        gtfs = expand("data/reannotation/stringtie/illumina/illumina_{sample}_stringtie.gtf",
+            sample=SAMPLE_INFO_ont["illumina"].tolist())
+    elif wildcards.dataset == "cdna":
+        gtfs = expand("data/reannotation/stringtie/cdna/cdna_{sample}_stringtie.gtf",
+            sample=SAMPLE_INFO_ont["cdna"].tolist())
+    elif wildcards.dataset == "teloprime":
+        gtfs = expand("data/reannotation/stringtie/teloprime/teloprime_{sample}_stringtie.gtf",
+            sample=SAMPLE_INFO_ont["ont"].tolist())
+    elif wildcards.dataset == "rna":
+        gtfs = expand("data/reannotation/stringtie/rna/rna_{sample}_stringtie.gtf",
+            sample=["cool", "rt"])
+    return gtfs
+
+
+rule stringtie_merge:
+    input:
+        gtfs = get_stringtie_merge_gtf_names
+    output:
+        "data/reannotation/stringtie/{dataset}_stringtie.gtf"
+    threads:
+        8
+    params:
+        label = "stringtie_merge_{dataset}"
+    shell:
+        """
+        {STRINGTIE} --merge \
+            -p {threads} \
+            -l {params.label} \
+            -c 1.5 -f 0.05 \
+            -o {output} \
+            {input.gtfs}
+        """

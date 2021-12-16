@@ -11,4 +11,5 @@ STRINGTIE: "/data/home/christophak/src/stringtie-2.1.4.Linux_x86_64/stringtie"
 FLAIR: "/data/home/christophak/src/flair-1.5/"
 
 # Reannotation parameters
-SJ_cutoff: 10 # splice junction cutoff
+SJ_cutoff: 10 # splice junction cutoff for both flair and stringtie
+SUPPORT_cutoff: 5 # required mappings  for flair to keep a transcript
