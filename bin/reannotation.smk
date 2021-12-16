@@ -171,7 +171,8 @@ rule flair_collapse:
             ".fa", ".gtf", ".psl")
     params:
         out_prefix = "data/reannotation/flair/annotation/{dataset}_flair",
-        ends = ends_switch
+        ends = ends_switch,
+        cutoff = config["SUPPORT_cutoff"]
     wildcard_constraints:
         dataset = "teloprime|cdna|rna"
     threads:
@@ -185,7 +186,7 @@ rule flair_collapse:
             -t {threads} \
             -p {input.promoters} \
             -o {params.out_prefix} \
-            -s conf["SUPPORT_cutoff"] --stringent \
+            -s {params.cutoff} --stringent \
             {params.ends} \
             --temp_dir ./"
 
@@ -203,7 +204,8 @@ rule stringtie_illumina:
     threads:
         4
     params:
-        label = "{sample}"
+        label = "{sample}",
+        cutoff = config["SUPPORT_cutoff"]
     shell:
         """
         {STRINGTIE} \
@@ -213,7 +215,9 @@ rule stringtie_illumina:
             -l {params.label} \
             -G {input.annotation} \
             -o {output} \
-            -j 10 -c 1.5 -f 0.05
+            -j {params.cutoff}
+            -c 1.5 \
+            -f 0.05
         """
 
 
@@ -226,23 +230,24 @@ def get_illumina_bam(wildcards):
         filename = "data/bam/illumina/{}_Aligned.sortedByCoord.out.bam".format(illumina)
     elif wildcards.dataset == "rna":
         if wildcards.barcode == "rt":
-            filename = "data/bam/illumina/5034_S33_Aligned.sortedByCoord.out.bam
+            filename = "data/bam/illumina/5034_S33_Aligned.sortedByCoord.out.bam"
         if wildcards.barcode == "cool":
-            filename = "data/bam/illumina/5035_S34_Aligned.sortedByCoord.out.bam
+            filename = "data/bam/illumina/5035_S34_Aligned.sortedByCoord.out.bam"
     return filename
 
 
 rule stringtie_ont:
     input:
         bam_long = "data/bam/{dataset}/merged/{dataset}_{barcode}_genome_primaryOnly.bam",
-        bam_short = ,
+        bam_short = get_illumina_bam,
         annotation = "data/annotation/annotation.gtf"
     output:
         "data/reannotation/stringtie/{dataset}/{dataset}_{barcode}_stringtie.gtf"
     threads:
         4
     params:
-        label = "{barcode}"
+        label = "{barcode}",
+        cutoff = config["SUPPORT_cutoff"]
     shell:
         """
         {STRINGTIE} \
@@ -252,7 +257,7 @@ rule stringtie_ont:
             -l {params.label} \
             -G {input.annotation} \
             -o {output} \
-            -j conf["SUPPORT_cutoff"] \
+            -j {params.cutoff} \
             -c 1.5 \
             -f 0.05
         """
@@ -282,7 +287,7 @@ rule stringtie_merge:
     threads:
         8
     params:
-        label = "stringtie_merge_{dataset}"
+        label = "stringtie_merge_{dataset}",
     shell:
         """
         {STRINGTIE} --merge \

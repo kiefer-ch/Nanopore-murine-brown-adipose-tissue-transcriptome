@@ -5,17 +5,16 @@ rule gffcompare:
             [expand("data/reannotation/flair/annotation/{dataset}_flair.isoforms.gtf",
                     dataset=["cdna", "teloprime", "rna"]),
                 expand("data/reannotation/stringtie/{dataset}_stringtie.gtf",
-                    dataset=["cdna", "teloprime", "rna", "illumina"])),
+                    dataset=["cdna", "teloprime", "rna", "illumina"])],
         reference = "data/annotation/annotation.gtf"
     output:
-        "data/comparisons/reannotation/gffcompare/gffcompare.loci",
-        "data/comparisons/reannotation/gffcompare/gffcompare.stats",
-        "data/comparisons/reannotation/gffcompare/gffcompare.combined.gtf",
-        "data/comparisons/reannotation/gffcompare/gffcompare.tracking",
-        expand("data/reannotation/stringtie/{dataset}/gffcompare.{dataset}_stringtie.gtf.tmap",
-            dataset=["illumina", "cdna", "teloprime", "rna"]),
-        expand("data/reannotation/flair/annotation/gffcompare.{dataset}_flair.isoforms.gtf.tmap",
-               dataset=["cdna", "teloprime", "rna"])
+        multiext("data/comparisons/reannotation/gffcompare/gffcompare", ".loci",
+            ".stats", ".tracking"),
+        "data/comparisons/reannotation/gffcompare/gffcompare.combined.gtf"
+#        expand("data/reannotation/stringtie/gffcompare.{dataset}_stringtie.gtf.tmap",
+#            dataset=["illumina", "cdna", "teloprime", "rna"]),
+#        expand("data/reannotation/flair/annotation/gffcompare.{dataset}_flair.isoforms.gtf.tmap",
+#               dataset=["cdna", "teloprime", "rna"])
     params:
         out_prefix = "data/comparisons/reannotation/gffcompare/gffcompare"
     shell:
@@ -42,10 +41,10 @@ rule sqanti_stringtie:
         annotation = "data/annotation/annotation.gtf",
         genome = "data/annotation/genome.fa"
     output:
-        "data/comparisons/reannotation/squanti/{dataset}_stringtie_noUnknownStrand_sqanti_report.pdf",
-        "data/comparisons/reannotation/squanti/{dataset}_stringtie_noUnknownStrand._classification.txt"
+        "data/comparisons/reannotation/squanti/{dataset}/{dataset}_stringtie_noUnknownStrand_sqanti_report.pdf",
+        "data/comparisons/reannotation/squanti/{dataset}/{dataset}_stringtie_noUnknownStrand_classification.txt"
     params:
-        out_dir = "data/comparisons/reannotation/squanti/"
+        out_dir = "data/comparisons/reannotation/squanti/{dataset}"
     shell:
         "sqanti_qc2 -g \
             -d {params.out_dir} \
@@ -59,10 +58,10 @@ rule sqanti_flair:
         annotation = "data/annotation/annotation.gtf",
         genome = "data/annotation/genome.fa"
     output:
-        "data/comparisons/reannotation/squanti/{dataset}_flair.isoforms_sqanti_report.pdf",
-        "data/comparisons/reannotation/squanti/{dataset}_flair.isoforms_classification.txt"
+        "data/comparisons/reannotation/squanti/{dataset}/{dataset}_flair.isoforms_sqanti_report.pdf",
+        "data/comparisons/reannotation/squanti/{dataset}/{dataset}_flair.isoforms_classification.txt"
     params:
-        out_dir = "data/comparisons/reannotation/squanti/"
+        out_dir = "data/comparisons/reannotation/squanti/{dataset}"
     shell:
         "sqanti_qc2 -g \
             -d {params.out_dir} \
