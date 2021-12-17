@@ -14,36 +14,48 @@ editor_options:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = FALSE)
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
+    cache = FALSE, out.width = 800)
 ```
 
 ```{r library, include=FALSE}
 source(".Rprofile")
-library("dplyr")
-library("readr")
-library("purrr")
-library("ggplot2")
-library("ggthemes")
-library("UpSetR")
-library("ggpmisc")
+suppressPackageStartupMessages({
+    library("dplyr")
+    library("readr")
+    library("purrr")
+    library("ggplot2")
+    library("ggthemes")
+    library("UpSetR")
+    library("ggpmisc")
+})
 ```
 
 ```{r dataImport}
 # load gffcompare
 df <- snakemake@input[["gffcompare"]] %>% 
-    set_names(., strsplit(snakemake@input[["gffcompare"]], "/all") %>% map(`[`, 1)) %>% 
-    map(read_tsv) %>%  
-    bind_rows(.id = "dataset")
+    set_names(., sub("^.+/gffcmp.", "", .) %>%
+                     sub("\\.isoforms.gtf.tmap$", "", .) %>% 
+                     sub("\\.gtf.+$", "", .))  %>% 
+    map(read_tsv, show_col_types = FALSE) %>%  
+    bind_rows(.id = "dataset") %>% 
+    mutate(dataset = factor(dataset,
+        levels = c("illumina_stringtie", "teloprime_stringtie", "cdna_stringtie",
+            "rna_stringtie", "teloprime_flair", "cdna_flair", "rna_flair")))
 
-# correct colnames
-colnames(df)[10:13] <- colnames(df)[11:14]
-df <- df[, -14]
 
 # load sqanti
 df2 <- snakemake@input[["sqanti"]] %>% 
-    set_names(., strsplit(snakemake@input[["gffcompare"]], "/all") %>% map(`[`, 1)) %>% 
-    map(read_tsv) %>% 
-    bind_rows(.id = "dataset")
+    set_names(., sub("^.+stringtie/", "", .) %>% 
+                     sub("^.+flair/", "", .) %>% 
+                     sub("_noU.+$", "", .) %>% 
+                     sub("\\.iso.+$", "", .) %>% 
+                     sub("^.+/", "", .)) %>% 
+    map(read_tsv, show_col_types = FALSE) %>% 
+    bind_rows(.id = "dataset") %>% 
+    mutate(dataset = factor(dataset,
+        levels = c("illumina_stringtie", "teloprime_stringtie", "cdna_stringtie",
+            "rna_stringtie", "teloprime_flair", "cdna_flair", "rna_flair")))
 ```
 
 # Gffcompare
@@ -54,46 +66,56 @@ knitr::include_graphics("http://ccb.jhu.edu/software/stringtie/gffcompare_codes.
 
 http://ccb.jhu.edu/software/stringtie/gffcompare_codes.png
 
-```{r plot_gffcompare}
+```{r plot_gffcompare, fig.width = 6.85, fig.asp = .65 / 2}
 df %>% 
     mutate(grouped_num_exons = cut(num_exons, 
-        breaks = c(0, 1, 2, 5, max(num_exons)))) %>% 
+        breaks = c(0, 1, 2, 5, max(num_exons)),
+        labels = c("1", "2", "3-5", ">5"))) %>% 
     ggplot(aes(class_code)) +
     geom_bar(aes(fill = grouped_num_exons), position = "fill") +
-    facet_wrap(~dataset) +
-    scale_fill_colorblind() +
-    theme_tufte() +
-    geom_rangeframe(sides = 'l') +
+    facet_wrap(~dataset, nrow = 1) +
+    scale_fill_brewer(palette = "Dark2", name = "exons") +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe(sides = 'bl') +
     ylab(NULL) +
-    scale_y_continuous(labels = scales::percent)
+    scale_y_continuous(labels = scales::percent) +
+    theme(legend.key.size = unit(.33, "cm"))
 
-df %>% 
-    ggplot(aes(dataset)) +
-    geom_bar(aes(fill = class_code), position = "fill") +
-    scale_fill_viridis_d() +
-    theme_tufte() +
-    geom_rangeframe(sides = 'l') +
-    ylab(NULL) +
-    xlab(NULL) +
-    scale_y_continuous(labels = scales::percent)
 
-df %>% 
-    ggplot(aes(dataset)) +
-    geom_bar(aes(fill = class_code)) +
-    scale_fill_viridis_d() +
-    theme_tufte() +
-    geom_rangeframe(sides = 'l') +
-    ylab(NULL) +
-    xlab(NULL)
-    
 df %>% 
     ggplot(aes(class_code, len)) +
     geom_boxplot() +
     facet_wrap(~dataset) +
     scale_y_log10() +
-    theme_tufte() +
-    geom_rangeframe(sides = 'l') +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe(sides = 'bl') +
     ylab("Transcript length [nt]")
+```
+
+
+```{r plot_gffcompare2, fig.width = 6.85 / 2, fig.asp = .65}
+df %>% 
+    ggplot(aes(dataset)) +
+    geom_bar(aes(fill = class_code), position = "fill") +
+    scale_fill_viridis_d() +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe(sides = 'bl') +
+    ylab(NULL) +
+    xlab(NULL) +
+    scale_y_continuous(labels = scales::percent) +
+    theme(legend.key.size = unit(.33, "cm")) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5))
+
+df %>% 
+    ggplot(aes(dataset)) +
+    geom_bar(aes(fill = class_code)) +
+    scale_fill_viridis_d() +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe(sides = 'bl') +
+    ylab(NULL) +
+    xlab(NULL) +
+    theme(legend.key.size = unit(.33, "cm")) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5))
 ```
 
 # Sqanti
@@ -104,46 +126,56 @@ knitr::include_graphics("https://raw.githubusercontent.com/Magdoll/images_public
 
 https://github.com/Magdoll/SQANTI2
 
-```{r plot_sqanti}
+```{r plot_sqanti, fig.width = 6.85, fig.asp = .65 / 2}
 df2 %>% 
     mutate(grouped_num_exons = cut(exons, 
-        breaks = c(0, 1, 2, 5, max(exons)))) %>% 
+        breaks = c(0, 1, 2, 5, max(exons)),
+        labels = c("1", "2", "3-5", ">5"))) %>% 
     ggplot(aes(structural_category)) +
     geom_bar(aes(fill = grouped_num_exons), position = "fill") +
-    facet_wrap(~dataset) +
-    scale_fill_colorblind() +
-    theme_tufte() +
-    geom_rangeframe(sides = 'l') +
+    facet_wrap(~dataset, nrow = 1) +
+    scale_fill_brewer(palette = "Dark2", name = "exons") +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe(sides = 'bl') +
     ylab(NULL) +
     scale_y_continuous(labels = scales::percent) +
-    theme(axis.text.x = element_text(angle = 90, hjust = 1))
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5)) +
+    theme(legend.key.size = unit(.33, "cm"))
 
-df2 %>% 
-    ggplot(aes(dataset)) +
-    geom_bar(aes(fill = structural_category), position = "fill") +
-    scale_fill_viridis_d() +
-    theme_tufte() +
-    geom_rangeframe(sides = 'l') +
-    ylab(NULL) +
-    xlab(NULL) +
-    scale_y_continuous(labels = scales::percent)
-
-df2 %>% 
-    ggplot(aes(dataset)) +
-    geom_bar(aes(fill = structural_category)) +
-    scale_fill_viridis_d() +
-    theme_tufte() +
-    geom_rangeframe(sides = 'l') +
-    ylab(NULL) +
-    xlab(NULL)
 
 df2 %>% 
     ggplot(aes(structural_category, length)) +
     geom_boxplot() +
     facet_wrap(~dataset) +
     scale_y_log10() +
-    theme_tufte() +
-    geom_rangeframe(sides = 'l') +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe(sides = 'bl') +
     ylab("Transcript length [nt]") +
-    theme(axis.text.x = element_text(angle = 90, hjust = 1))
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5))
+```
+
+
+```{r plot_sqanti2, fig.width = 6.85 / 2, fig.asp = .65}
+df2 %>% 
+    ggplot(aes(dataset)) +
+    geom_bar(aes(fill = structural_category), position = "fill") +
+    scale_fill_brewer(palette = "Paired", name = NULL) +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe(sides = 'bl') +
+    ylab(NULL) +
+    xlab(NULL) +
+    scale_y_continuous(labels = scales::percent) +
+    theme(legend.key.size = unit(.33, "cm")) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5))
+
+df2 %>% 
+    ggplot(aes(dataset)) +
+    geom_bar(aes(fill = structural_category)) +
+    scale_fill_brewer(palette = "Paired", name = NULL) +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe(sides = 'bl') +
+    ylab(NULL) +
+    xlab(NULL) +
+    theme(legend.key.size = unit(.33, "cm")) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5))
 ```

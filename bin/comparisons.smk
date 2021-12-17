@@ -307,20 +307,22 @@ rule compare_dge:
 
 
 # reannotation
-#rule compare_reannotation:
-#    input:
-#        gffcompare = ["stringtie/illumina/all_gffcompare.stringtie_illumina_merged.gtf.tmap",
-#            expand("flair/{dataset}/all_gffcompare.flair.collapse.{dataset}.isoforms.gtf.tmap",
-#                dataset=["cdna", "teloprime", "rna"])],
-#        sqanti =
-#            [expand("data/comparisons/reannotation/squanti/stringtie/{dataset}/{dataset}_stringtie_noUnknownStrand_classification.txt",
-#                dataset=["cdna", "teloprime", "rna"],
-#            expand("data/comparisons/reannotation/squanti/flair/{dataset}/{dataset}_flair.isoforms_classification.txt",
-#                dataset=["cdna", "teloprime", "rna"])]
-#    output:
-#        "res/comparisons/comparisons_reannotation.html"
-#    script:
-#        "comparisons_reannotation.Rmd"
+rule compare_reannotation:
+    input:
+        gffcompare =
+            [expand("data/reannotation/flair/annotation/gffcmp.{dataset}_flair.isoforms.gtf.tmap",
+                dataset=["cdna", "teloprime", "rna"]),
+            expand("data/reannotation/stringtie/gffcmp.{dataset}_stringtie.gtf.tmap",
+                dataset=["cdna", "teloprime", "rna", "illumina"])],
+        sqanti =
+            [expand("data/comparisons/reannotation/squanti/stringtie/{dataset}/{dataset}_stringtie_noUnknownStrand_classification.txt",
+                dataset=["cdna", "teloprime", "rna", "illumina"]),
+            expand("data/comparisons/reannotation/squanti/flair/{dataset}/{dataset}_flair.isoforms_classification.txt",
+                dataset=["cdna", "teloprime", "rna"])]
+    output:
+        "res/comparisons/comparisons_reannotation.html"
+    script:
+        "comparisons_reannotation.Rmd"
 
 
 

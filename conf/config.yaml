@@ -12,4 +12,4 @@ FLAIR: "/data/home/christophak/src/flair-1.5/"
 
 # Reannotation parameters
 SJ_cutoff: 10 # splice junction cutoff for both flair and stringtie
-SUPPORT_cutoff: 5 # required mappings  for flair to keep a transcript
+SUPPORT_cutoff: 3 # required mappings  for flair to keep a transcript

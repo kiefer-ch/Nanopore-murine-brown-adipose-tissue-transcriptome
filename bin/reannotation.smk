@@ -205,7 +205,7 @@ rule stringtie_illumina:
         4
     params:
         label = "{sample}",
-        cutoff = config["SUPPORT_cutoff"]
+        SJ_cutoff = config["SJ_cutoff"]
     shell:
         """
         {STRINGTIE} \
@@ -215,9 +215,9 @@ rule stringtie_illumina:
             -l {params.label} \
             -G {input.annotation} \
             -o {output} \
-            -j {params.cutoff}
-            -c 1.5 \
-            -f 0.05
+            -j {params.SJ_cutoff}
+            -c 1 \
+            -f 0.01
         """
 
 
@@ -247,7 +247,7 @@ rule stringtie_ont:
         4
     params:
         label = "{barcode}",
-        cutoff = config["SUPPORT_cutoff"]
+        cutoff = config["SJ_cutoff"]
     shell:
         """
         {STRINGTIE} \
@@ -258,8 +258,8 @@ rule stringtie_ont:
             -G {input.annotation} \
             -o {output} \
             -j {params.cutoff} \
-            -c 1.5 \
-            -f 0.05
+            -c 1 \
+            -f 0.01
         """
 
 
@@ -288,12 +288,14 @@ rule stringtie_merge:
         8
     params:
         label = "stringtie_merge_{dataset}",
+        SUPPORT_cutoff = config["SUPPORT_cutoff"]
     shell:
         """
         {STRINGTIE} --merge \
             -p {threads} \
             -l {params.label} \
-            -c 1.5 -f 0.05 \
+            -c {params.SUPPORT_cutoff}
+            -f 0.05 \
             -o {output} \
             {input.gtfs}
         """
