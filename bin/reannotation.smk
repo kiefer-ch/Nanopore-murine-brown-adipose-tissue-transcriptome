@@ -215,7 +215,7 @@ rule stringtie_illumina:
             -l {params.label} \
             -G {input.annotation} \
             -o {output} \
-            -j {params.SJ_cutoff}
+            -j {params.SJ_cutoff} \
             -c 1 \
             -f 0.01
         """
@@ -247,7 +247,9 @@ rule stringtie_ont:
         4
     params:
         label = "{barcode}",
-        cutoff = config["SJ_cutoff"]
+        SJ_cutoff = config["SJ_cutoff"]
+    wildcard_constraints:
+        dataset = "teloprime|cdna|rna"
     shell:
         """
         {STRINGTIE} \
@@ -257,7 +259,7 @@ rule stringtie_ont:
             -l {params.label} \
             -G {input.annotation} \
             -o {output} \
-            -j {params.cutoff} \
+            -j {params.SJ_cutoff} \
             -c 1 \
             -f 0.01
         """
@@ -289,12 +291,14 @@ rule stringtie_merge:
     params:
         label = "stringtie_merge_{dataset}",
         SUPPORT_cutoff = config["SUPPORT_cutoff"]
+    wildcard_constraints:
+        dataset = "teloprime|cdna|rna|illumina"
     shell:
         """
         {STRINGTIE} --merge \
             -p {threads} \
             -l {params.label} \
-            -c {params.SUPPORT_cutoff}
+            -c {params.SUPPORT_cutoff} \
             -f 0.05 \
             -o {output} \
             {input.gtfs}

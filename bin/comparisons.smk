@@ -318,7 +318,8 @@ rule compare_reannotation:
             [expand("data/comparisons/reannotation/squanti/stringtie/{dataset}/{dataset}_stringtie_noUnknownStrand_classification.txt",
                 dataset=["cdna", "teloprime", "rna", "illumina"]),
             expand("data/comparisons/reannotation/squanti/flair/{dataset}/{dataset}_flair.isoforms_classification.txt",
-                dataset=["cdna", "teloprime", "rna"])]
+                dataset=["cdna", "teloprime", "rna"])],
+        gffcompare_stats = "data/comparisons/reannotation/gffcompare/RQ/gffcmp.stats"
     output:
         "res/comparisons/comparisons_reannotation.html"
     script:

@@ -13,17 +13,21 @@ editor_options:
     chunk_output_type: console
 ---
 
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
     cache = FALSE, dpi = 600)
 ```
 
+
 ```{r library, include=FALSE}
 source(".Rprofile")
-library("GenomicFeatures")
-library("Gviz")
-library("dplyr")
-library("AnnotationDbi")
+suppressPackageStartupMessages({
+    library("GenomicFeatures")
+    library("Gviz")
+    library("dplyr")
+    library("AnnotationDbi")
+})
 ```
 
 
@@ -33,6 +37,9 @@ txdb_dump <- as.list(txdb)
 
 txdb_flair <- loadDb(snakemake@input[["txdb_flair"]])
 txdb_flair_dump <- as.list(txdb_flair)
+
+txdb_stringtie <- loadDb(snakemake@input[["txdb_stringtie"]])
+txdb_stringtie_dump <- as.list(txdb_stringtie)
 ```
 
 
@@ -161,7 +168,7 @@ plot.transcripts <- function(gene_id, max_cov_h3k4 = 5, max_cov_cdna = 300,
     options(ucscChromosomeNames = FALSE)
 
     tracks <- list(gtrack,
-#            illumina_warm, illumina_cold,
+            illumina_warm, illumina_cold,
             cdna_warm,# cdna_cold,
             ncd_warm_h3k4me3, ncd_cold_h3k4me3,
             flairtrack)

@@ -49,6 +49,8 @@ rule make_txdb_from_gtf:
         "{file}.gtf"
     output:
         "{file}_txdb.sqlite"
+    params:
+        species = "mouse"
     script:
         "annotation_txdb.R"
 

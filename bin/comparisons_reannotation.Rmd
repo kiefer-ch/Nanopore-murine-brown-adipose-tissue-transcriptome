@@ -27,7 +27,7 @@ suppressPackageStartupMessages({
     library("ggplot2")
     library("ggthemes")
     library("UpSetR")
-    library("ggpmisc")
+    library("scales")
 })
 ```
 
@@ -58,6 +58,7 @@ df2 <- snakemake@input[["sqanti"]] %>%
             "rna_stringtie", "teloprime_flair", "cdna_flair", "rna_flair")))
 ```
 
+
 # Gffcompare
 
 ```{r}
@@ -67,7 +68,7 @@ knitr::include_graphics("http://ccb.jhu.edu/software/stringtie/gffcompare_codes.
 http://ccb.jhu.edu/software/stringtie/gffcompare_codes.png
 
 ```{r plot_gffcompare, fig.width = 6.85, fig.asp = .65 / 2}
-df %>% 
+df %>%
     mutate(grouped_num_exons = cut(num_exons, 
         breaks = c(0, 1, 2, 5, max(num_exons)),
         labels = c("1", "2", "3-5", ">5"))) %>% 
@@ -126,18 +127,19 @@ knitr::include_graphics("https://raw.githubusercontent.com/Magdoll/images_public
 
 https://github.com/Magdoll/SQANTI2
 
-```{r plot_sqanti, fig.width = 6.85, fig.asp = .65 / 2}
+```{r plot_sqanti, fig.width = 6.85, fig.asp = .65}
 df2 %>% 
     mutate(grouped_num_exons = cut(exons, 
         breaks = c(0, 1, 2, 5, max(exons)),
         labels = c("1", "2", "3-5", ">5"))) %>% 
     ggplot(aes(structural_category)) +
     geom_bar(aes(fill = grouped_num_exons), position = "fill") +
-    facet_wrap(~dataset, nrow = 1) +
+    facet_wrap(~dataset, nrow = 2) +
     scale_fill_brewer(palette = "Dark2", name = "exons") +
     theme_tufte(base_size = 8, base_family = "Helvetica") +
     geom_rangeframe(sides = 'bl') +
     ylab(NULL) +
+    xlab(NULL) +
     scale_y_continuous(labels = scales::percent) +
     theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5)) +
     theme(legend.key.size = unit(.33, "cm"))
@@ -146,11 +148,12 @@ df2 %>%
 df2 %>% 
     ggplot(aes(structural_category, length)) +
     geom_boxplot() +
-    facet_wrap(~dataset) +
+    facet_wrap(~dataset, nrow = 2) +
     scale_y_log10() +
     theme_tufte(base_size = 8, base_family = "Helvetica") +
     geom_rangeframe(sides = 'bl') +
     ylab("Transcript length [nt]") +
+    xlab(NULL) +
     theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5))
 ```
 
@@ -178,4 +181,47 @@ df2 %>%
     xlab(NULL) +
     theme(legend.key.size = unit(.33, "cm")) +
     theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5))
+```
+
+# Overlap
+
+Based on sqanti. Comparison between the different methods ability to identify 
+transcripts from the reference annotation.
+
+```{r upset, fig.asp = .65}
+df2 %>% 
+    filter(grepl("^ENS", associated_transcript)) %>% 
+    group_by(dataset, associated_transcript) %>% 
+    summarise(n = n()) %>% 
+    ungroup() %>% 
+    tidyr::pivot_wider(names_from = dataset, values_from = n, values_fill = 0) %>% 
+    mutate_if(is.numeric, ~ as.integer(. > 0)) %>% 
+    as.data.frame() %>%
+    tibble::column_to_rownames("associated_transcript") %>% 
+    upset(nsets = 7, keep.order = TRUE,
+        nintersects = 15,
+        order.by = "freq",
+        sets = c("illumina_stringtie", "teloprime_stringtie", "cdna_stringtie",
+            "rna_stringtie", "teloprime_flair", "cdna_flair", "rna_flair"),
+        sets.x.label = "Annotated transcripts",
+        mainbar.y.label = "Shared annotated transcripts",
+        text.scale = 1.5)
+```
+
+# Sensitivity and specificity
+
+```{r, fig.width = 6.85 / 2, fig.asp = .65}
+tibble(
+    dataset = c("illumina_stringtie", "teloprime_stringtie", "cdna_stringtie",
+        "rna_stringtie", "teloprime_flair", "cdna_flair", "rna_flair"),
+    sensitivity = c(19.7, 23.1, 19.3, 18.1, 19.0, 15.1, 15.8) / 100,
+    precision = c(72.0, 76.5, 70.0, 74.7, 43.9, 45.8, 65.2) / 100) %>% 
+    ggplot(aes(precision, sensitivity)) +
+    geom_point(aes(colour = grepl("flair", dataset)), size = 1, alpha = .5) +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe(sides = 'bl') +
+    scale_color_brewer(palette = "Dark2", guide = NULL) + 
+    scale_x_continuous(name = "Precision", labels = label_percent(accuracy = 1)) +
+    scale_y_continuous(name = "Sensitivity", labels = label_percent()) +
+    ggrepel::geom_text_repel(aes(label = dataset), size = 2)
 ```
