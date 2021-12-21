@@ -69,13 +69,13 @@ illumina <- snakemake@input[["geneBodyCoverage_illumina"]] %>%
 
 teloprime <- snakemake@input[["geneBodyCoverage_teloprime"]] %>%
     prepare_dataset(name = "teloprime") %>% 
-    tidyr::separate(sample, c("library", "sample"), extra = "drop") %>%
+    tidyr::separate(sample, c("sample", "type"), extra = "drop") %>%
     left_join(sample_info, by = c("sample" = "ont")) %>%
     dplyr::select(-sample, -illumina)
 
 cdna <- snakemake@input[["geneBodyCoverage_cdna"]] %>%
     prepare_dataset(name = "cdna") %>%
-    tidyr::separate(sample, c("library", "sample"), extra = "drop") %>%
+    tidyr::separate(sample, c("sample", "library"), extra = "drop") %>%
     left_join(sample_info, by = c("sample" = "cdna")) %>%
     dplyr::select(-sample, -illumina)
 
@@ -94,7 +94,7 @@ list(illumina, teloprime, cdna, rna) %>%
     ungroup() %>%
     mutate(dataset = factor(dataset, levels = c("illumina", "teloprime", "cdna", "rna"))) %>% 
     ggplot(aes(Percentile, p)) +
-        geom_line(aes(colour = dataset, lty = sample_id), lwd = .25) +
+        geom_line(aes(colour = dataset, group = interaction(sample_id, dataset)), lwd = .25) +
         theme_tufte(base_size = 8, base_family = "Helvetica") +
         geom_rangeframe(sides = "bl") +
         scale_y_continuous(labels = scales::percent) +
@@ -176,7 +176,7 @@ df %>%
     ylab("Fraction of transcript covered by read") +
     theme_tufte(base_size = 8, base_family = "Helvetica") +
     geom_rangeframe(sides = 'lb') +
-    scale_fill_brewer(palette = "Dark2", name = NULL) +
+    scale_fill_brewer(palette = "Dark2", name = NULL, , drop = FALSE) +
     scale_y_continuous(labels = scales::percent) +
     theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5)) +
     theme(legend.key.size = unit(.33, "cm"))
@@ -196,7 +196,7 @@ df %>%
     scale_x_log10(name = "Transcript Length",
         labels = trans_format("log10", math_format(10^.x))) +
     scale_y_continuous(name = "Coverage", labels = label_percent()) +
-    scale_colour_brewer(palette = "Dark2", name = NULL) +
+    scale_colour_brewer(palette = "Dark2", name = NULL, drop = FALSE) +
     scale_linetype(name = NULL) +
     theme_tufte(base_size = 8, base_family = "Helvetica") +
     geom_rangeframe(sides = "bl") +
@@ -228,7 +228,7 @@ df %>%
     scale_x_log10(name = "Transcript Length",
         labels = trans_format("log10", math_format(10^.x))) +
     scale_y_continuous(name = "Fraction of full length reads", labels = label_percent()) +
-    scale_colour_brewer(palette = "Dark2", name = NULL) +
+    scale_colour_brewer(palette = "Dark2", name = NULL, drop = FALSE) +
     scale_linetype(name = NULL) +
     theme_tufte(base_size = 8, base_family = "Helvetica") +
     geom_rangeframe(sides = "bl") +
