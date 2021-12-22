@@ -55,7 +55,7 @@ subset.txdb <- function(txdb, txdb_dump, gene_id, chrominfo = faidx) {
 }
 
 
-plot.transcripts <- function(gene_id, max_cov_h3k4 = 5, max_cov_cdna = 300,
+plot.transcripts <- function(gene_id, max_cov_h3k4 = 5, max_cov_ont = 300,
     max_cov_illumina = 2000, extend = 2500, lwd_sashimi_max = 3, temp = "warm") {
 
     message(sprintf("Preparing %s...", gene_id))
@@ -87,7 +87,7 @@ plot.transcripts <- function(gene_id, max_cov_h3k4 = 5, max_cov_cdna = 300,
         chromosome = gene_info$TXCHROM,
         min.height = 3,
         from = gene_info$TXSTART, to = gene_info$TXEND,
-        name = "flair cDNA")
+        name = "flair TeloPr")
 
 
     # stringtie
@@ -98,7 +98,7 @@ plot.transcripts <- function(gene_id, max_cov_h3k4 = 5, max_cov_cdna = 300,
         chromosome = gene_info$TXCHROM,
         min.height = 3,
         from = gene_info$TXSTART, to = gene_info$TXEND,
-        name = "strtie telo")
+        name = "strTie TeloPr")
 
 
     # list of unique exons for sashimi plot
@@ -118,11 +118,11 @@ plot.transcripts <- function(gene_id, max_cov_h3k4 = 5, max_cov_cdna = 300,
     # bam tracks
     if(temp == "warm") {
 
-        cdna <- AlignmentsTrack(snakemake@input[["cdna_warm"]],
+        ont <- AlignmentsTrack(snakemake@input[["ont_warm"]],
             isPaired = FALSE,
             genome = "mm10",
-            name = "cDNA 22°C",
-            ylim = c(0, max_cov_cdna),
+            name = "TeloPrime 22°C",
+            ylim = c(0, max_cov_ont),
             type = c("pileup"),
             min.height = 3, # minimum height of a read in px, controls how many read are plotted
             chromosome = gene_info$TXCHROM,
@@ -144,11 +144,11 @@ plot.transcripts <- function(gene_id, max_cov_h3k4 = 5, max_cov_cdna = 300,
 
     } else if (temp == "cold") {
 
-        cdna <- AlignmentsTrack(snakemake@input[["cdna_cold"]],
+        ont <- AlignmentsTrack(snakemake@input[["ont_cold"]],
             isPaired = FALSE,
             genome = "mm10",
-            name = "cDNA 4°C",
-            ylim = c(0, max_cov_cdna),
+            name = "TeloPrime 4°C",
+            ylim = c(0, max_cov_ont),
             type = c("pileup"),
             min.height = 3, # minimum height of a read in px, controls how many read are plotted
             chromosome = gene_info$TXCHROM,
@@ -194,7 +194,7 @@ plot.transcripts <- function(gene_id, max_cov_h3k4 = 5, max_cov_cdna = 300,
 
     tracks <- list(gtrack,
             illumina,
-            cdna,
+            ont,
 #           ncd_warm_h3k4me3, ncd_cold_h3k4me3,
             gencodetrack, flairtrack, stringtietrack)
 
@@ -236,7 +236,7 @@ pdf(snakemake@output[[1]],
 
     plot.transcripts(
         gene_id = snakemake@params$gene_id,
-        max_cov_cdna = snakemake@params$max_cov_cdna,
+        max_cov_ont = snakemake@params$max_cov_ont,
         max_cov_illumina = snakemake@params$max_cov_illumina,
         lwd_sashimi_max = snakemake@params$lwd_sashimi_max,
         extend = snakemake@params$extend_plot,

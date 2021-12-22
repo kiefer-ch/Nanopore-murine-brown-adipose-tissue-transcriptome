@@ -20,7 +20,7 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
 
 
 ```{r loadPackages}
-#source(".Rprofile")
+source(".Rprofile")
 suppressPackageStartupMessages({
     library("dplyr")
     library("dtplyr")
@@ -114,7 +114,7 @@ df_tx %>%
         labels = c("primary_with_supplementary" = "pri. w/ sup.",
             "primary_wo_supplementary" = "pri. w/o sup.")) +
     ylab("Read length") +
-    scale_fill_brewer(palette = "Dark2", name = NULL) +
+    scale_fill_brewer(palette = "Dark2", name = NULL, drop = FALSE) +
     theme(legend.key.size = unit(.33, "cm"))
 ```
 
