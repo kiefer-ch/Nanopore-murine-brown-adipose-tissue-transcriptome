@@ -94,9 +94,9 @@ MASHMAP = config["MASHMAP"]
 
 rule salmon_prepareDecoys:
     input:
-        transcripts = "annotation/transcripts.fa",
-        genome = "annotation/genome.fa",
-        annotation = "annotation/annotation.gtf"
+        transcripts = "data/annotation/transcripts.fa",
+        genome = "data/annotation/genome.fa",
+        annotation = "data/annotation/annotation.gtf"
     output:
         "indices/salmon/decoy/gentrome.fa",
         "indices/salmon/decoy/decoys.txt"

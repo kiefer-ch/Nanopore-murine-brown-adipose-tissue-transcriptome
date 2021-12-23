@@ -303,3 +303,14 @@ rule stringtie_merge:
             -o {output} \
             {input.gtfs}
         """
+
+
+rule stringtie_getFasta:
+    input:
+        "data/annotation/genome.fa.fai"
+        gtf = "data/reannotation/stringtie/{dataset}_stringtie.gtf",
+        genome = "data/annotation/genome.fa"
+    output:
+        "data/reannotation/stringtie/{dataset}_stringtie.fa"
+    shell:
+        "gffread -w {output} -g {input.genome} {input.gtf}"

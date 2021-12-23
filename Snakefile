@@ -31,6 +31,4 @@ include: "bin/browserTracks.smk"
 include: "bin/drimseq.snakefile"
 
 include: "bin/dexseq.snakefile"
-include: "bin/drimseq.snakefile"
 include: "bin/qpcr.snakefile"
-

@@ -1,53 +1,103 @@
-# illumina reads
+# illumina
 rule tximport_drimseqIllumina:
     input:
         salmon_out = expand("data/quantification/salmon/{sample}/quant.sf", sample=SAMPLES_ont),
         txdb = "data/annotation/annotation_txdb.sqlite",
         sample_info = config["SAMPLE_INFO"]
     output:
-        "data/drimseq/drimseq_dtuScaledTPM.rds"
+        "data/drimseq/illumina_ref_dmds.rds"
     script:
-        "drimseq_txImport.R"
+        "drimseq_dmdsFromSalmon.R"
 
 
-
-
-rule drimseq_dmdsFromScaledTpm:
+# cDNA
+rule drimseq_dmdsFromONT:
     input:
-        tpm = "res/drimseq/illumina/drimseq_dtuScaledTPM.rds",
-        txdb = "annotation/annotation_txdb.sqlite",
-        sample_info = "sample_info/sampleInfo.csv"
+        counts = expand("data/quantification/cdna/merged/cdna_merged_{barcode}_quant.tsv", barcode=SAMPLE_INFO_ont["cdna"]),
+        txdb = "data/annotation/annotation_txdb.sqlite",
+        sample_info = config["SAMPLE_INFO"]
     output:
-        "res/drimseq/illumina/illumina_dmds.rds"
-    script:
-        "drimseq_dmdsFromScaledTpm.R"
-
-
-# ont
-rule drimseq_dmdsFromCountMatrix_flair:
-    input:
-        txdb = "flair/{dataset}/flair.collapse.{dataset}.isoforms_txdb.sqlite",
-        counts = "flair/{dataset}/flair_{dataset}_counts_matrix.tsv",
-        sample_info = "sample_info/sampleInfo.csv"
-    output:
-        "res/drimseq/{dataset}_flair/{dataset}_flair_dmds.rds"
+        "data/drimseq/cdna_ref_dmds.rds"
     wildcard_constraints:
         dataset = "teloprime|cdna"
     script:
-        "drimseq_dmdsFromCountMatrix_flair.R"
+        "drimseq_dmdsFromONT.R"
+
+# salmon align_reannotation
+BEDTOOLS = config["BEDTOOLS"]
+MASHMAP = config["MASHMAP"]
 
 
-rule drimseq_dmdsFromCountMatrix:
+rule salmon_prepareDecoys_reannotatedStringtie:
     input:
-        txdb = "annotation/annotation_txdb.sqlite",
-        counts = "res/deseq/{dataset}/txlevel/{dataset}_txlevel_cm_cts.csv.gz",
-        sample_info = "sample_info/sampleInfo.csv"
+        genome = "data/annotation/genome.fa",
+        annotation = "data/reannotation/stringtie/{dataset}_stringtie.gtf",
+        transcripts = "data/reannotation/stringtie/{dataset}_stringtie.fa"
     output:
-        "res/drimseq/{dataset}/{dataset}_dmds.rds"
+        "indices/salmon_{dataset}_stringtie/decoy/gentrome.fa",
+        "indices/salmon_{dataset}_stringtie/decoy/decoys.txt"
+    params:
+        outputDir = "indices/salmon_teloStringtie/decoy"
+    threads: 20
+    shell:
+        "bin/generateDecoyTranscriptome.sh \
+            -j {threads} \
+            -g {input.genome} \
+            -t {input.transcripts} \
+            -a {input.annotation} \
+            -b {BEDTOOLS} \
+            -m {MASHMAP} \
+            -o {params.outputDir}"
+
+
+rule salmon_prepareDecoys_reannotatedFlair:
+    input:
+        genome = "data/annotation/genome.fa",
+        annotation = "data/reannotation/flair/annotation/{dataset}_flair.isoforms.gtf",
+        transcripts = "data/reannotation/flair/annotation/{dataset}_flair.isoforms.fa"
+    output:
+        "indices/salmon_{dataset}_flair/decoy/gentrome.fa",
+        "indices/salmon_{dataset}_flair/decoy/decoys.txt"
+    params:
+        outputDir = "indices/salmon_teloflair/decoy"
+    threads: 20
+    shell:
+        "bin/generateDecoyTranscriptome.sh \
+            -j {threads} \
+            -g {input.genome} \
+            -t {input.transcripts} \
+            -a {input.annotation} \
+            -b {BEDTOOLS} \
+            -m {MASHMAP} \
+            -o {params.outputDir}"
+
+
+rule salmon_index_reannotated:
+    input:
+        "indices/salmon_{dataset}_{method}/decoy/gentrome.fa",
+        "indices/salmon_{dataset}_{method}/decoy/decoys.txt"
+    output:
+        "indices/salmon_{dataset}_{method}/duplicate_clusters.tsv",
+        "indices/salmon_{dataset}_{method}/hash.bin",
+        "indices/salmon_{dataset}_{method}/rsd.bin",
+        "indices/salmon_{dataset}_{method}/sa.bin",
+        "indices/salmon_{dataset}_{method}/txpInfo.bin"
+    params:
+        outputDir = "indices/salmon_{dataset}_{method}"
     wildcard_constraints:
-        dataset = "teloprime|cdna"
-    script:
-        "drimseq_dmdsFromCountMatrix.R"
+        method = "flair|stringtie",
+        dataset = "illumina|cdna|telorprime"
+    threads: 20
+    shell:
+        "salmon index \
+            --gencode \
+            -t {input.gentrome} \
+            -i {params.outputDir} \
+            -d {input.decoy} \
+            -p {threads}"
+
+
+
 
 
 # common
