@@ -1,13 +1,15 @@
 # illumina reads
-rule tximport_drimseq_illumina:
+rule tximport_drimseqIllumina:
     input:
-        salmon_out = expand("salmon/{sample}/quant.sf", sample=SAMPLES_ont),
-        txdb = "annotation/annotation_txdb.sqlite",
-        sample_info = "sample_info/sampleInfo.csv"
+        salmon_out = expand("data/quantification/salmon/{sample}/quant.sf", sample=SAMPLES_ont),
+        txdb = "data/annotation/annotation_txdb.sqlite",
+        sample_info = config["SAMPLE_INFO"]
     output:
-        "res/drimseq/illumina/drimseq_dtuScaledTPM.rds"
+        "data/drimseq/drimseq_dtuScaledTPM.rds"
     script:
         "drimseq_txImport.R"
+
+
 
 
 rule drimseq_dmdsFromScaledTpm:

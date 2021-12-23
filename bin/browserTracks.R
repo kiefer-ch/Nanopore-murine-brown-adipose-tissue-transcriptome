@@ -5,10 +5,12 @@ suppressPackageStartupMessages({
     library("Gviz")
     library("dplyr")
     library("readr")
+    library("logger")
     library("AnnotationDbi")
 })
 
 
+log_info("Reading annotation files..")
 txdb_gencode <- loadDb(snakemake@input[["txdb"]])
 txdb_gencode_dump <- as.list(txdb_gencode)
 
@@ -34,7 +36,7 @@ faidx <- read_tsv(snakemake@input$genome,
 
 
 
-
+# function definitions
 subset.txdb <- function(txdb, txdb_dump, gene_id, chrominfo = faidx) {
 
     all_tx <- suppressMessages(AnnotationDbi::select(txdb, gene_id,
@@ -55,10 +57,8 @@ subset.txdb <- function(txdb, txdb_dump, gene_id, chrominfo = faidx) {
 }
 
 
-plot.transcripts <- function(gene_id, max_cov_h3k4 = 5, max_cov_ont = 300,
-    max_cov_illumina = 2000, extend = 2500, lwd_sashimi_max = 3, temp = "warm") {
-
-    message(sprintf("Preparing %s...", gene_id))
+plot.transcripts <- function(gene_id, max_cov_illumina = 5,
+    extend = 2500, lwd_sashimi_max = 3, temp = "warm") {
 
     gene_info <- suppressMessages(AnnotationDbi::select(txdb_gencode, keys = gene_id,
             keytype = "GENEID",
@@ -87,7 +87,7 @@ plot.transcripts <- function(gene_id, max_cov_h3k4 = 5, max_cov_ont = 300,
         chromosome = gene_info$TXCHROM,
         min.height = 3,
         from = gene_info$TXSTART, to = gene_info$TXEND,
-        name = "flair TeloPr")
+        name = "flair cDNA")
 
 
     # stringtie
@@ -121,8 +121,7 @@ plot.transcripts <- function(gene_id, max_cov_h3k4 = 5, max_cov_ont = 300,
         ont <- AlignmentsTrack(snakemake@input[["ont_warm"]],
             isPaired = FALSE,
             genome = "mm10",
-            name = "TeloPrime 22°C",
-            ylim = c(0, max_cov_ont),
+            name = "cDNA 22°C",
             type = c("pileup"),
             min.height = 3, # minimum height of a read in px, controls how many read are plotted
             chromosome = gene_info$TXCHROM,
@@ -133,11 +132,12 @@ plot.transcripts <- function(gene_id, max_cov_h3k4 = 5, max_cov_ont = 300,
             isPaired = TRUE,
             genome = "mm10",
             name = "Illu 22°C",
-            ylim = c(0, max_cov_illumina),
             type = c("coverage", "sashimi"),
+            ylim = c(0, max_cov_illumina),
+            transformation = function(x) log1p(x),
+            sashimiTransformation = function(x) x,
             lwd.sashimiMax = lwd_sashimi_max,
             sashimiHeight = .33,
-            transformation = function(x) log1p(x),
             chromosome = gene_info$TXCHROM,
             start = gene_info$TXSTART,
             end = gene_info$TXEND)
@@ -147,8 +147,7 @@ plot.transcripts <- function(gene_id, max_cov_h3k4 = 5, max_cov_ont = 300,
         ont <- AlignmentsTrack(snakemake@input[["ont_cold"]],
             isPaired = FALSE,
             genome = "mm10",
-            name = "TeloPrime 4°C",
-            ylim = c(0, max_cov_ont),
+            name = "cDNA 4°C",
             type = c("pileup"),
             min.height = 3, # minimum height of a read in px, controls how many read are plotted
             chromosome = gene_info$TXCHROM,
@@ -159,44 +158,36 @@ plot.transcripts <- function(gene_id, max_cov_h3k4 = 5, max_cov_ont = 300,
             isPaired = TRUE,
             genome = "mm10",
             name = "Illu 4°C",
-            ylim = c(0, max_cov_illumina),
             type = c("coverage", "sashimi"),
+            ylim = c(0, max_cov_illumina),
+            transformation = function(x) log1p(x),
+            sashimiTransformation = function(x) x,
             lwd.sashimiMax = lwd_sashimi_max,
             sashimiHeight = .33,
-            transformation = function(x) log1p(x),
             chromosome = gene_info$TXCHROM,
             start = gene_info$TXSTART,
             end = gene_info$TXEND)
+
     }
 
-    # # ChIP seq
-    # ncd_warm_h3k4me3 <- DataTrack(snakemake@input[["ncd_warm_h3k4me3"]],
-    #     genome = "mm10",
-    #     name = "H3K4me3 22 NCD",
-    #     ylim = c(0, max_cov_h3k4),
-    #     chromosome = unique(gene_info$TXCHROM),
-    #     start = min(gene_info$TXSTART) - extend,
-    #     end = max(gene_info$TXEND) + extend,
-    #     type = "histogram")
-    #
-    # ncd_cold_h3k4me3 <- DataTrack(snakemake@input[["ncd_cold_h3k4me3"]],
-    #     genome = "mm10",
-    #     name = "H3K4me3 4 NCD",
-    #     ylim = c(0, max_cov_h3k4),
-    #     chromosome = unique(gene_info$TXCHROM),
-    #     start = min(gene_info$TXSTART) - extend,
-    #     end = max(gene_info$TXEND) + extend,
-    #     type = "histogram")
+    # chip
+    h3k4me3 <- DataTrack(snakemake@input[["ncd_cold_h3k4me3"]],
+        genome = "mm10",
+        name = "H3K4me3",
+        chromosome = unique(gene_info$TXCHROM),
+        start = min(gene_info$TXSTART) - extend,
+        end = max(gene_info$TXEND) + extend,
+        type = "histogram")
 
 
     # Plotting
     options(ucscChromosomeNames = FALSE)
 
     tracks <- list(gtrack,
-            illumina,
-            ont,
-#           ncd_warm_h3k4me3, ncd_cold_h3k4me3,
-            gencodetrack, flairtrack, stringtietrack)
+        illumina,
+        ont,
+        gencodetrack, flairtrack, stringtietrack,
+        h3k4me3)
 
 
     if(length(extend) == 1) {
@@ -211,24 +202,23 @@ plot.transcripts <- function(gene_id, max_cov_h3k4 = 5, max_cov_ont = 300,
 
     }
 
-
     plotTracks(
         tracks,
         from = min(gene_info$TXSTART) - extend_l,
         to = max(gene_info$TXEND) + extend_r,
         extend.left = 250,
         extend.right = 250,
-        background.title = "darkblue",
+        background.title = "transparent",
+        col.title = "grey10",
         cex = .75,
         cex.axis = .6,
         sashimiFilter = unique_exons,
         lwd = .25,
-        sizes = c(.1,
-              .33,               #illumina
-              1,                 #ont
-#              rep(.5, 2),       #chip
-              rep(.25, 3)))      #annotation
+        sizes = c(.1, .33, 1, rep(.25, 4)))
+
 }
+
+log_info(sprintf("Plotting %s...", snakemake@params$gene_id))
 
 pdf(snakemake@output[[1]],
     width = snakemake@params$dimsenion[1],
@@ -236,7 +226,6 @@ pdf(snakemake@output[[1]],
 
     plot.transcripts(
         gene_id = snakemake@params$gene_id,
-        max_cov_ont = snakemake@params$max_cov_ont,
         max_cov_illumina = snakemake@params$max_cov_illumina,
         lwd_sashimi_max = snakemake@params$lwd_sashimi_max,
         extend = snakemake@params$extend_plot,

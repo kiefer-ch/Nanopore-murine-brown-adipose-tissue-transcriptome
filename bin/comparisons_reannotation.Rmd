@@ -53,9 +53,14 @@ df2 <- snakemake@input[["sqanti"]] %>%
                      sub("^.+/", "", .)) %>% 
     map(read_tsv, show_col_types = FALSE) %>% 
     bind_rows(.id = "dataset") %>% 
-    mutate(dataset = factor(dataset,
-        levels = c("illumina_stringtie", "teloprime_stringtie", "cdna_stringtie",
-            "rna_stringtie", "teloprime_flair", "cdna_flair", "rna_flair")))
+    mutate(
+        dataset = factor(dataset,
+            levels = c("illumina_stringtie", "teloprime_stringtie", "cdna_stringtie",
+                "rna_stringtie", "teloprime_flair", "cdna_flair", "rna_flair")),
+        structural_category = factor(structural_category,
+            levels = c("full-splice_match", "novel_in_catalog", "incomplete-splice_match",
+                "novel_not_in_catalog", "fusion", "antisense",
+                "genic", "genic_intron", "intergenic")))
 ```
 
 
@@ -160,24 +165,26 @@ df2 %>%
 
 ```{r plot_sqanti2, fig.width = 6.85 / 2, fig.asp = .65}
 df2 %>% 
+    mutate(structural_category = factor(structural_category, rev(levels(structural_category)))) %>% 
     ggplot(aes(dataset)) +
     geom_bar(aes(fill = structural_category), position = "fill") +
-    scale_fill_brewer(palette = "Paired", name = NULL) +
+    scale_fill_brewer(palette = "Paired", name = NULL, limits = levels(df2$structural_category)) +
     theme_tufte(base_size = 8, base_family = "Helvetica") +
     geom_rangeframe(sides = 'bl') +
-    ylab(NULL) +
+    ylab("Reassembled transcripts") +
     xlab(NULL) +
     scale_y_continuous(labels = scales::percent) +
     theme(legend.key.size = unit(.33, "cm")) +
     theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5))
 
 df2 %>% 
+    mutate(structural_category = factor(structural_category, rev(levels(structural_category)))) %>% 
     ggplot(aes(dataset)) +
     geom_bar(aes(fill = structural_category)) +
-    scale_fill_brewer(palette = "Paired", name = NULL) +
+    scale_fill_brewer(palette = "Paired", name = NULL, limits = levels(df2$structural_category)) +
     theme_tufte(base_size = 8, base_family = "Helvetica") +
     geom_rangeframe(sides = 'bl') +
-    ylab(NULL) +
+    ylab("Reassembled transcripts") +
     xlab(NULL) +
     theme(legend.key.size = unit(.33, "cm")) +
     theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5))

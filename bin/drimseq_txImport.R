@@ -1,9 +1,13 @@
-#!/usr/bin/Rscript --no-restore --no-environ --no-save
+
+save.image()
 
 source(".Rprofile")
-library("readr")
-library("dplyr")
-library("tximport")
+suppressPackageStartupMessages({
+    library("logger")
+    library("readr")
+    library("dplyr")
+    library("tximport")
+})
 
 ################################################################################
 #
@@ -12,11 +16,16 @@ library("tximport")
 #
 ################################################################################
 
-# prepare sample_info
-sample_info <- read_csv(snakemake@input[["sample_info"]]) %>%
-    filter(!is.na(ont)) %>%
+log_info("Pprepare sample_info")
+files <- tibble(path = snakemake@input$salmon_out) %>%
+    mutate(illumina = path %>% dirname() %>% basename())
+
+sample_info <- read_csv(snakemake@input[["sample_info"]],
+        show_col_types = FALSE) %>%
     mutate_at(vars(matches("condition")), as.factor) %>%
-    mutate(path = file.path("salmon", illumina, "quant.sf"))
+    filter(!is.na(ont)) %>%
+    dplyr::select(sample_id, condition_temp, illumina) %>%
+    left_join(files, "illumina")
 
 # generate tx2gene table
 tx2g <- AnnotationDbi::loadDb(snakemake@input[["txdb"]])  %>%
