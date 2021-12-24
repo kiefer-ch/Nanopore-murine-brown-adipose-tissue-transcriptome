@@ -307,7 +307,7 @@ rule stringtie_merge:
 
 rule stringtie_getFasta:
     input:
-        "data/annotation/genome.fa.fai"
+        "data/annotation/genome.fa.fai",
         gtf = "data/reannotation/stringtie/{dataset}_stringtie.gtf",
         genome = "data/annotation/genome.fa"
     output:

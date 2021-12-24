@@ -20,24 +20,26 @@ def get_minimapInput(wildcards):
     return file_name
 
 
-
-
-
 rule minimap_mapGenome:
     input:
         index = "indices/minimap2/genome_minimap2.mmi",
         fastq = get_minimapInput
     output:
-        sam = "data/bam/{dataset}/{dataset}_{flowcell}_genome_{barcode}_q7.sam"
-    threads: 24
+         "data/bam/{dataset}/{flowcell}/{dataset}_{flowcell}_genome_{barcode}_q7_sort.bam",
+    threads: 20
+    wildcard_constraints:
+        dataset = "cdna|rna|teloprime",
+        flowcell = "flowcell1|flowcell2|merged"
     shell:
         "minimap2 \
+            -2 \
             -ax splice \
             -t {threads} \
             --secondary=no \
             -uf \
             {input.index} \
-            {input.fastq} > {output.sam}"
+            {input.fastq} | \
+        samtools sort -l 5 -o {output} -O bam -@ 6"
 
 
 rule minimap_mapTranscriptome:
@@ -45,16 +47,21 @@ rule minimap_mapTranscriptome:
         index = "indices/minimap2/transcriptome_minimap2.mmi",
         fastq = get_minimapInput
     output:
-        sam = "data/bam/{dataset}/{dataset}_{flowcell}_transcriptome_{barcode}_q7.sam"
-    threads: 24
+         "data/bam/{dataset}/{flowcell}/{dataset}_{flowcell}_transcriptome_{barcode}_q7_sort.bam",
+    threads: 20
+    wildcard_constraints:
+        dataset = "cdna|rna|teloprime",
+        flowcell = "flowcell1|flowcell2|merged"
     shell:
         "minimap2 \
+            -2 \
             -ax map-ont \
             -t {threads} \
             --secondary=no \
             -uf \
             {input.index} \
-            {input.fastq} > {output.sam}"
+            {input.fastq} | \
+        samtools sort -l 5 -o {output} -O bam -@ 6"
 
 
 rule samtools_merge:
@@ -63,7 +70,7 @@ rule samtools_merge:
         "data/bam/{dataset}/flowcell1/{dataset}_flowcell1_transcriptome_{barcode}_q7_sort.bam"
     output:
         "data/bam/{dataset}/merged/{dataset}_{barcode}_{type}.bam"
-    threads: 4
+    threads: 6
     wildcard_constraints:
         dataset = "teloprime|cdna",
         type = "genome|transcriptome"
@@ -96,7 +103,8 @@ rule quantify_minimap:
         "data/quantification/{dataset}/{flowcell}/{dataset}_{flowcell}_{barcode}_quant.tsv"
     wildcard_constraints:
         dataset = "teloprime|cdna|rna",
-        type = "genome|transcriptome"
+        type = "genome|transcriptome",
+        flowcell = "flowcell1|flowcell2|merged"
     script:
         "quantify_minimap.R"
 

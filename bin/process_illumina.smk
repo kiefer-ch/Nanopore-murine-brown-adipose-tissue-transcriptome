@@ -98,8 +98,8 @@ rule salmon_prepareDecoys:
         genome = "data/annotation/genome.fa",
         annotation = "data/annotation/annotation.gtf"
     output:
-        "indices/salmon/decoy/gentrome.fa",
-        "indices/salmon/decoy/decoys.txt"
+        temp("indices/salmon/decoy/gentrome.fa"),
+        temp("indices/salmon/decoy/decoys.txt")
     params:
         outputDir = "indices/salmon/decoy"
     threads: 20
@@ -147,10 +147,10 @@ rule salmon_align:
         fastq_fw = "data/fastq/illumina/trimmed/{sample}_R1_001_trimmed.fastq.gz",
         fastq_rv = "data/fastq/illumina/trimmed/{sample}_R2_001_trimmed.fastq.gz"
     output:
-        "salmon/{sample}/quant.sf"
+        "data/quantification/salmon/{sample}/quant.sf"
     params:
         inputDir = "indices/salmon",
-        outputDir = "data/salmon/{sample}"
+        outputDir = "data/quantification/salmon/{sample}"
     shell:
         "salmon quant \
             --gcBias \
@@ -165,17 +165,6 @@ rule salmon_align:
             -o {params.outputDir}"
 
 
-rule sam_to_sortBam:
-    input:
-        "{file}.sam"
-    output:
-        "{file}_sort.bam"
-    threads:
-        5
-    shell:
-        "samtools sort -l 5 -o {output} -O bam -@ {threads} {input}"
-
-
 rule samtools_index:
     input:
         "{file}.bam"
@@ -183,6 +172,11 @@ rule samtools_index:
         "{file}.bam.bai"
     shell:
         "samtools index {input}"
+
+
+rule trim_all_illumina:
+    input:
+        expand("data/fastq/illumina/trimmed/{sample}_R2_001_trimmed.fastq.gz", sample=SAMPLES_ont)
 
 
 rule make_deseqDataSet_illumina:
