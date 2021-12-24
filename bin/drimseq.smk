@@ -6,8 +6,8 @@ MASHMAP = config["MASHMAP"]
 rule salmon_prepareDecoys_reannotatedStringtie:
     input:
         genome = "data/annotation/genome.fa",
-        annotation = "data/reannotation/stringtie/{dataset}_stringtie.gtf",
-        transcripts = "data/reannotation/stringtie/{dataset}_stringtie.fa"
+        annotation = "data/reannotation/stringtie/{dataset}_stringtie_noUnknownStrand.gtf",
+        transcripts = "data/reannotation/stringtie/{dataset}_stringtie_noUnknownStrand.fa"
     output:
         "indices/salmon_{dataset}_stringtie/decoy/gentrome.fa",
         "indices/salmon_{dataset}_stringtie/decoy/decoys.txt"
@@ -88,7 +88,7 @@ rule salmon_align_reannotated:
         "data/quantification/illumina_{dataset}_{method}/{sample}/quant.sf"
     params:
         inputDir = "indices/salmon_{dataset}_{method}",
-        outputDir = "data/reannotation/illumina_{dataset}_{method}/{sample}"
+        outputDir = "data/quantification/illumina_{dataset}_{method}/{sample}"
     wildcard_constraints:
         method = "flair|stringtie"
     shell:
@@ -110,7 +110,7 @@ def get_minimapIndexInput(wildcards):
     if wildcards.method == "flair":
         file = "data/reannotation/flair/annotation/{dataset}_flair.isoforms.fa"
     elif wildcards.method == "stringtie":
-        file = "data/reannotation/stringtie/{dataset}_stringtie_noUnkownStrand.fa"
+        file = "data/reannotation/stringtie/{dataset}_stringtie_noUnknownStrand.fa"
     return file
 
 

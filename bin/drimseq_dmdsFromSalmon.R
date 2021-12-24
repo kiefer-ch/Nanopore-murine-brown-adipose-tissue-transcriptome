@@ -37,6 +37,11 @@ tx2g <- AnnotationDbi::loadDb(snakemake@input[["txdb"]])  %>%
     dplyr::select(TXNAME, GENEID)
 
 
+if (snakemake@wildcards$method == "flair") {
+
+   tx2g$TXNAME <-  paste(tx2g$TXNAME, tx2g$GENEID, sep = "_")
+
+}
 
 log_info("Import reads...")
 txi <- tximport(files = sample_info$path,

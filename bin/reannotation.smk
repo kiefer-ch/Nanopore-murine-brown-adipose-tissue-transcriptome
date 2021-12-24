@@ -308,9 +308,11 @@ rule stringtie_merge:
 rule stringtie_getFasta:
     input:
         "data/annotation/genome.fa.fai",
-        gtf = "data/reannotation/stringtie/{dataset}_stringtie.gtf",
+        gtf = "data/reannotation/stringtie/{dataset}_stringtie_noUnknownStrand.gtf",
         genome = "data/annotation/genome.fa"
     output:
-        "data/reannotation/stringtie/{dataset}_stringtie.fa"
+        "data/reannotation/stringtie/{dataset}_stringtie_noUnknownStrand.fa"
+    wildcard_constraints:
+        dataset = "illumina|cdna|teloprime"
     shell:
         "gffread --ignore-locus -w {output} -g {input.genome} {input.gtf}"
