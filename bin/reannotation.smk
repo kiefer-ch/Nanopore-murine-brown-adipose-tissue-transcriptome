@@ -313,4 +313,4 @@ rule stringtie_getFasta:
     output:
         "data/reannotation/stringtie/{dataset}_stringtie.fa"
     shell:
-        "gffread -w {output} -g {input.genome} {input.gtf}"
+        "gffread --ignore-locus -w {output} -g {input.genome} {input.gtf}"

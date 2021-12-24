@@ -110,7 +110,7 @@ def get_minimapIndexInput(wildcards):
     if wildcards.method == "flair":
         file = "data/reannotation/flair/annotation/{dataset}_flair.isoforms.fa"
     elif wildcards.method == "stringtie":
-        file = "data/reannotation/stringtie/{dataset}_stringtie.fa"
+        file = "data/reannotation/stringtie/{dataset}_stringtie_noUnkownStrand.fa"
     return file
 
 
@@ -198,11 +198,22 @@ rule drimseq_dmdsFromONT:
         "drimseq_dmdsFromONT.R"
 
 
+def get_txdb(wildcards):
+    if wildcards.method == "flair":
+        file =  "data/reannotation/flair/annotation/cdna_flair.isoforms_txdb.sqlite"
+    elif wildcards.method == "stringtie":
+        if wildcards.dataset == "illumina":
+            file = "data/reannotation/stringtie/illumina_stringtie_noUnknownStrand_txdb.sqlite",
+        elif wildcards.dataset == "teloprime":
+            file = "data/reannotation/stringtie/teloprime_stringtie_noUnknownStrand_txdb.sqlite"
+    return file
+
+
 rule drimseq_dmdsFromONTreannotated:
     input:
         counts = expand("data/quantification/cdna_{{dataset}}_{{method}}/{barcode}_quant.tsv",
             barcode=SAMPLE_INFO_ont["cdna"]),
-        txdb = "data/annotation/annotation_txdb.sqlite",
+        txdb = get_txdb,
         sample_info = config["SAMPLE_INFO"]
     output:
         "data/drimseq/cdna_{dataset}_{method}_dmds.rds"
@@ -219,7 +230,7 @@ rule tximport_drimseqIlluminaReannotated:
         salmon_out =
             expand("data/quantification/illumina_{{dataset}}_{{method}}/{sample}/quant.sf",
                 sample=SAMPLES_ont),
-        txdb = "data/annotation/annotation_txdb.sqlite",
+        txdb = get_txdb,
         sample_info = config["SAMPLE_INFO"]
     output:
         "data/drimseq/illumina_{dataset}_{method}_dmds.rds"

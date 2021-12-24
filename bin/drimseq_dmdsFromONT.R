@@ -36,9 +36,16 @@ cts <- snakemake@input[["counts"]] %>%
     dplyr::rename(TXNAME = "Name") %>%
     tidyr::pivot_wider(names_from = barcode, values_from = "NumReads", values_fill = 0)
 
+# remove gene name for flair
+if (snakemake@wildcards$method == "flair") {
+
+    cts <- cts %>%
+        mutate(TXNAME = sub("_.+$", "", TXNAME))
+
+}
+
 
 txdf <- txdf[match(cts$TXNAME, txdf$TXNAME),]
-
 
 counts <- cts %>%
     left_join(txdf, by = "TXNAME") %>%
@@ -57,7 +64,6 @@ sample_info <- read_csv(snakemake@input[["sample_info"]],
 
 log_info("Create dmds")
 dmds <- dmDSdata(counts = counts, samples = as.data.frame(sample_info))
-
 
 
 log_info("Write to disc...")
