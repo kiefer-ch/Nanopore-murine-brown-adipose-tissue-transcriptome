@@ -252,21 +252,17 @@ rule tximport_drimseqIllumina:
         "drimseq_dmdsFromSalmon.R"
 
 
-
-
-
-
-
-
-# common
+# dtu
 rule drimseq_dtu:
     input:
-        sample_info = "sample_info/sampleInfo.csv",
-        dmds = "res/drimseq/{dataset}/{dataset}_dmds.rds",
-        biomaRt_gene = "annotation/biomaRt_gene.rds"
+        sample_info = config["SAMPLE_INFO"],
+        dmds = "data/drimseq/{file}_dmds.rds"
     output:
-        dmds = "res/drimseq/{dataset}/{dataset}_dmds_dtu.rds",
-        res = "res/drimseq/{dataset}/{dataset}_drimSeqStageR.csv"
+        dmds = "data/drimseq/{file}_dmds_dtu.rds"
+    params:
+        min_feature_expr = 10,
+        min_feature_prop = 0.1,
+        min_gene_expr = 10
     threads:
         4
     script:

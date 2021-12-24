@@ -15,7 +15,7 @@ suppressPackageStartupMessages({
 ################################################################################
 
 log_info("Create txdf...")
-txdf <- AnnotationDbi::loadDb(snakemake@input[["txdb"]])  %>%
+txdf <- suppressPackageStartupMessages(AnnotationDbi::loadDb(snakemake@input[["txdb"]]))  %>%
     AnnotationDbi::select(.,
         keys =  AnnotationDbi::keys(., keytype = "GENEID"),
         keytype = "GENEID",
@@ -37,13 +37,12 @@ cts <- snakemake@input[["counts"]] %>%
     tidyr::pivot_wider(names_from = barcode, values_from = "NumReads", values_fill = 0)
 
 # remove gene name for flair
-if (snakemake@wildcards$method == "flair") {
-
-    cts <- cts %>%
-        mutate(TXNAME = sub("_.+$", "", TXNAME))
-
+if (!is.null(snakemake@wildcards$method)) {
+    if (snakemake@wildcards$method == "flair") {
+        cts <- cts %>%
+            mutate(TXNAME = sub("_.+$", "", TXNAME))
+    }
 }
-
 
 txdf <- txdf[match(cts$TXNAME, txdf$TXNAME),]
 
@@ -67,7 +66,7 @@ dmds <- dmDSdata(counts = counts, samples = as.data.frame(sample_info))
 
 
 log_info("Write to disc...")
-saveRDS(cts, snakemake@output[[1]])
+saveRDS(dmds, snakemake@output[[1]])
 
 
 log_success("Done.")

@@ -29,18 +29,17 @@ sample_info <- read_csv(snakemake@input[["sample_info"]],
 
 
 log_info("Generate tx2gene table...")
-tx2g <- AnnotationDbi::loadDb(snakemake@input[["txdb"]])  %>%
+tx2g <- suppressPackageStartupMessages(AnnotationDbi::loadDb(snakemake@input[["txdb"]]))  %>%
     AnnotationDbi::select(.,
         keys =  AnnotationDbi::keys(., keytype = "GENEID"),
         keytype = "GENEID",
         columns = "TXNAME") %>%
     dplyr::select(TXNAME, GENEID)
 
-
-if (snakemake@wildcards$method == "flair") {
-
-   tx2g$TXNAME <-  paste(tx2g$TXNAME, tx2g$GENEID, sep = "_")
-
+if (!is.null(snakemake@wildcards$method)) {
+    if (snakemake@wildcards$method == "flair") {
+       tx2g$TXNAME <-  paste(tx2g$TXNAME, tx2g$GENEID, sep = "_")
+    }
 }
 
 log_info("Import reads...")
@@ -76,7 +75,7 @@ dmds <- dmDSdata(counts = counts, samples = as.data.frame(sample_info))
 
 
 log_info("Write to disc...")
-saveRDS(cts, snakemake@output[[1]])
+saveRDS(dmds, snakemake@output[[1]])
 
 
 log_success("Done.")
