@@ -8,8 +8,6 @@ suppressPackageStartupMessages({
     library("stageR")
 })
 
-BPPARAM = BiocParallel::MulticoreParam(snakemake@threads[[1]])
-
 ################################################################################
 #
 # author: Christoph Kiefer
@@ -18,52 +16,25 @@ BPPARAM = BiocParallel::MulticoreParam(snakemake@threads[[1]])
 ################################################################################
 
 log_info("Importing data...")
-dmds <- read_rds(snakemake@input[["dmds"]])
-biomart_gene <- read_rds(snakemake@input[["biomaRt_gene"]])
+dmds <- read_rds(snakemake@input$dmds)
+
+biomart_gene <- read_rds(snakemake@input$biomart)
 
 sample_info <- read_csv(snakemake@input[["sample_info"]],
         show_col_types = FALSE) %>%
     mutate_at(vars(matches("condition")), as.factor) %>%
     filter(!is.na(ont)) %>%
-    dplyr::select(condition_temp, sample_id = "cdna")
-
-log_info("Filtering lowly expressed transcripts...")
-genes <- counts(dmds)$gene_id %>%  unique() %>%  length()
-transcripts <- counts(dmds)$feature_id %>%  unique() %>%  length()
-log_info(sprintf("Before filtering: %s genes with %s transcripts", genes, transcripts))
-
-# total number of samples
-n <- 6
-# number of samples in the smallest group
-n.small <- 3
-
-# filter
-dmds <- dmFilter(dmds,
-    min_samps_feature_expr = n.small,
-    min_feature_expr = snakemake@params$min_feature_expr,
-    min_samps_feature_prop = n.small,
-    min_feature_prop = snakemake@params$min_feature_prop,
-    min_samps_gene_expr = n,
-    min_gene_expr = snakemake@params$min_gene_expr)
-
-genes <- counts(dmds)$gene_id %>%  unique() %>%  length()
-transcripts <- counts(dmds)$feature_id %>%  unique() %>%  length()
-log_info(sprintf("After filtering: %s genes with %s transcripts", genes, transcripts))
+    dplyr::select(condition_temp, sample_id, cdna)
 
 
-log_info("Fitting and testing models...")
-design_full <- model.matrix(~condition_temp,
-    data = DRIMSeq::samples(dmds) %>%
-        mutate(condition_temp = relevel(condition_temp, "22")))
+if (snakemake@wildcards$dataset == "cdna") {
+    sample_info <- sample_info %>%
+        select(condition_temp, sample_id = "cdna")
+} else {
+    sample_info <- sample_info %>%
+        select(-cdna)
+}
 
-dmds <- dmPrecision(dmds, design = design_full,
-    BPPARAM = BPPARAM)
-dmds <- dmFit(dmds, design = design_full)
-dmds <- dmTest(dmds, coef = "condition_temp4")
-
-# export
-log_info("Writing dmds to disc...")
-saveRDS(dmds, snakemake@output[["dmds"]])
 
 # build results tables
 log_info("Building results table...")
@@ -93,19 +64,21 @@ drim.padj <- getAdjustedPValues(stageRObj, order = TRUE,
 
 res_stageR <- drim.padj %>%
     as_tibble() %>%
-    dplyr::rename(ensembl_gene_id_version = "geneID",
-        ensembl_transcript_id_version = "txID") %>%
-    left_join(biomart_gene, by = "ensembl_gene_id_version")
+    dplyr::rename(gene_id = "geneID",
+        transcript_id = "txID")
 
-# Undo the name change
-res_stageR <- res_stageR %>%
-    mutate(ensembl_gene_id_version = sub('_', ':', ensembl_gene_id_version))
 
 # Add proportions
 props <- proportions(dmds) %>%
-    tidyr::gather("sample_id", "proportion", -gene_id, -feature_id) %>%
-    mutate(sample_id = substr(sample_id, 2, nchar(sample_id))) %>%
-    left_join(sample_info %>% select(sample_id, condition_temp), by = "sample_id") %>%
+    tidyr::gather("sample_id", "proportion", -gene_id, -feature_id)
+
+if (snakemake@wildcards$dataset == "illumina") {
+    props <- props %>%
+    mutate(sample_id = substr(sample_id, 2, nchar(sample_id)))
+}
+
+props <- props %>%
+    left_join(sample_info, by = "sample_id") %>%
     group_by(gene_id, feature_id, condition_temp) %>%
     summarise(proportion = mean(proportion)) %>%
     ungroup() %>%
@@ -114,12 +87,36 @@ props <- proportions(dmds) %>%
     dplyr::rename(ensembl_gene_id_version = "gene_id",
         ensembl_transcript_id_version = "feature_id")
 
-# export
+res_stageR <- res_stageR %>%
+    left_join(props, by = c("gene_id" = "ensembl_gene_id_version",
+                        "transcript_id" = "ensembl_transcript_id_version"))
+
+
+if (!is.null(snakemake@input$tmap)) {
+    tmap <- read_tsv(snakemake@input$tmap, col_types = "ccfccidddici", na = "-") %>%
+        select(ref_gene_id, ref_id, qry_gene_id, qry_id)
+
+    res_stageR <- res_stageR %>%
+        left_join(tmap,
+                  by = c("gene_id" = "qry_gene_id", "transcript_id" = "qry_id")) %>%
+        mutate(gene_id = if_else(is.na(ref_gene_id), gene_id, ref_gene_id),
+               transcript_id = if_else(is.na(ref_id), transcript_id, ref_id)) %>%
+        select(-ref_gene_id, -ref_id)
+}
+
+res_stageR <- res_stageR %>%
+    left_join(biomart_gene, by = c("gene_id" = "ensembl_gene_id_version"))
+
+
+# Undo the name change
+res_stageR <- res_stageR %>%
+    mutate(gene_id = sub('_', ':', gene_id))
+
+
 log_info("Writing results table to disc...")
 res_stageR %>%
-    left_join(props, by = c("ensembl_gene_id_version", "ensembl_transcript_id_version")) %>%
-    dplyr::select("ensembl_gene_id_version", "ensembl_transcript_id_version",
+    dplyr::select("gene_id", "transcript_id",
         "mgi_symbol", "description", "gene_biotype", everything()) %>%
-    write_csv(snakemake@output[["res"]])
+    write_csv(snakemake@output[[1]])
 
 log_success("Done")

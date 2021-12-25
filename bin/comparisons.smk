@@ -326,38 +326,13 @@ rule compare_reannotation:
         "comparisons_reannotation.Rmd"
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-rule compare_dtu_1:
+rule compare_dtu:
     input:
-        drimseq = expand("res/drimseq/{dataset}/{dataset}_drimSeqStageR.csv",
-            dataset=["illumina", "cdna", "teloprime", "cdna_flair", "teloprime_flair"]),
-        dexseq = expand("res/dexseq/{dataset}/{dataset}_dexseq_results.csv.gz",
-            dataset=["illumina", "cdna", "teloprime"]),
-        biomaRt_gene = "annotation/biomaRt_gene.rds",
-        counts = "res/comparisons/comparisons_meanCounts_gene.csv.gz"
+        expand("data/drimseq/{dataset}_{file}_dtu_res.csv",
+            dataset = ["illumina", "cdna"],
+            file = ["ref", "illumina_stringtie", "cdna_flair", "teloprime_stringtie"])
     output:
         signif = "res/comparisons/comparisons_dtu_significant.csv",
         all = "res/comparisons/comparisons_dtu_all.rds"
-    script:
-        "comparisons_dtu.R"
-
-
-rule compare_dtu_2:
-    input:
-        signif = "res/comparisons/comparisons_dtu_significant.csv",
-        all = "res/comparisons/comparisons_dtu_all.rds"
-    output:
-        "res/comparisons/comparisons_dtu.html"
     script:
         "comparisons_dtu.Rmd"

@@ -30,5 +30,4 @@ include: "bin/gffcompare.smk"
 include: "bin/browserTracks.smk"
 include: "bin/drimseq.smk"
 
-#include: "bin/dexseq.snakefile"
 #include: "bin/qpcr.snakefile"
