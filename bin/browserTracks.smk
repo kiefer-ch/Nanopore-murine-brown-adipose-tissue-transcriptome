@@ -4,6 +4,8 @@ rule browserTrackAdcy3:
         txdb_flair = "data/reannotation/flair/annotation/cdna_flair.isoforms_txdb.sqlite",
         txdb_stringtie = "data/reannotation/stringtie/teloprime_stringtie_noUnknownStrand_txdb.sqlite",
         tmap = "data/reannotation/stringtie/gffcmp.teloprime_stringtie.gtf.tmap",
+        txdb_stringtie_illumina = "data/reannotation/stringtie/illumina_stringtie_noUnknownStrand_txdb.sqlite",
+        tmap_illumina = "data/reannotation/stringtie/gffcmp.illumina_stringtie.gtf.tmap",
         illumina_warm = "data/bam/illumina/5034_S33_Aligned.sortedByCoord.out.bam",
         illumina_cold = "data/bam/illumina/5035_S34_Aligned.sortedByCoord.out.bam",
         ont_warm = "data/bam/cdna/merged/cdna_barcode07_genome.bam",
@@ -17,7 +19,7 @@ rule browserTrackAdcy3:
         lwd_sashimi_max = 10,
         extend_plot = 0,
         temp = "warm",
-        dimension = [6.85, 5]
+        dimension = [6.85, 6]
     output:
         "res/browserTracks/Adcy3.pdf"
     script:
@@ -30,6 +32,8 @@ rule browserTrackCars2:
         txdb_flair = "data/reannotation/flair/annotation/cdna_flair.isoforms_txdb.sqlite",
         txdb_stringtie = "data/reannotation/stringtie/teloprime_stringtie_noUnknownStrand_txdb.sqlite",
         tmap = "data/reannotation/stringtie/gffcmp.teloprime_stringtie.gtf.tmap",
+        txdb_stringtie_illumina = "data/reannotation/stringtie/illumina_stringtie_noUnknownStrand_txdb.sqlite",
+        tmap_illumina = "data/reannotation/stringtie/gffcmp.illumina_stringtie.gtf.tmap",
         illumina_warm = "data/bam/illumina/5034_S33_Aligned.sortedByCoord.out.bam",
         illumina_cold = "data/bam/illumina/5035_S34_Aligned.sortedByCoord.out.bam",
         ont_warm = "data/bam/cdna/merged/cdna_barcode07_genome.bam",
@@ -43,7 +47,7 @@ rule browserTrackCars2:
         lwd_sashimi_max = 10,
         temp = "cold",
         extend_plot = 400,
-        dimension = [6.85, 5]
+        dimension = [6.85, 6]
     output:
         "res/browserTracks/Cars2.pdf"
     script:

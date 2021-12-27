@@ -14,82 +14,118 @@ editor_options:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, cache = FALSE)
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
+    cache = FALSE, out.width = 800)
 ```
 
 ```{r library, include=FALSE}
 source(".Rprofile")
-library("dplyr")
-library("readr")
-library("purrr")
-library("UpSetR")
+suppressPackageStartupMessages({
+    library("dplyr")
+    library("readr")
+    library("purrr")
+    library("UpSetR")
+    library("ggplot2")
+    library("ggthemes")
+})
 ```
 
 ```{r dataImport}
-df <- read_rds(snakemake@input[["all"]])
+df <- snakemake@input$dtu %>% 
+    set_names(basename(.) %>% 
+                  sub("_dtu.+$", "", .)) %>% 
+    map(read_csv, col_types = c("ccccfdddd")) %>% 
+    bind_rows(.id = "id")
 ```
 
-# Upset plots
+# Gene level overlap
 
-## All datasets
+only genes in reference
 
-```{r}
+## upset
+
+```{r, fig.asp = .65}
 df %>%
-    mutate_if(is.numeric, function(x) as.integer(x < .05)) %>%
+    filter(grepl("^ENS", gene_id)) %>% 
+    group_by(id, gene_id) %>% 
+    summarise(gene = min(gene)) %>% 
+    ungroup() %>% 
+    mutate(gene = as.integer(gene <= snakemake@params$dtu_cutoff)) %>% 
+    tidyr::pivot_wider(values_from = gene, names_from = id, values_fill = 0) %>% 
     as.data.frame() %>%
-    tibble::column_to_rownames("ensembl_gene_id_version") %>%
-    upset(nsets = 8,
-        nintersects = 204,
-        order.by = "freq")
+    tibble::column_to_rownames("gene_id") %>%
+    upset(nsets = 8, keep.order = TRUE,
+        order.by = "freq",
+        sets = c("illumina_ref", "illumina_illumina_stringtie",
+                 "illumina_cdna_flair", "illumina_teloprime_stringtie",
+                 "cdna_ref", "cdna_illumina_stringtie",
+                 "cdna_cdna_flair", "cdna_teloprime_stringtie"),
+        sets.x.label = "Genes with DTU",
+        mainbar.y.label = "Shared genes with DTU",
+        text.scale = 1.25)
 ```
 
-## Without illumina
+## Table
 
 ```{r}
-df %>%
-    select_at(vars(-matches("illumina"))) %>%
-    mutate_if(is.numeric, function(x) as.integer(x < .05)) %>%
-    as.data.frame() %>%
-    tibble::column_to_rownames("ensembl_gene_id_version") %>%
-    upset(nsets = 6,
-        nintersects = 204,
-        order.by = "freq")
-```
-
-## Dexseq only
-
-```{r}
-df %>%
-    select_at(vars(-matches("drimseq"))) %>%
-    mutate_if(is.numeric, function(x) as.integer(x < .05)) %>%
-    as.data.frame() %>%
-    tibble::column_to_rownames("ensembl_gene_id_version") %>%
-    upset(nsets = 6,
-        nintersects = 204,
-        order.by = "freq")
-```
-
-## Drimseq only
-
-```{r}
-df %>%
-    select_at(vars(-matches("dexseq"))) %>%
-    mutate_if(is.numeric, function(x) as.integer(x < .05)) %>%
-    as.data.frame() %>%
-    tibble::column_to_rownames("ensembl_gene_id_version") %>%
-    upset(nsets = 6,
-        nintersects = 204,
-        order.by = "freq")
-```
-
-# List of genes that show DTU in any of the analyses
-
-```{r}
-df_sub <- read_csv(snakemake@input[["signif"]])
-
-df_sub %>%
-    filter_if(is.numeric, any_vars(. < .05)) %>%
+df %>% 
+    group_by(gene_id) %>% 
+    mutate(min_gene = min(gene)) %>% 
+    ungroup() %>% 
+    filter(min_gene < snakemake@params$dtu_cutoff) %>% 
+    group_by(id, gene_id, mgi_symbol, description, gene_biotype) %>% 
+    summarise(gene = min(gene)) %>% 
+    ungroup() %>% 
+    tidyr::pivot_wider(values_from = gene, names_from = id, values_fill = 1) %>% 
+    filter(grepl("^ENS", gene_id)) %>% 
+    arrange(mgi_symbol) %>% 
     knitr::kable(format = "html") %>%
     kableExtra::kable_styling() %>%
     kableExtra::scroll_box(width = "100%", height = "600px")
 ```
+
+# qPCR validation
+```{r, fig.width = 6.85 / 2, fig.asp = .65}
+qpcr <- read_csv(snakemake@input$qpcr, show_col_types = FALSE)
+
+df %>%
+    group_by(id, mgi_symbol) %>% 
+    summarise(gene = min(gene)) %>% 
+    ungroup() %>% 
+    tidyr::pivot_wider(values_from = gene, names_from = id, values_fill = 1) %>% 
+    right_join(qpcr, by = "mgi_symbol") %>% 
+    dplyr::select(-qpcr_p, -sign) %>% 
+    tidyr::gather("dataset", "padj", -mgi_symbol) %>%  
+    mutate(dataset = if_else(dataset == "qpcr_padj", "qpcr", dataset)) %>% 
+    mutate(mgi_symbol = factor(mgi_symbol, levels = rev(levels(as.factor(mgi_symbol))))) %>% 
+    filter(!mgi_symbol %in% c("Smyd4", "Pex6", "Lipe", "Gnas")) %>% 
+    mutate(dataset = factor(dataset, levels = c("illumina_ref", "illumina_illumina_stringtie",
+                 "illumina_cdna_flair", "illumina_teloprime_stringtie",
+                 "cdna_ref", "cdna_illumina_stringtie",
+                 "cdna_cdna_flair", "cdna_teloprime_stringtie", "qpcr"))) %>% 
+    ggplot(aes(dataset, mgi_symbol)) +
+        geom_tile(aes(fill = padj)) +
+        scale_fill_viridis_c(direction = -1, labels = scales::label_pvalue(),
+            limits = c(0,1)) +
+        theme_tufte(base_size = 8, base_family = "Helvetica") +
+        theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5)) +
+        xlab(NULL) + 
+        scale_y_discrete(name = NULL) +
+        theme(legend.key.size = unit(.33, "cm"))
+```
+
+```{r}
+qpcr %>% 
+    filter(!mgi_symbol %in% c("Smyd4", "Pex6", "Lipe", "Gnas")) %>%  
+    mutate(qpcr_padj = p.adjust(qpcr_p)) %>%
+    mutate(sign = symnum(qpcr_padj,
+                         cutpoints = c(0, .001, .01, .05, .1, 1),
+                         symbols = c("***", "**", "*", ".", " ")))  %>% 
+      knitr::kable(format = "html") %>%
+    kableExtra::kable_styling()
+```
+
+
+gene ontology?
+
+analyse der detektierten typen?

@@ -278,6 +278,7 @@ def get_tmap(wildcards):
         file = []
     return file
 
+
 rule drimseq_results:
     input:
         sample_info = config["SAMPLE_INFO"],
@@ -288,5 +289,7 @@ rule drimseq_results:
         dataset = "illumina|cdna"
     output:
         "data/drimseq/{dataset}_{file}_dtu_res.csv"
+    params:
+        dtu_cutoff = 0.1
     script:
         "drimseq_stageR.R"

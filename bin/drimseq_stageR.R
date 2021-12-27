@@ -57,7 +57,8 @@ tx2gene <- res_tx[ , c("feature_id", "gene_id")] %>%
 
 stageRObj <- stageRTx(pScreen = pScreen, pConfirmation = pConfirmation,
         pScreenAdjusted = FALSE, tx2gene = tx2gene)
-stageRObj <- stageWiseAdjustment(stageRObj, method = "dtu", alpha = 0.05)
+stageRObj <- stageWiseAdjustment(stageRObj, method = "dtu",
+        alpha = snakemake@params$dtu_cutoff)
 
 drim.padj <- getAdjustedPValues(stageRObj, order = TRUE,
     onlySignificantGenes = FALSE)
