@@ -1,0 +1,412 @@
+---
+title: "qPCR dtu validation"
+author: "Christoph Kiefer"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+    html_document:
+        toc: true
+        toc_float: true
+        toc_depth: 2
+        fig_caption: false
+        dev: "svg"
+editor_options:
+    chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
+    cache = FALSE, out.width = 800)
+```
+
+```{r library, include=FALSE}
+source(".Rprofile")
+suppressPackageStartupMessages({
+    library("dplyr")
+    library("readr")
+    library("ggplot2")
+    library("ggthemes")
+    library("purrr")
+    library("ggrepel")
+    library("UpSetR")
+    library("Gviz")
+    library("AnnotationDbi")
+})
+```
+
+
+
+```{r importData}
+df <- read_rds(snakemake@input$cq)
+hkp <- c("Gtf2b", "Hprt")
+```
+
+```{r detectOutliers, warning=FALSE}
+detect.outliers <- function(df, cutoff = 1) {
+    out <- df %>%
+        group_by_at(vars(matches("sample_id|gene"))) %>%
+        mutate(error = max(cq, na.rm = TRUE) - min(cq, na.rm = TRUE)) %>%
+        ungroup() %>%
+        mutate(high_var = if_else(error > cutoff, TRUE, FALSE)) %>%
+        dplyr::select(-error)
+
+    if(any(out$high_var, na.rm = TRUE)) {
+        cat(sprintf("%i samples set to NA due to high variance in qPCR
+                replicates.\n",
+            sum(out$high_var, na.rm = TRUE) / 2))
+    } else {
+        cat("No samples with high variance detected.\n")
+    }
+
+    return(out)
+}
+
+df <- df %>%
+    map(detect.outliers, cutoff = 1)
+```
+
+
+# Cq values
+
+```{r cq_loop, results="asis"}
+for (plate in 1:3) {
+    
+    cat('\n') 
+    cat("## ", plate, "\n") 
+    
+    
+    pl <- df[[plate]] %>%
+        ggplot(aes(paste(sample_id, condition_temp), -cq)) +
+        geom_point(aes(colour = high_var)) +
+        geom_text_repel(aes(label = pos),
+            family = "serif", size = 2) +
+        facet_wrap(~gene) +
+        theme_tufte(base_family = "Helvetica") +
+        geom_rangeframe() +
+        ylab("cq") +
+        xlab(NULL) +
+        theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+        scale_color_colorblind()
+    
+    print(pl)
+}
+```
+
+
+# \(\Delta\)Cq
+
+Normalised to Gtf2b/Hprt
+
+```{r average_cq}
+get.averageCq <- function(df) {
+    df %>%
+        mutate(cq = if_else(high_var, NA_real_, cq)) %>%
+        group_by_at(vars(matches("sample_id|condition|gene"))) %>%
+        summarise(cq = mean(cq, na.rm = TRUE)) %>%
+        ungroup()
+}
+
+df <- df %>%
+    bind_rows() %>%
+    get.averageCq()
+```
+
+```{r dcq}
+get.dCq <- function(df, hkp) {
+    ref <- df %>%
+        filter(gene %in% hkp) %>%
+        group_by_at(vars(matches("sample_id"))) %>%
+        summarise(housekeeper = mean(cq)) %>%
+        ungroup()
+
+    df %>%
+        filter(!gene %in% hkp) %>%
+        left_join(ref, by = colnames(df)[grep("sample_id", colnames(df))]) %>%
+        mutate(dcq = cq - housekeeper) %>%
+        dplyr::select(-cq, -housekeeper)
+}
+
+df <- df %>%
+    get.dCq(hkp = hkp)
+```
+
+```{r}
+get.averageDCq <- function(df) {
+    df %>%
+        group_by_at(vars(matches("condition|gene|sample_id"))) %>%
+        summarise(dcq = mean(dcq, na.rm = TRUE)) %>%
+        ungroup()
+}
+
+df <- df %>%
+    get.averageDCq()
+```
+
+```{r}
+df %>%
+    mutate(condition_temp = relevel(condition_temp, "22")) %>%
+    tidyr::separate(gene, c("gene", "isoform"), sep = '_') %>%
+    tidyr::drop_na() %>%
+    ggplot(aes(condition_temp, 2^-dcq, colour = isoform)) +
+    geom_point(position = position_dodge(width = .5)) +
+    stat_summary(geom = "crossbar",
+        fun.data = mean_se,
+        width = .25, lwd = .25,
+        position = position_dodge(width = .5)) +
+    facet_wrap(~gene, scales = "free_y") +
+    scale_y_log10(labels = function(x) x) +
+    theme_tufte(base_family = "Helvetica") +
+    geom_rangeframe(colour = "black") +
+    ylab("rel. expr. vs. Gtf2b/Hprt") +
+    xlab("temperature") +
+    scale_color_colorblind()
+```
+
+# Statistics
+
+## Gene level
+
+This section contains the p value from the interaction terms from linear models.
+It corresponds to the differential transcript usage.
+
+```{r}
+pvalues <- df %>%
+    dplyr::select(gene, condition_temp, dcq) %>%
+    tidyr::separate(gene, c("gene", "isoform"), sep = '_') %>%
+    tidyr::drop_na() %>%
+    split(.$gene) %>%
+    map(lm, formula = dcq ~ isoform * condition_temp) %>%
+    map(summary.lm) %>%
+    map(function(x) x$coefficients[16]) %>%
+    unlist() %>%
+    tibble::enframe(name = "mgi_symbol", value = "qpcr_p") %>%
+    mutate(qpcr_padj = p.adjust(qpcr_p)) %>%
+    mutate(sign = symnum(qpcr_padj,
+        cutpoints = c(0, .001, .01, .05, .1, 1),
+        symbols = c("***", "**", "*", ".", " ")))
+
+pvalues %>%
+    knitr::kable(format = "html") %>%
+    kableExtra::kable_styling()
+```
+
+## Isoform level
+
+This section contains t-tests on isoform level. It corresponds to differential
+transcript expression in the sequencing datasets.
+
+```{r}
+df %>%
+    dplyr::select(gene, condition_temp, dcq) %>%
+    tidyr::separate(gene, c("gene", "isoform"), sep = '_') %>%
+    tidyr::drop_na() %>%
+    group_by(gene, isoform) %>%
+    summarise(log2fc = t.test(dcq ~ condition_temp)$estimate["mean in group 22"] -
+                  t.test(dcq ~ condition_temp)$estimate["mean in group 4"],
+              p = t.test(dcq ~ condition_temp)$p.value) %>%
+    mutate(padj = p.adjust(p)) %>%
+    mutate(sign = symnum(padj,
+        cutpoints = c(0, .001, .01, .05, .1, 1),
+        symbols = c("***", "**", "*", ".", " "))) %>%
+    knitr::kable(format = "html") %>%
+    kableExtra::kable_styling()
+```
+
+
+<!-- # Individual genes -->
+
+<!-- ```{r browserPlotDefinition} -->
+<!-- txdb_gencode <- loadDb(snakemake@input[["txdb"]]) -->
+<!-- txdb_gencode_dump <- as.list(txdb_gencode) -->
+
+<!-- txdb_flair <- loadDb(snakemake@input[["txdb_flair"]]) -->
+<!-- txdb_flair_dump <- as.list(txdb_flair) -->
+
+<!-- primer_stats <- read_csv(snakemake@input[["primer_stats"]]) %>%  -->
+<!--     dplyr::select(mgi_symbol, ensembl_gene_id_version, primer_name, amplified_region) %>%  -->
+<!--     tidyr::separate(amplified_region, c("chr", "start", "end")) %>%  -->
+<!--     mutate_at(vars(matches("start|end")), as.integer) %>%  -->
+<!--     dplyr::select(-chr)     -->
+
+
+<!-- subset.txdb <- function(txdb, txdb_dump, gene_id) { -->
+
+<!--     all_tx <- AnnotationDbi::select(txdb, gene_id, -->
+<!--             c("GENEID", "TXNAME"), "GENEID") %>% -->
+<!--         pull(TXNAME) -->
+
+<!--     all_tx_ids <- txdb_dump[[1]] %>% -->
+<!--         as_tibble() %>% -->
+<!--         filter(tx_name %in% all_tx) %>% -->
+<!--         pull(tx_id) -->
+
+<!--     new_txdb_dump <- vector("list", 4) -->
+<!--     new_txdb_dump[1:3] <- txdb_dump[1:3] %>% -->
+<!--         purrr::map(filter, tx_id %in% all_tx_ids) -->
+<!--     new_txdb_dump[4] <- txdb_dump[4] -->
+
+<!--     do.call(makeTxDb, new_txdb_dump) -->
+<!-- } -->
+
+<!-- plot.transcripts <- function(gene_id) { -->
+
+<!--     gene_info <- AnnotationDbi::select(txdb_gencode, keys = gene_id, -->
+<!--             keytype = "GENEID", -->
+<!--             columns = c("TXCHROM", "TXSTART", "TXEND")) %>% -->
+<!--         as_tibble() %>% -->
+<!--         group_by(GENEID) %>% -->
+<!--         summarise(TXCHROM = unique(TXCHROM), -->
+<!--             TXSTART = min(TXSTART), -->
+<!--             TXEND = max(TXEND)) -->
+
+<!--     primer_info <- primer_stats %>%  -->
+<!--         filter(ensembl_gene_id_version == gene_id) -->
+
+<!--     # annotation track -->
+<!--     txdb_gencode_sub <- subset.txdb(txdb_gencode, txdb_gencode_dump, gene_id) -->
+
+<!--     atrack_gencode <- GeneRegionTrack(txdb_gencode_sub, -->
+<!--         chromosome = gene_info$TXCHROM, -->
+<!--         from = gene_info$TXSTART, to = gene_info$TXEND, -->
+<!--         name = "GENCODE M23") -->
+
+<!--     txdb_flair_sub <- subset.txdb(txdb_flair, txdb_flair_dump, gene_id) -->
+
+<!--     atrack_flair <- GeneRegionTrack(txdb_flair_sub, -->
+<!--         chromosome = gene_info$TXCHROM, -->
+<!--         from = gene_info$TXSTART, to = gene_info$TXEND, -->
+<!--         name = "flair cDNA") -->
+
+<!--     gtrack <- GenomeAxisTrack(from = gene_info$TXSTART,  -->
+<!--         to = gene_info$TXEND, -->
+<!--         scale = 0.25) -->
+
+<!--     # bam files -->
+<!--     teloprime_warm <- AlignmentsTrack(snakemake@input[["teloprime_warm"]], -->
+<!--         isPaired = FALSE, -->
+<!--         genome = "mm10", -->
+<!--         name = "Telo 22°C", -->
+<!--         chromosome = gene_info$TXCHROM, -->
+<!--         start = gene_info$TXSTART, -->
+<!--         end = gene_info$TXEND) -->
+
+<!--     teloprime_cold <- AlignmentsTrack(snakemake@input[["teloprime_cold"]], -->
+<!--         isPaired = FALSE, -->
+<!--         genome = "mm10", -->
+<!--         name = "Telo 4°C", -->
+<!--         chromosome = gene_info$TXCHROM, -->
+<!--         start = gene_info$TXSTART, -->
+<!--         end = gene_info$TXEND) -->
+
+<!--     cdna_warm <- AlignmentsTrack(snakemake@input[["cdna_warm"]], -->
+<!--         isPaired = FALSE, -->
+<!--         genome = "mm10", -->
+<!--         name = "cDNA 22°C", -->
+<!--         chromosome = gene_info$TXCHROM, -->
+<!--         start = gene_info$TXSTART, -->
+<!--         end = gene_info$TXEND) -->
+
+<!--     cdna_cold <- AlignmentsTrack(snakemake@input[["cdna_cold"]], -->
+<!--         isPaired = FALSE, -->
+<!--         genome = "mm10", -->
+<!--         name = "cDNA 4°C", -->
+<!--         chromosome = gene_info$TXCHROM, -->
+<!--         start = gene_info$TXSTART, -->
+<!--         end = gene_info$TXEND) -->
+
+<!--     illumina_warm <- AlignmentsTrack(snakemake@input[["illumina_warm"]], -->
+<!--         isPaired = TRUE, -->
+<!--         genome = "mm10", -->
+<!--         name = "Illu 22°C", -->
+<!--         chromosome = gene_info$TXCHROM, -->
+<!--         start = gene_info$TXSTART, -->
+<!--         end = gene_info$TXEND) -->
+
+<!--     illumina_cold <- AlignmentsTrack(snakemake@input[["illumina_cold"]], -->
+<!--         isPaired = TRUE, -->
+<!--         genome = "mm10", -->
+<!--         name = "Illu 4°C", -->
+<!--         chromosome = gene_info$TXCHROM, -->
+<!--         start = gene_info$TXSTART, -->
+<!--         end = gene_info$TXEND) -->
+
+<!--    primerTrack <- AnnotationTrack( -->
+<!--         start = c(primer_info[1, ]$start, primer_info[1, ]$end - 20,  -->
+<!--             primer_info[2, ]$start, primer_info[2, ]$end - 20),  -->
+<!--         width = rep(20, 4), -->
+<!--         group = rep(c(paste(primer_info[1, ]$mgi_symbol, primer_info[1, ]$primer_name),  -->
+<!--                 paste(primer_info[2, ]$mgi_symbol, primer_info[2, ]$primer_name)), -->
+<!--             each = 2), -->
+<!--         genome = "mm10", -->
+<!--         chromosome = gene_info$TXCHROM, -->
+<!--         name = "RT-qPCR", -->
+<!--         shape = "box", -->
+<!--         groupAnnotation = "group", -->
+<!--         just.group = "above") -->
+
+<!--     options(ucscChromosomeNames = FALSE) -->
+
+<!--     plotTracks(list(gtrack, -->
+<!--             illumina_warm, illumina_cold, -->
+<!--             teloprime_warm, teloprime_cold, -->
+<!--             cdna_warm, cdna_cold, -->
+<!--             atrack_gencode, -->
+<!--             atrack_flair, -->
+<!--             primerTrack), -->
+<!--         from = gene_info$TXSTART, -->
+<!--         to = gene_info$TXEND, -->
+<!--         type = c("coverage", "sashimi"), -->
+<!--         extend.left = 250, -->
+<!--         extend.right = 250, -->
+<!--         background.title = "darkblue", -->
+<!--         cex.axis = .4, -->
+<!--         min.height = 0, -->
+<!--         sashimiScore = 5, -->
+<!--         sizes = c(.25, rep(1, 6), rep(1, 2), .5)) -->
+<!-- } -->
+<!-- ``` -->
+
+<!-- ```{r loop, results="asis"} -->
+<!-- for (gene in pvalues$ensembl_gene_id_version) { -->
+
+<!--     gene_p <- pvalues %>%  -->
+<!--         filter(ensembl_gene_id_version == gene) -->
+
+<!--     cat('\n')  -->
+<!--     cat("## ", gene_p$mgi_symbol, gene_p$ensembl_gene_id_version, "\n")  -->
+
+<!--     gene_p %>%  -->
+<!--         dplyr::select_at(vars(matches("padj"))) %>%  -->
+<!--         tidyr::gather("dataset", "padj") %>%  -->
+<!--         mutate(sign = symnum(padj, -->
+<!--         cutpoints = c(0, .001, .01, .05, .1, 1), -->
+<!--         symbols = c("***", "**", "*", ".", " "))) %>%  -->
+<!--         knitr::kable(format = "html") %>% -->
+<!--         kableExtra::kable_styling() %>%  -->
+<!--         print() -->
+
+<!--     plot.transcripts(gene) -->
+
+<!--     pl <- df %>% -->
+<!--         filter(grepl(gene_p$mgi_symbol, gene)) %>% -->
+<!--         mutate(condition_temp = relevel(condition_temp, "22")) %>% -->
+<!--         tidyr::separate(gene, c("gene", "isoform"), sep = '_') %>% -->
+<!--         tidyr::drop_na() %>% -->
+<!--         ggplot(aes(condition_temp, 2^-dcq, colour = isoform)) + -->
+<!--         geom_point(position = position_dodge(width = .5)) + -->
+<!--         stat_summary(geom = "crossbar", -->
+<!--             fun.data = mean_se, -->
+<!--             width = .25, lwd = .25, -->
+<!--             position = position_dodge(width = .5)) + -->
+<!--         scale_y_log10(labels = function(x) x) + -->
+<!--         theme_tufte() + -->
+<!--         geom_rangeframe(colour = "black") + -->
+<!--         ylab("rel. expr. vs. Gtf2b/Hprt") + -->
+<!--         xlab("temperature") + -->
+<!--         scale_color_colorblind() -->
+
+<!--     print(pl) -->
+<!--     cat('\n')  -->
+<!-- } -->
+
+<!-- ``` -->
+

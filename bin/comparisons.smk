@@ -326,18 +326,6 @@ rule compare_reannotation:
         "comparisons_reannotation.Rmd"
 
 
-rule dtu_qpcr:
-    input:
-        cq1 = "data/qpcr/200514/200514_bl6_dtu_1.txt",
-        cq2 = "data/qpcr/200514/200514_bl6_dtu_2.txt",
-        cq3 = "data/qpcr/200611/200611_bl6_dtu_3.txt",
-        sample_info = config["SAMPLE_INFO"]
-    output:
-        "data/qpcr/dtu_qpcr.csv"
-    script:
-        "qpcr_dtu.R"
-
-
 rule compare_dtu:
     input:
         dtu_res = expand("data/drimseq/{dataset}_{file}_dtu_res.csv",

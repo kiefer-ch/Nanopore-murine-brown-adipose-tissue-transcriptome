@@ -1,6 +1,15 @@
+
+def get_minimapFasta(wildcards):
+    if wildcards.type == "transcriptome":
+        file_name = "data/annotation/transcripts.fa"
+    if wildcards.type == "genome":
+        file_name = "data/annotation/genome.fa"
+    return file_name
+
+
 rule minimap_index:
     input:
-        "data/annotation/{type}.fa"
+        get_minimapFasta
     output:
         "indices/minimap2/{type}_minimap2.mmi"
     threads: 3

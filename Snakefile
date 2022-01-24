@@ -18,6 +18,29 @@ SAMPLES_ont = SAMPLE_INFO_ont["illumina"].tolist()
 BARCODES = SAMPLE_INFO_illumina[SAMPLE_INFO_illumina["ont"].notnull()]["ont"].tolist()
 
 
+rule all:
+    input:
+        "multiqc_trimmed.html",
+        "res/browserTracks/Adcy3.pdf",
+        "res/browserTracks/Cars2.pdf",
+        "res/comparisons/comparisons_countsPCA.html",
+        "res/comparisons/comparisons_coverage.html",
+        "res/comparisons/comparisons_dgeDte.html",
+        "res/comparisons/comparisons_dtu.html",
+        "res/comparisons/comparisons_feature_detection.html",
+        "res/comparisons/comparisons_go.html",
+        "res/comparisons/comparisons_quantification_correlation.html",
+        "res/comparisons/comparisons_quantification_correlation_normalised.html",
+        "res/comparisons/comparisons_quantification_correlationWithinSamples.html",
+        "res/comparisons/comparisons_quantification_correlationWithinSamples_normalised.html",
+        "res/comparisons/comparisons_readLengths_bam_genome.html",
+        "res/comparisons/comparisons_readLengths_bam_transcriptome.html",
+        "res/comparisons/comparisons_readLengths_fastq.html",
+        "res/comparisons/comparisons_reannotation.html",
+        "res/qpcr/qpcr_dtu_validation.html",
+        "res/qpcr/qpcr_temperature_effect.html"
+
+
 # Include other rules
 include: "bin/annotation.smk"
 include: "bin/process_illumina.smk"
@@ -29,5 +52,4 @@ include: "bin/reannotation.smk"
 include: "bin/gffcompare.smk"
 include: "bin/browserTracks.smk"
 include: "bin/drimseq.smk"
-
-#include: "bin/qpcr.snakefile"
+include: "bin/qpcr.smk"

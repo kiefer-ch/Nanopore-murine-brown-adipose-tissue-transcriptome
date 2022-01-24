@@ -11,8 +11,6 @@ suppressPackageStartupMessages({
 # author: Christoph Kiefer
 # email: christophak@bmb.sdu.dk
 #
-# some code taken from https://github.com/csoneson/NativeRNAseqComplexTranscriptome/blob/master/Rscripts/get_nbr_reads.R
-#
 ################################################################################
 
 genes1 <- c("Gtf2b", "Hprt", "Cars2_long", "Cars2_short", "Scp2_5p", "Scp2_3p",
@@ -103,6 +101,11 @@ df3 <- get.pipettingScheme(
     filter(sample_id != "190220_5_iBAT") # there was not enough cDNA left
 
 df <- list(df1, df2, df3)
+
+# export cq values
+df %>%
+    write_rds(snakemake@output[[2]])
+
 
 detect.outliers <- function(df, cutoff = 1) {
     out <- df %>%
