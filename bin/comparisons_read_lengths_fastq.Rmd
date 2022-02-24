@@ -20,16 +20,21 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
 
 ```{r loadPackages, include=FALSE}
 source(".Rprofile")
-library("dplyr")
-library("readr")
-library("purrr")
-library("ggplot2")
-library("ggthemes")
-library("scales")
+suppressPackageStartupMessages({
+    library("dplyr")
+    library("readr")
+    library("purrr")
+    library("ggplot2")
+    library("ggthemes")
+    library("scales")
+    library("lme4")
+    library("lmerTest")
+})
 ```
 
 ```{r}
-sample_info <- read_csv(snakemake@input[["sample_info"]])
+sample_info <- read_csv(snakemake@input[["sample_info"]],
+        show_col_types = FALSE)
 
 sample_info2 <- sample_info %>% 
     filter(!is.na(ont)) %>%
@@ -129,6 +134,41 @@ df %>%
         labels = c("22" = "22°C", "4" = "4°C")) +
     theme(legend.key.size = unit(.33, "cm"))
 ```
+
+```{r}
+df_stats <- df %>% 
+    group_by(method, sample_id, flowcell) %>% 
+    summarise(counts = sum(counts)) %>% 
+    mutate(method = factor(method, levels = c("illumina", "teloprime", "cdna", "rna"))) %>% 
+    group_by(method, sample_id) %>% 
+    ungroup() %>% 
+    left_join(sample_info %>%
+            select(sample_id, condition_temp) %>% 
+            mutate(condition_temp = relevel(as.factor(condition_temp), "22")),
+        by = "sample_id") %>% 
+    mutate(flowcell = if_else(sample_id == "rt", "cell_1",
+        if_else(sample_id == "cool", "cell_2", as.character(flowcell)))) %>% 
+    filter(method %in% c("cdna", "teloprime"))
+
+mod <- lmer(counts ~ condition_temp * flowcell * method  + (1|sample_id), data = df_stats)
+mod <- step(mod)
+```
+
+model simplification
+
+```{r}
+print(mod)
+```
+
+
+ANOVA table 
+```{r}
+anova(get_model(mod))
+```
+
+Interpretation: The two interaction terms with method, condition_temp:method and
+flowcell:method are significant, since in teloprime the counts depend on temperature
+but not flowcell and in cdna the counts depend on flowcell but not temperature.
 
 
 # Length of reads by method, flowcell, sample

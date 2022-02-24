@@ -27,7 +27,7 @@ rule readLength_fastq_histogram:
     output:
         "data/comparisons/fastq/readLengthDistribution/{dataset}_fastqReadLengths.csv"
     script:
-        "comparisons_fastq_readLengthHistogram.py"
+        "comparisons_read_lengths_fastq_readLengthHistogram.py"
 
 
 rule readQuality_fastq_histogram:
@@ -36,7 +36,7 @@ rule readQuality_fastq_histogram:
     output:
         "data/comparisons/fastq/readQualityDistribution/{dataset}_fastqQualities.csv"
     script:
-        "comparisons_fastq_readLengthHistogram.py"
+        "comparisons_read_lengths_fastq_readLengthHistogram.py"
 
 
 rule readLengths_fastq:
