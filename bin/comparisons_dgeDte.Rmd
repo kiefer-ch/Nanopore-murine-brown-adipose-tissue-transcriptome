@@ -29,9 +29,9 @@ suppressPackageStartupMessages({
     library("UpSetR")
     library("scales")
     library("patchwork")
+    library("topGO")
+    source("R/go.R")
 })
-select <- dplyr::select
-rename <- dplyr::rename
 ```
 
 ```{r dataImport}
@@ -40,9 +40,9 @@ dte <- snakemake@input[["dte"]] %>%
     set_names(., tools::file_path_sans_ext(basename(.), compression = TRUE)) %>%
     map(read_csv, show_col_types = FALSE) %>%
     bind_rows(.id = "dataset") %>% 
-    select(-mgi_symbol, -description, -lfcSE, -baseMean) %>%
+    dplyr::select(-mgi_symbol, -description, -lfcSE, -baseMean) %>%
     tidyr::separate(dataset, c("dataset", "trash", "type"), extra = "drop") %>%
-    select(-trash) %>% 
+    dplyr::select(-trash) %>% 
     tidyr::unite("method", dataset, type) %>%
     tidyr::pivot_wider(names_from = method, 
         values_from = c(log2FoldChange, svalue),
@@ -52,9 +52,9 @@ dge <- snakemake@input[["dge"]] %>%
     set_names(., tools::file_path_sans_ext(basename(.), compression = TRUE)) %>%
     map(read_csv, show_col_types = FALSE) %>%
     bind_rows(.id = "dataset") %>% 
-    select(-mgi_symbol, -description, -lfcSE, -baseMean) %>%
+    dplyr::select(-mgi_symbol, -description, -lfcSE, -baseMean) %>%
     tidyr::separate(dataset, c("dataset", "trash", "type"), extra = "drop") %>%
-    select(-trash) %>% 
+    dplyr::select(-trash) %>% 
     tidyr::unite("method", dataset, type) %>%
     tidyr::pivot_wider(names_from = method, 
         values_from = c(log2FoldChange, svalue),
@@ -70,10 +70,10 @@ tx <- snakemake@input$tx_counts %>%
                 na.rm = TRUE),
            cold = rowMeans(dplyr::select(., "190220_4_iBAT", "190220_11_iBAT", "190220_15_iBAT"),
                 na.rm = TRUE)) %>% 
-    select(id, dataset, cold, warm) %>% 
+    dplyr::select(id, dataset, cold, warm) %>% 
     mutate(fold_change = cold/warm,
-           base_mean = rowMeans(select(., cold, warm))) %>% 
-    select(-cold, -warm)
+           base_mean = rowMeans(dplyr::select(., cold, warm))) %>% 
+    dplyr::select(-cold, -warm)
     
 gene <- snakemake@input$gene_counts %>% 
     set_names(basename(.) %>% sub("_gene.+$", "", .)) %>% 
@@ -81,10 +81,10 @@ gene <- snakemake@input$gene_counts %>%
     bind_rows(.id = "dataset") %>% 
     mutate(warm = rowMeans(dplyr::select(., "190220_2_iBAT", "190220_9_iBAT", "190220_14_iBAT"), na.rm = TRUE),
            cold = rowMeans(dplyr::select(., "190220_4_iBAT", "190220_11_iBAT", "190220_15_iBAT"), na.rm = TRUE)) %>% 
-    select(id, dataset, cold, warm) %>% 
+    dplyr::select(id, dataset, cold, warm) %>% 
     mutate(fold_change = cold/warm,
-           base_mean = rowMeans(select(., cold, warm))) %>% 
-    select(-cold, -warm)
+           base_mean = rowMeans(dplyr::select(., cold, warm))) %>% 
+    dplyr::select(-cold, -warm)
 
 
 # biotypes
@@ -99,16 +99,44 @@ biotype_groups <- read_csv(snakemake@input[["grouped_biotypes"]],
 dte_grouped <- dte %>%
     group_by(ensembl_gene_id_version) %>%
     summarise_if(is.numeric, min) %>%
-    select(-transcript_length)
+    dplyr::select(-transcript_length)
 
 df <- dge %>%
     full_join(dte_grouped, by = "ensembl_gene_id_version") %>%
     mutate_if(is.numeric, tidyr::replace_na, 1)
 ```
 
-
 Analysis on gene level. The txlevel pvalues are the smallest for any of the transcripts
 of a gene.
+
+
+## GO
+
+```{r}
+reference <- df$ensembl_gene_id_version %>% 
+    remove.version()
+
+go_res <- df %>% 
+    dplyr::select(starts_with(c("ensembl", "sval"))) %>% 
+    tidyr::pivot_longer(starts_with("sval"),
+        names_to = "group",
+        values_to = "svalue") %>% 
+    filter(svalue < .05) %>% 
+    split(~group) %>% 
+    map(pull, "ensembl_gene_id_version") %>% 
+    map(remove.version) %>% 
+    map(get.geneList, reference = reference) %>% 
+    set_names(sub("svalue_", "", names(.))) %>% 
+    map2(names(.), make.topGO) %>% 
+    map(get.results)
+```
+
+```{r, fig.asp = .65}
+plot.go.summary(go_res) +
+    xlab(NULL) +
+    ggplot2::scale_fill_viridis_c(direction = -1, trans = "log10", name = "s") +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+```
 
 
 ## All genes
@@ -136,7 +164,7 @@ df %>%
 ```{r, fig.asp = .65}
 df %>%
     filter(gene_biotype == "protein_coding") %>%
-    select(-gene_biotype) %>%
+    dplyr::select(-gene_biotype) %>%
     mutate_if(is.numeric, function(x) as.integer(x < .05)) %>%
     tidyr::drop_na(ensembl_gene_id_version) %>%
     as.data.frame() %>%
@@ -158,7 +186,7 @@ df %>%
 ```{r}
 pl_gene <- dge %>%
     left_join(biotype_groups, by = c("gene_biotype" = "transcript_biotype")) %>%
-    select(-gene_biotype) %>%
+    dplyr::select(-gene_biotype) %>%
     tidyr::drop_na(grouped_biotype) %>% 
     tidyr::pivot_longer(cols = matches("svalue|log2FoldChange"), 
         names_sep = "_", names_to = c(".value", "library")) %>% 
@@ -184,7 +212,7 @@ pl_gene <- dge %>%
 ```{r}
 pl_tx <- dte %>%
     left_join(biotype_groups, by = "transcript_biotype") %>%
-    select(-transcript_biotype, -transcript_length, -ensembl_gene_id_version,
+    dplyr::select(-transcript_biotype, -transcript_length, -ensembl_gene_id_version,
         -gene_biotype) %>%
     tidyr::drop_na(grouped_biotype) %>%
     tidyr::pivot_longer(cols = matches("svalue|log2FoldChange"), 
