@@ -31,6 +31,7 @@ suppressPackageStartupMessages({
     library("patchwork")
     library("topGO")
     source("R/go.R")
+    source("R/reactomePA.R")
 })
 ```
 
@@ -110,7 +111,9 @@ Analysis on gene level. The txlevel pvalues are the smallest for any of the tran
 of a gene.
 
 
-## GO
+## Enrichment analysis
+
+### GO
 
 ```{r}
 reference <- df$ensembl_gene_id_version %>% 
@@ -125,7 +128,7 @@ go_res <- df %>%
     split(~group) %>% 
     map(pull, "ensembl_gene_id_version") %>% 
     map(remove.version) %>% 
-    map(get.geneList, reference = reference) %>% 
+    map(get_geneList, reference = reference) %>% 
     set_names(sub("svalue_", "", names(.))) %>% 
     map2(names(.), make.topGO) %>% 
     map(get.results)
@@ -135,7 +138,52 @@ go_res <- df %>%
 plot.go.summary(go_res) +
     xlab(NULL) +
     ggplot2::scale_fill_viridis_c(direction = -1, trans = "log10", name = "s") +
-    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
+    theme(legend.key.size = unit(.33, "cm"))
+```
+
+### Reactome
+
+```{r}
+# named vector of entrez_ids
+reference <- df$ensembl_gene_id_version %>% 
+    remove.version() %>% 
+    mapIds(x = org.Mm.eg.db,
+        keys = .,
+        column = "ENTREZID",
+        keytype = "ENSEMBL",
+        multiVals = "first") %>% 
+    unlist()
+
+reactome_res <- df %>% 
+    dplyr::select(starts_with(c("ensembl", "sval"))) %>% 
+    tidyr::pivot_longer(starts_with("sval"),
+        names_to = "group",
+        values_to = "svalue") %>% 
+    filter(svalue < .05) %>% 
+    split(~group) %>% 
+    set_names(sub("svalue_", "", names(.))) %>% 
+    map(pull, ensembl_gene_id_version) %>% 
+    map(remove.version) %>% 
+    map(mapIds,
+        x = org.Mm.eg.db,
+        column = "ENTREZID",
+        keytype = "ENSEMBL",
+        multiVals = "first") %>% 
+    map(ReactomePA::enrichPathway,
+        organism = "mouse",
+        readable = TRUE,
+        universe = reference)
+```
+
+```{r, fig.asp = .65}
+plot.reactome.summary(reactome_res) +
+    xlab(NULL) +
+    ggplot2::scale_fill_viridis_c(direction = -1, trans = "log10", name = "s") +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
+    theme(legend.key.size = unit(.33, "cm"))
 ```
 
 
