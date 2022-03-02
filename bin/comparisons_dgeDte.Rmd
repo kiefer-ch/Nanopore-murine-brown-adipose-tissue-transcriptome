@@ -44,11 +44,20 @@ dte <- snakemake@input[["dte"]] %>%
     dplyr::select(-mgi_symbol, -description, -lfcSE, -baseMean) %>%
     tidyr::separate(dataset, c("dataset", "trash", "type"), extra = "drop") %>%
     dplyr::select(-trash) %>% 
-    tidyr::unite("method", dataset, type) %>%
+    tidyr::unite("method", dataset, type)
+
+dte_ref <- dte %>% 
+    dplyr::select(method, ensembl_gene_id_version, svalue) %>% 
+    split(~method) %>% 
+    map(pull, ensembl_gene_id_version) %>% 
+    map(unique)
+
+dte <- dte %>%
     tidyr::pivot_wider(names_from = method, 
         values_from = c(log2FoldChange, svalue),
         values_fill = list("log2FoldChange" = 0, "svalue" = 1))
     
+
 dge <- snakemake@input[["dge"]] %>%
     set_names(., tools::file_path_sans_ext(basename(.), compression = TRUE)) %>%
     map(read_csv, show_col_types = FALSE) %>%
@@ -56,7 +65,15 @@ dge <- snakemake@input[["dge"]] %>%
     dplyr::select(-mgi_symbol, -description, -lfcSE, -baseMean) %>%
     tidyr::separate(dataset, c("dataset", "trash", "type"), extra = "drop") %>%
     dplyr::select(-trash) %>% 
-    tidyr::unite("method", dataset, type) %>%
+    tidyr::unite("method", dataset, type)
+
+dge_ref <- dge %>% 
+    dplyr::select(method, ensembl_gene_id_version, svalue) %>% 
+    split(~method) %>% 
+    map(pull, ensembl_gene_id_version) %>% 
+    map(unique)
+
+dge <- dge%>%
     tidyr::pivot_wider(names_from = method, 
         values_from = c(log2FoldChange, svalue),
         values_fill = list("log2FoldChange" = 0, "svalue" = 1))
@@ -107,8 +124,8 @@ df <- dge %>%
     mutate_if(is.numeric, tidyr::replace_na, 1)
 ```
 
-Analysis on gene level. The txlevel pvalues are the smallest for any of the transcripts
-of a gene.
+Analysis on gene level. The txlevel pvalues are the smallest for any of the
+transcripts of a gene.
 
 
 ## Enrichment analysis
@@ -116,8 +133,8 @@ of a gene.
 ### GO
 
 ```{r}
-reference <- df$ensembl_gene_id_version %>% 
-    remove.version()
+reference <- c(dte_ref, dge_ref) %>% 
+    map(remove.version)
 
 go_res <- df %>% 
     dplyr::select(starts_with(c("ensembl", "sval"))) %>% 
@@ -128,8 +145,12 @@ go_res <- df %>%
     split(~group) %>% 
     map(pull, "ensembl_gene_id_version") %>% 
     map(remove.version) %>% 
-    map(get_geneList, reference = reference) %>% 
-    set_names(sub("svalue_", "", names(.))) %>% 
+    set_names(sub("svalue_", "", names(.)))
+
+reference <- reference[names(go_res)]
+
+go_res <- go_res %>% 
+    map2(reference, get_geneList) %>% 
     map2(names(.), make.topGO) %>% 
     map(get.results)
 ```
@@ -137,24 +158,21 @@ go_res <- df %>%
 ```{r, fig.asp = .65}
 plot.go.summary(go_res) +
     xlab(NULL) +
-    ggplot2::scale_fill_viridis_c(direction = -1, trans = "log10", name = "s") +
+    ggplot2::scale_fill_viridis_c(direction = -1, trans = "log10", name = "p") +
     theme_tufte(base_size = 8, base_family = "Helvetica") +
-    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
-    theme(legend.key.size = unit(.33, "cm"))
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
 ```
 
 ### Reactome
 
 ```{r}
 # named vector of entrez_ids
-reference <- df$ensembl_gene_id_version %>% 
-    remove.version() %>% 
-    mapIds(x = org.Mm.eg.db,
-        keys = .,
+reference <- reference %>% 
+    map(mapIds,
+        x = org.Mm.eg.db,
         column = "ENTREZID",
         keytype = "ENSEMBL",
-        multiVals = "first") %>% 
-    unlist()
+        multiVals = "first")
 
 reactome_res <- df %>% 
     dplyr::select(starts_with(c("ensembl", "sval"))) %>% 
@@ -163,7 +181,11 @@ reactome_res <- df %>%
         values_to = "svalue") %>% 
     filter(svalue < .05) %>% 
     split(~group) %>% 
-    set_names(sub("svalue_", "", names(.))) %>% 
+    set_names(sub("svalue_", "", names(.)))
+
+reference <- reference[names(reactome_res)]
+
+reactome_res <- reactome_res %>% 
     map(pull, ensembl_gene_id_version) %>% 
     map(remove.version) %>% 
     map(mapIds,
@@ -180,10 +202,9 @@ reactome_res <- df %>%
 ```{r, fig.asp = .65}
 plot.reactome.summary(reactome_res) +
     xlab(NULL) +
-    ggplot2::scale_fill_viridis_c(direction = -1, trans = "log10", name = "s") +
+    ggplot2::scale_fill_viridis_c(direction = -1, trans = "log10", name = "q") +
     theme_tufte(base_size = 8, base_family = "Helvetica") +
-    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
-    theme(legend.key.size = unit(.33, "cm"))
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
 ```
 
 

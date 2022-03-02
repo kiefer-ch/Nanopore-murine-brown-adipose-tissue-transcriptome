@@ -27,6 +27,9 @@ suppressPackageStartupMessages({
     library("UpSetR")
     library("ggplot2")
     library("ggthemes")
+    library("topGO")
+    source("R/go.R")
+    source("R/reactomePA.R")
 })
 ```
 
@@ -42,7 +45,90 @@ df <- snakemake@input$dtu %>%
 
 only genes in reference
 
-## upset
+## Enrichment analysis
+
+### GO
+
+```{r}
+# list of reference vectors
+reference <- df %>% 
+    dplyr::select(id, gene_id, gene) %>% 
+    group_by(id, gene_id) %>% 
+    summarise(gene = min(gene)) %>% 
+    filter(grepl("^ENS", gene_id)) %>% 
+    split(~id) %>% 
+    map(pull, gene_id) %>% 
+    map(remove.version)
+
+go_res <- df %>% 
+    dplyr::select(id, gene_id, gene) %>% 
+    filter(gene < .05) %>% 
+    split(~id) %>% 
+    map(pull, "gene_id") %>% 
+    map(remove.version) %>% 
+    map2(reference, get_geneList) %>% 
+    map2(names(.), make.topGO) %>% 
+    map(get.results)
+```
+
+```{r, fig.asp = .65}
+plot.go.summary(go_res) +
+    xlab(NULL) +
+    ggplot2::scale_fill_viridis_c(direction = -1, trans = "log10", name = "p") +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+```
+
+### Reactome
+
+No significant terms.
+
+```{r}
+# named vector of entrez_ids
+reference <- df %>% 
+    dplyr::select(id, gene_id, gene) %>% 
+    group_by(id, gene_id) %>% 
+    summarise(gene = min(gene)) %>% 
+    filter(grepl("^ENS", gene_id)) %>% 
+    split(~id) %>% 
+    map(pull, gene_id) %>% 
+    map(remove.version) %>% 
+    map(mapIds,
+        x = org.Mm.eg.db,
+        column = "ENTREZID",
+        keytype = "ENSEMBL",
+        multiVals = "first") %>% 
+    map(unlist)
+
+reactome_res <- df %>% 
+    dplyr::select(id, gene_id, gene) %>% 
+    filter(gene < .05) %>% 
+    split(~id) %>% 
+    set_names(sub("svalue_", "", names(.))) %>% 
+    map(pull, gene_id) %>% 
+    map(remove.version) %>% 
+    map(mapIds,
+        x = org.Mm.eg.db,
+        column = "ENTREZID",
+        keytype = "ENSEMBL",
+        multiVals = "first") %>% 
+    map2(reference, ReactomePA::enrichPathway,
+        organism = "mouse",
+        pvalueCutoff = 0.05,
+        pAdjustMethod = "BH",
+        qvalueCutoff = 0.2,
+        readable = TRUE)
+```
+
+```{r, fig.asp = .65}
+plot.reactome.summary(reactome_res)
+#    xlab(NULL) +
+#    ggplot2::scale_fill_viridis_c(direction = -1, trans = "log10", name = "q") +
+#    theme_tufte(base_size = 8, base_family = "Helvetica") +
+#    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+```
+
+## Upset
 
 ```{r, fig.asp = .65}
 df %>%
