@@ -185,18 +185,57 @@ rule quantify_minimap_reannotated:
         "quantify_minimap.R"
 
 
+def get_isa_counts(wildcards):
+    if wildcards.dataset == "illumina":
+        if wildcards.annotation == "ref":
+            return expand("data/quantification/salmon/{barcode}/quant.sf",
+                barcode=SAMPLE_INFO_ont["illumina"])
+        else:
+            return expand("data/quantification/illumina_{{annotation}}/{barcode}/quant.sf",
+                barcode=SAMPLE_INFO_ont["illumina"])
+    elif wildcards.dataset == "cdna":
+        if wildcards.annotation == "ref":
+            return expand("data/quantification/cdna/merged/cdna_merged_{barcode}_quant.tsv",
+                barcode=SAMPLE_INFO_ont["cdna"])
+        else:
+            return expand("data/quantification/cdna_{{annotation}}/{barcode}_quant.tsv",
+                barcode=SAMPLE_INFO_ont["cdna"])
+
+
+def get_isa_gtf(wildcards):
+    if wildcards.annotation == "ref":
+        return "data/annotation/annotation.gtf"
+    elif wildcards.annotation == "cdna_flair":
+        return "data/reannotation/flair/annotation/cdna_flair.isoforms.gtf"
+    elif wildcards.annotation == "illumina_stringtie":
+        return "data/reannotation/stringti/illumina_stringtie_noUnknownStrand.gtf"
+    elif wildcards.annotation == "teloprime_stringtie":
+        return "data/reannotation/stringti/teloprime_stringtie_noUnknownStrand.gtf"
+
+
+def get_isa_transcripts(wildcards):
+    if wildcards.annotation == "ref":
+        return "data/annotation/transcripts.fa"
+    elif wildcards.annotation == "cdna_flair":
+        return "data/reannotation/flair/annotation/cdna_flair.isoforms.fa"
+    elif wildcards.annotation == "illumina_stringtie":
+        return "data/reannotation/stringti/illumina_stringtie_noUnknownStrand.fa"
+    elif wildcards.annotation == "teloprime_stringtie":
+        return "data/reannotation/stringti/teloprime_stringtienoUnknownStrand.fa"
+
+
 rule isoformswitchanalyser_importData:
     input:
-        counts = "data/deseq/{dataset}/{dataset}_transcript_cm_cts.csv.gz",
+        counts = get_isa_counts,
         sample_info = config["SAMPLE_INFO"],
-        gtf = "data/annotation/annotation.gtf",
-        transcripts = "data/annotation/transcripts.fa"
+        gtf = get_isa_gtf,
+        transcripts = get_isa_transcripts
     output:
         "data/drimseq/{dataset}_{annotation}/{dataset}_{annotation}_sal.rds",
         "data/drimseq/{dataset}_{annotation}/{dataset}_{annotation}_isoform_AA.fasta",
         res = "data/drimseq/{dataset}_{annotation}/{dataset}_{annotation}_dtu_res.csv.gz"
     params:
-        aa_path = "data/drimseq",
+        aa_path = "data/drimseq/{dataset}_{annotation}/",
         aa_prefix = "{dataset}_{annotation}_isoform",
         dtu_cutoff = 0.05,
         dIF_cutoff = 0.1,
@@ -208,4 +247,4 @@ rule isoformswitchanalyser_importData:
     threads:
         8
     script:
-        "drimseq_isoformswitchanalyser_importData.R"
+        "isoformswitchanalyser_importData.R"

@@ -51,5 +51,6 @@ include: "bin/deseq.smk"
 include: "bin/reannotation.smk"
 include: "bin/gffcompare.smk"
 include: "bin/browserTracks.smk"
-include: "bin/drimseq.smk"
+include: "bin/isoformswitchanalyser.smk"
 include: "bin/qpcr.smk"
+
