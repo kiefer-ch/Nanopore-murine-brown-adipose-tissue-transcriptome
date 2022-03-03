@@ -106,6 +106,16 @@ if(snakemake@wildcards$dataset == "illumina") {
 }
 
 
+log_info("Prefiltering")
+switchList <- preFilter(switchList,
+    geneExpressionCutoff = 3,
+    isoformExpressionCutoff = 1,
+    IFcutoff = .1,
+    removeSingleIsoformGenes = TRUE,
+    reduceToSwitchingGenes = FALSE
+)
+
+
 log_info("Testing for DTU using DRIMSeq")
 switchList <- isoformSwitchTestDRIMSeq(switchList,
         alpha = snakemake@params$dtu_cutoff,

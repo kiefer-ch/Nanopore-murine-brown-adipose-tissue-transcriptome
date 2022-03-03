@@ -239,7 +239,7 @@ rule isoformswitchanalyser_importData:
         aa_prefix = "{dataset}_{annotation}_isoform",
         dtu_cutoff = 0.05,
         dIF_cutoff = 0.1,
-        min_feature_expr = 10,
+        min_feature_expr = 5,
         min_feature_prop = 0.1,
         min_gene_expr = 10
     wildcard_constraints:
