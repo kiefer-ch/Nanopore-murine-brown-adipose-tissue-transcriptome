@@ -185,111 +185,27 @@ rule quantify_minimap_reannotated:
         "quantify_minimap.R"
 
 
-# make dmds datasets
-# cDNA
-rule drimseq_dmdsFromONT:
+rule isoformswitchanalyser_importData:
     input:
-        counts = expand("data/quantification/cdna/merged/cdna_merged_{barcode}_quant.tsv", barcode=SAMPLE_INFO_ont["cdna"]),
-        txdb = "data/annotation/annotation_txdb.sqlite",
-        sample_info = config["SAMPLE_INFO"]
-    output:
-        "data/drimseq/cdna_ref_dmds.rds"
-    script:
-        "drimseq_dmdsFromONT.R"
-
-
-def get_txdb(wildcards):
-    if wildcards.method == "flair":
-        file =  "data/reannotation/flair/annotation/cdna_flair.isoforms_txdb.sqlite"
-    elif wildcards.method == "stringtie":
-        if wildcards.dataset == "illumina":
-            file = "data/reannotation/stringtie/illumina_stringtie_noUnknownStrand_txdb.sqlite",
-        elif wildcards.dataset == "teloprime":
-            file = "data/reannotation/stringtie/teloprime_stringtie_noUnknownStrand_txdb.sqlite"
-    return file
-
-
-rule drimseq_dmdsFromONTreannotated:
-    input:
-        counts = expand("data/quantification/cdna_{{dataset}}_{{method}}/{barcode}_quant.tsv",
-            barcode=SAMPLE_INFO_ont["cdna"]),
-        txdb = get_txdb,
-        sample_info = config["SAMPLE_INFO"]
-    output:
-        "data/drimseq/cdna_{dataset}_{method}_dmds.rds"
-    wildcard_constraints:
-        dataset = "teloprime|cdna|illumina",
-        type = "flair|stringtie"
-    script:
-        "drimseq_dmdsFromONT.R"
-
-
-# illumina
-rule tximport_drimseqIlluminaReannotated:
-    input:
-        salmon_out =
-            expand("data/quantification/illumina_{{dataset}}_{{method}}/{sample}/quant.sf",
-                sample=SAMPLES_ont),
-        txdb = get_txdb,
-        sample_info = config["SAMPLE_INFO"]
-    output:
-        "data/drimseq/illumina_{dataset}_{method}_dmds.rds"
-    wildcard_constraints:
-        dataset = "teloprime|cdna|illumina",
-        type = "flair|stringtie"
-    script:
-        "drimseq_dmdsFromSalmon.R"
-
-
-rule tximport_drimseqIllumina:
-    input:
-        salmon_out = expand("data/quantification/salmon/{sample}/quant.sf", sample=SAMPLES_ont),
-        txdb = "data/annotation/annotation_txdb.sqlite",
-        sample_info = config["SAMPLE_INFO"]
-    output:
-        "data/drimseq/illumina_ref_dmds.rds"
-    script:
-        "drimseq_dmdsFromSalmon.R"
-
-
-# dtu
-rule drimseq_dtu:
-    input:
+        counts = "data/deseq/{dataset}/{dataset}_transcript_cm_cts.csv.gz",
         sample_info = config["SAMPLE_INFO"],
-        dmds = "data/drimseq/{file}_dmds.rds"
+        gtf = "data/annotation/annotation.gtf",
+        transcripts = "data/annotation/transcripts.fa"
     output:
-        dmds = "data/drimseq/{file}_dmds_dtu.rds"
+        "data/drimseq/{dataset}_{annotation}/{dataset}_{annotation}_sal.rds",
+        "data/drimseq/{dataset}_{annotation}/{dataset}_{annotation}_isoform_AA.fasta",
+        res = "data/drimseq/{dataset}_{annotation}/{dataset}_{annotation}_dtu_res.csv.gz"
     params:
+        aa_path = "data/drimseq",
+        aa_prefix = "{dataset}_{annotation}_isoform",
+        dtu_cutoff = 0.05,
+        dIF_cutoff = 0.1,
         min_feature_expr = 10,
         min_feature_prop = 0.1,
         min_gene_expr = 10
-    threads:
-        4
-    script:
-        "drimseq_dtu.R"
-
-
-def get_tmap(wildcards):
-    if wildcards.file ==  "illumina_stringtie":
-        file = "data/reannotation/stringtie/gffcmp.illumina_stringtie.gtf.tmap"
-    elif wildcards.file == "teloprime_stringtie":
-        file = "data/reannotation/stringtie/gffcmp.teloprime_stringtie.gtf.tmap"
-    else:
-        file = []
-    return file
-
-
-rule drimseq_results:
-    input:
-        sample_info = config["SAMPLE_INFO"],
-        dmds = "data/drimseq/{dataset}_{file}_dmds_dtu.rds",
-        biomart = "data/annotation/biomaRt_gene.rds",
-        tmap = get_tmap
     wildcard_constraints:
-        dataset = "illumina|cdna"
-    output:
-        "data/drimseq/{dataset}_{file}_dtu_res.csv"
-    params:
-        dtu_cutoff = 0.1
+        dataset = "cdna|illumina",
+    threads:
+        8
     script:
-        "drimseq_stageR.R"
+        "drimseq_isoformswitchanalyser_importData.R"

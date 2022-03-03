@@ -34,7 +34,7 @@ suppressPackageStartupMessages({
 ```
 
 ```{r dataImport}
-df <- snakemake@input$dtu %>% 
+df <- snakemake@input$dtu_res %>% 
     set_names(basename(.) %>% 
                   sub("_dtu.+$", "", .)) %>% 
     map(read_csv, col_types = c("ccccfdddd")) %>% 
