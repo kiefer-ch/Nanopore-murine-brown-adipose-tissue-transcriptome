@@ -208,20 +208,20 @@ def get_isa_gtf(wildcards):
     elif wildcards.annotation == "cdna_flair":
         return "data/reannotation/flair/annotation/cdna_flair.isoforms.gtf"
     elif wildcards.annotation == "illumina_stringtie":
-        return "data/reannotation/stringti/illumina_stringtie_noUnknownStrand.gtf"
+        return "data/reannotation/stringtie/illumina_stringtie_noUnknownStrand.gtf"
     elif wildcards.annotation == "teloprime_stringtie":
-        return "data/reannotation/stringti/teloprime_stringtie_noUnknownStrand.gtf"
+        return "data/reannotation/stringtie/teloprime_stringtie_noUnknownStrand.gtf"
 
 
 def get_isa_transcripts(wildcards):
     if wildcards.annotation == "ref":
         return "data/annotation/transcripts.fa"
     elif wildcards.annotation == "cdna_flair":
-        return "data/reannotation/flair/annotation/cdna_flair.isoforms.fa"
+        return "data/reannotation/flair/annotation/cdna_flair.isoforms_cleanHeaders.fa"
     elif wildcards.annotation == "illumina_stringtie":
-        return "data/reannotation/stringti/illumina_stringtie_noUnknownStrand.fa"
+        return "data/reannotation/stringtie/illumina_stringtie_noUnknownStrand.fa"
     elif wildcards.annotation == "teloprime_stringtie":
-        return "data/reannotation/stringti/teloprime_stringtienoUnknownStrand.fa"
+        return "data/reannotation/stringtie/teloprime_stringtie_noUnknownStrand.fa"
 
 
 rule isoformswitchanalyser_importData:

@@ -191,6 +191,16 @@ rule flair_collapse:
             --temp_dir ./"
 
 
+rule flair_cleanFastaHeaders:
+    input:
+        "data/reannotation/flair/annotation/{dataset}_flair.isoforms.fa"
+    output:
+        temp("data/reannotation/flair/annotation/{dataset}_flair.isoforms_cleanHeaders.fa")
+    shell:
+        "cat {input} | sed 's/_.*//' > {output}"
+
+
+
 # stringtie
 STRINGTIE = config["STRINGTIE"]
 

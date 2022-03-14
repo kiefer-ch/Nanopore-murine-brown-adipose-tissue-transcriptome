@@ -28,6 +28,7 @@ design_matrix <- sample_info %>%
         condition = condition_temp) %>%
     as.data.frame()
 
+
 log_info("Import counts...")
 if(snakemake@wildcards$dataset == "illumina") {
 
@@ -35,26 +36,38 @@ if(snakemake@wildcards$dataset == "illumina") {
 
     order <- match(sample_info$illumina,
         snakemake@input$counts %>%
-            sub("^.+salmon/", "", .) %>%
-            sub("/quant.sf$", "", .))
+            sub("/quant.sf$", "", .) %>%
+            basename())
 
     names(samples) <- sample_info$sample_id[order]
 
     salmon_quant <- importIsoformExpression(
         sampleVector = samples)
 
+    if(grepl("flair", snakemake@wildcards$annotation)) {
+        # remove the gene name from the flair isoform ids
+        salmon_quant$abundance$isoform_id <- salmon_quant$abundance$isoform_id %>%
+            sub("_.+$", "", .)
+
+        salmon_quant$counts$isoform_id <- salmon_quant$counts$isoform_id %>%
+            sub("_.+$", "", .)
+    }
+
 } else {
 
     counts <- snakemake@input$counts %>%
         purrr::set_names(basename(.) %>%
-                      sub("_quant.tsv", "", .)) %>%
+                             sub("_quant.tsv", "", .)) %>%
         purrr::map(read_tsv, col_types = "ci") %>%
-        bind_rows(.id = "id") %>%
-        tidyr::separate(id, c("trash", "trash2", "barcode")) %>%
-        dplyr::select(-trash, -trash2) %>%
-        mutate(barcode = sub("^.+_barcode", "barcode", barcode)) %>%
+        bind_rows(.id = "barcode") %>%
         tidyr::pivot_wider(names_from = "barcode", values_from = NumReads,
             values_fill = 0)
+
+    if(grepl("flair", snakemake@wildcards$annotation)) {
+        # remove the gene name from the flair isoform ids
+        counts$Name <- counts$Name %>%
+            sub("_.+$", "", .)
+    }
 
     order <- match(sample_info$cdna, names(counts)) - 1
 
@@ -64,23 +77,23 @@ if(snakemake@wildcards$dataset == "illumina") {
     missing_transcripts <- read_gtf(snakemake@input$gtf) %>%
         filter(feature == "transcript") %>%
         pull(attributes) %>%
-        sub('\"; gene_type.+$', "", .) %>%
-        sub('^.+transcript_id \"', "", .)
+        sub('^.+transcript_id \"', "", .) %>%
+        sub('\";.*$', "", .)
 
 
     # add empty rows for the sake of isoformswitchanalyser
     missing_transcripts <- missing_transcripts[!missing_transcripts %in% counts$isoform_id]
 
     counts <- tibble(isoform_id = missing_transcripts,
-                     "190220_2_iBAT" = 0,
-                     "190220_4_iBAT" = 0,
-                     "190220_9_iBAT" = 0,
-                     "190220_11_iBAT" = 0,
-                     "190220_14_iBAT" = 0,
-                     "190220_15_iBAT" = 0)  %>%
+            "190220_2_iBAT" = 0,
+            "190220_4_iBAT" = 0,
+            "190220_9_iBAT" = 0,
+            "190220_11_iBAT" = 0,
+            "190220_14_iBAT" = 0,
+            "190220_15_iBAT" = 0)  %>%
         bind_rows(counts)
-
 }
+
 
 log_info("Create switchlist...")
 if(snakemake@wildcards$dataset == "illumina") {
@@ -179,4 +192,3 @@ log_info("Writing to disc...")
 saveRDS(switchList, snakemake@output[[1]])
 
 log_success("Done.")
-
