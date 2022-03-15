@@ -328,13 +328,16 @@ rule compare_reannotation:
 
 rule compare_dtu:
     input:
-        dtu_res = expand("data/drimseq/{dataset}_{file}_dtu_res.csv",
+        dtu_res = expand("data/drimseq/{dataset}_{annotation}/{dataset}_{annotation}_dtu_res.csv.gz",
             dataset = ["illumina", "cdna"],
-            file = ["ref", "illumina_stringtie", "cdna_flair", "teloprime_stringtie"]),
-        qpcr = "data/qpcr/dtu_qpcr.csv"
+            annotation = ["ref", "illumina_stringtie", "cdna_flair", "teloprime_stringtie"]),
+        qpcr = "data/qpcr/dtu_qpcr.csv",
+        annotation = "data/annotation/annotation_txdb.sqlite",
+        telo_tmap = "data/reannotation/stringtie/gffcmp.teloprime_stringtie.gtf.tmap",
+        illu_tmap = "data/reannotation/stringtie/gffcmp.illumina_stringtie.gtf.tmap"
     output:
         "res/comparisons/comparisons_dtu.html",
     params:
-        dtu_cutoff = 0.1
+        dtu_cutoff = 0.05
     script:
         "comparisons_dtu.Rmd"

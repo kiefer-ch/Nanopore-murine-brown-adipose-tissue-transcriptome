@@ -37,7 +37,52 @@ suppressPackageStartupMessages({
 df <- snakemake@input$dtu_res %>% 
     set_names(basename(.) %>% 
                   sub("_dtu.+$", "", .)) %>% 
-    map(read_csv, col_types = c("ccccfdddd")) %>% 
+    map(read_csv, col_types = c("cccfdddd"))
+
+# add ensembl gene_id
+is <- read_tsv(snakemake@input$illu_tmap) %>% 
+    dplyr::select(qry_gene_id, ref_gene_id) %>% 
+    tibble::deframe()
+
+df$illumina_illumina_stringtie <- df$illumina_illumina_stringtie %>% 
+    mutate(gene_id = is[gene_id])
+
+df$cdna_illumina_stringtie <- df$cdna_illumina_stringtie %>% 
+    mutate(gene_id = is[gene_id])
+
+
+ts <- read_tsv(snakemake@input$telo_tmap) %>% 
+    dplyr::select(qry_gene_id, ref_gene_id) %>% 
+    tibble::deframe()
+
+df$illumina_teloprime_stringtie <- df$illumina_teloprime_stringtie %>% 
+    mutate(gene_id = ts[gene_id])
+
+df$cdna_teloprime_stringtie <- df$cdna_teloprime_stringtie %>% 
+    mutate(gene_id = ts[gene_id])
+
+
+annotation <- loadDb(snakemake@input$annotation)
+
+df$illumina_ref <- df$illumina_ref %>% 
+    mutate(gene_id = mapIds(
+        keys = .$transcript_id,
+        x = annotation,
+        column = "GENEID",
+        keytype = "TXNAME",
+        multiVals = "first"))
+
+df$cdna_ref <- df$cdna_ref %>% 
+    mutate(gene_id = mapIds(
+        keys = .$transcript_id,
+        x = annotation,
+        column = "GENEID",
+        keytype = "TXNAME",
+        multiVals = "first"))
+
+
+# bind
+df <- df %>% 
     bind_rows(.id = "id")
 ```
 
@@ -136,6 +181,7 @@ df %>%
     group_by(id, gene_id) %>% 
     summarise(gene = min(gene)) %>% 
     ungroup() %>% 
+    mutate(gene = tidyr::replace_na(gene, 1)) %>% 
     mutate(gene = as.integer(gene <= snakemake@params$dtu_cutoff)) %>% 
     tidyr::pivot_wider(values_from = gene, names_from = id, values_fill = 0) %>% 
     as.data.frame() %>%
@@ -159,7 +205,7 @@ df %>%
     mutate(min_gene = min(gene)) %>% 
     ungroup() %>% 
     filter(min_gene < snakemake@params$dtu_cutoff) %>% 
-    group_by(id, gene_id, mgi_symbol, description, gene_biotype) %>% 
+    group_by(id, gene_id, mgi_symbol, gene_biotype) %>% 
     summarise(gene = min(gene)) %>% 
     ungroup() %>% 
     tidyr::pivot_wider(values_from = gene, names_from = id, values_fill = 1) %>% 
@@ -175,12 +221,18 @@ df %>%
 qpcr <- read_csv(snakemake@input$qpcr, show_col_types = FALSE)
 
 df %>%
-    group_by(id, mgi_symbol) %>% 
+    group_by(id, gene_id) %>% 
     summarise(gene = min(gene)) %>% 
     ungroup() %>% 
     tidyr::pivot_wider(values_from = gene, names_from = id, values_fill = 1) %>% 
+    mutate(mgi_symbol = mapIds(
+        keys = remove.version(gene_id),
+        x = org.Mm.eg.db,
+        column = "SYMBOL",
+        keytype = "ENSEMBL",
+        multiVals = "first")) %>% 
     right_join(qpcr, by = "mgi_symbol") %>% 
-    dplyr::select(-qpcr_p, -sign) %>% 
+    dplyr::select(-qpcr_p, -sign, -gene_id) %>% 
     tidyr::gather("dataset", "padj", -mgi_symbol) %>%  
     mutate(dataset = if_else(dataset == "qpcr_padj", "qpcr", dataset)) %>% 
     mutate(mgi_symbol = factor(mgi_symbol, levels = rev(levels(as.factor(mgi_symbol))))) %>% 
@@ -210,8 +262,3 @@ qpcr %>%
       knitr::kable(format = "html") %>%
     kableExtra::kable_styling()
 ```
-
-
-gene ontology?
-
-analyse der detektierten typen?
