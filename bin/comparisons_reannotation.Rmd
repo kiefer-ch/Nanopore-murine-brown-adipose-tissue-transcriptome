@@ -58,7 +58,7 @@ df2 <- snakemake@input[["sqanti"]] %>%
             levels = c("illumina_stringtie", "teloprime_stringtie", "cdna_stringtie",
                 "rna_stringtie", "teloprime_flair", "cdna_flair", "rna_flair")),
         structural_category = factor(structural_category,
-            levels = c("full-splice_match", "novel_in_catalog", "incomplete-splice_match",
+            levels = c("full-splice_match", "incomplete-splice_match", "novel_in_catalog",
                 "novel_not_in_catalog", "fusion", "antisense",
                 "genic", "genic_intron", "intergenic")))
 ```
@@ -190,6 +190,44 @@ df2 %>%
     theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5))
 ```
 
+
+```{r plot_sqanti3, fig.width = 6.85 / 2, fig.asp = .65}
+df2 %>% 
+    filter(structural_category == "incomplete-splice_match") %>% 
+    ggplot(aes(dataset)) +
+    geom_bar(aes(fill = subcategory)) +
+    scale_fill_brewer(palette = "Dark2", name = NULL) +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe(sides = 'bl') +
+    ylab("Incomplete splice matches") +
+    xlab(NULL) +
+    theme(legend.key.size = unit(.33, "cm")) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5))
+```
+
+
+```{r}
+knitr::include_graphics("https://github.com/Magdoll/images_public/raw/master/SQANTI2_figures/sqanti2_ISM_subtype.png")
+```
+
+```{r plot_sqanti4, fig.width = 6.85 / 2, fig.asp = .65}
+df2 %>% 
+    filter(structural_category %in% c("novel_in_catalog", "novel_not_in_catalog")) %>% 
+    ggplot(aes(dataset)) +
+    geom_bar(aes(fill = subcategory)) +
+    scale_fill_brewer(palette = "Set1", name = NULL) +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe(sides = 'bl') +
+    ylab("Novel transcripts") +
+    xlab(NULL) +
+    theme(legend.key.size = unit(.33, "cm")) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5))
+```
+
+```{r}
+knitr::include_graphics("https://github.com/Magdoll/images_public/raw/master/SQANTI2_figures/sqanti2_NIC_subtype.png")
+```
+
 # Overlap
 
 Based on sqanti. Comparison between the different methods ability to identify 
@@ -206,14 +244,36 @@ df2 %>%
     as.data.frame() %>%
     tibble::column_to_rownames("associated_transcript") %>% 
     upset(nsets = 7, keep.order = TRUE,
-        nintersects = 15,
+        nintersects = 20,
         order.by = "freq",
         sets = c("illumina_stringtie", "teloprime_stringtie", "cdna_stringtie",
             "rna_stringtie", "teloprime_flair", "cdna_flair", "rna_flair"),
         sets.x.label = "Annotated transcripts",
-        mainbar.y.label = "Shared annotated transcripts",
+        mainbar.y.label = "Shared transcripts\n(based on reference annotation)",
         text.scale = 1.5)
 ```
+
+```{r upset_stringtie, fig.asp = .65}
+df2 %>% 
+    filter(grepl("^ENS", associated_transcript)) %>%
+    filter(grepl("stringtie", dataset)) %>% 
+    group_by(dataset, associated_transcript) %>% 
+    summarise(n = n()) %>% 
+    ungroup() %>% 
+    tidyr::pivot_wider(names_from = dataset, values_from = n, values_fill = 0) %>% 
+    mutate_if(is.numeric, ~ as.integer(. > 0)) %>% 
+    as.data.frame() %>%
+    tibble::column_to_rownames("associated_transcript") %>% 
+    upset(nsets = 4, keep.order = TRUE,
+        nintersects = 15,
+        order.by = "freq",
+        sets = c("illumina_stringtie", "teloprime_stringtie", "cdna_stringtie",
+            "rna_stringtie"),
+        sets.x.label = "Annotated transcripts",
+        mainbar.y.label = "Shared transcripts\n(based on reference annotation)",
+        text.scale = 1.5)
+```
+
 
 # Sensitivity and specificity
 
