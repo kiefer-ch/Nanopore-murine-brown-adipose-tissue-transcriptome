@@ -237,8 +237,8 @@ rule isoformswitchanalyser_importData:
     params:
         aa_path = "data/drimseq/{dataset}_{annotation}/",
         aa_prefix = "{dataset}_{annotation}_isoform",
-        dtu_cutoff = 0.05,
-        dIF_cutoff = 0.1,
+        dtu_cutoff = 0.05, # alpha
+        dIF_cutoff = 0.1,  # min difference
         min_feature_expr = 5,
         min_feature_prop = 0.1,
         min_gene_expr = 10

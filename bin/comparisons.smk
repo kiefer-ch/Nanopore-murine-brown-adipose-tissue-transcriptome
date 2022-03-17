@@ -331,6 +331,9 @@ rule compare_dtu:
         dtu_res = expand("data/drimseq/{dataset}_{annotation}/{dataset}_{annotation}_dtu_res.csv.gz",
             dataset = ["illumina", "cdna"],
             annotation = ["ref", "illumina_stringtie", "cdna_flair", "teloprime_stringtie"]),
+        sal = expand("data/drimseq/{dataset}_{annotation}/{dataset}_{annotation}_sal.rds",
+            dataset = ["illumina", "cdna"],
+            annotation = ["ref", "illumina_stringtie", "cdna_flair", "teloprime_stringtie"]),
         qpcr = "data/qpcr/dtu_qpcr.csv",
         annotation = "data/annotation/annotation_txdb.sqlite",
         telo_tmap = "data/reannotation/stringtie/gffcmp.teloprime_stringtie.gtf.tmap",
@@ -338,6 +341,7 @@ rule compare_dtu:
     output:
         "res/comparisons/comparisons_dtu.html",
     params:
-        dtu_cutoff = 0.05
+        dtu_cutoff = 0.05,
+        dIF_cutoff = 0.1
     script:
         "comparisons_dtu.Rmd"

@@ -148,6 +148,7 @@ switchList <- isoformSwitchTestDRIMSeq(switchList,
 
 
 log_info("Exporting DTU results table...")
+# this table holds all values, significant or not
 switchList$isoformFeatures %>%
     as_tibble() %>%
     dplyr::select(gene_id,
@@ -169,6 +170,9 @@ if(snakemake@wildcards$annotation != "ref") {
 
 log_info("Add aa sequence...")
 switchList <- extractSequence(switchList,
+    onlySwitchingGenes = TRUE,
+    alpha = snakemake@params$dtu_cutoff,
+    dIFcutoff = snakemake@params$dIF_cutoff,
     extractNTseq = FALSE,
     writeToFile = TRUE,
     pathToOutput = snakemake@params[["aa_path"]],
@@ -178,15 +182,20 @@ switchList <- extractSequence(switchList,
 log_info("Predict alternative splicing and intron retention...")
 switchList <- analyzeAlternativeSplicing(switchList,
     onlySwitchingGenes = TRUE,
-    alpha = snakemake@params$dtu_cutoff)
+    alpha = snakemake@params$dtu_cutoff,
+    dIFcutoff = snakemake@params$dIF_cutoff)
+
 switchList <- analyzeIntronRetention(switchList,
     onlySwitchingGenes = TRUE,
-    alpha = snakemake@params$dtu_cutoff)
+    alpha = snakemake@params$dtu_cutoff,
+    dIFcutoff = snakemake@params$dIF_cutoff)
 
 
 log_info("Analyze orf seq similarity...")
 switchList <- analyzeSwitchConsequences(switchList,
-    c("tss", "tts", "intron_retention", "ORF_seq_similarity", "NMD_status"))
+    c("tss", "tts", "intron_retention", "ORF_seq_similarity", "NMD_status"),
+    alpha = snakemake@params$dtu_cutoff,
+    dIFcutoff = snakemake@params$dIF_cutoff)
 
 log_info("Writing to disc...")
 saveRDS(switchList, snakemake@output[[1]])
