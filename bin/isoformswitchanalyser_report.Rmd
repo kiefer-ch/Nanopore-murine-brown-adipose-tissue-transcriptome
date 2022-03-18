@@ -1,0 +1,344 @@
+---
+title: "Isoformswitchanalyser results"
+author: "Christoph Kiefer"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+    html_document:
+        toc: true
+        toc_float: true
+        toc_depth: 2
+        fig_caption: false
+        dev: "svg"
+editor_options:
+    chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
+    cache = FALSE, out.width = 800)
+```
+
+```{r library, include=FALSE}
+source(".Rprofile")
+suppressPackageStartupMessages({
+    library("dplyr")
+    library("readr")
+    library("ggplot2")
+    library("ggthemes")
+    library("patchwork")
+    library("DRIMSeq")
+    library("IsoformSwitchAnalyzeR")
+})
+```
+
+```{r importData, include=FALSE}
+sample_info <- read_csv(snakemake@input[["sample_info"]],
+        show_col_types = FALSE) %>%
+    filter(!is.na(ont)) %>%
+    mutate_at(vars(matches("condition")), as.factor)
+
+
+switchList <- read_rds(snakemake@input[["switchList"]])
+
+#switchList <- analyzeSignalP(switchList,
+#    pathToSignalPresultFile = snakemake@input[["signalP"]])
+
+#switchList <- analyzePFAM(switchList,
+#    pathToPFAMresultFile = snakemake@input[["pfam"]],
+#    showProgress = FALSE)
+
+#targetP <- read_tsv(snakemake@input[["targetP"]], skip = 1) %>% 
+#    select("# ID", "Prediction")
+
+#CPAT <- read_tsv(snakemake@input[["cpat"]]) %>% 
+#    select(seq_ID, Coding_prob, ORF) %>% 
+#    tidyr::separate(seq_ID,
+#        c("ensembl_transcript_id_version", "ensembl_gene_id_version"),
+#        sep = '_') %>% 
+#    select(-ensembl_gene_id_version) %>% 
+#    mutate(ensembl_transcript_id_version =  if_else(substr(ensembl_transcript_id_version, 1, 7) == "ENSMUST",
+#        ensembl_transcript_id_version, tolower(ensembl_transcript_id_version)))
+
+#switchList <- analyzeSwitchConsequences(switchList,
+#    c("intron_retention", "ORF_seq_similarity", "NMD_status", 
+#      "domains_identified", "signal_peptide_identified"))
+```
+
+# Results tables
+
+```{r kableDrimSeqResults_gene}
+switchList$isoformFeatures %>%
+    as_tibble() %>%
+    dplyr::select(gene_id,
+        transcript_id = isoform_id,
+        mgi_symbol = gene_name,
+        gene_biotype,
+        gene = gene_switch_q_value,
+        transcript = isoform_switch_q_value,
+        dIF,
+        proportion_22 = IF1,
+        proportion_4 = IF2) %>% 
+    filter(gene < snakemake@params$dtu_cutoff) %>% 
+    filter(abs(dIF) > snakemake@params$dIF_cutoff) %>% 
+    knitr::kable(format = "html") %>%
+    kableExtra::kable_styling() %>%
+    kableExtra::scroll_box(width = "100%", height = "600px")
+```
+
+# Isoform switch analyser
+
+## Legend
+
+* ES: Exon Skipping. Compared to the hypothetical pre-RNA a single exon was skipped in the
+isoform analyzed (for every ES event annotated).
+* MEE: Mutually exclusive exon. Special case were two isoforms form the same gene contains
+two mutually exclusive exons and which are not found in any of the other isoforms from that
+gene.
+* MES: Multiple Exon Skipping. Compared to the hypothetical pre-RNA multiple consecutive
+exon was skipped in the isoform analyzed (for every MES event annotated).
+* IR: Intron Retention. Compared to the hypothetical pre-RNA an intron was retained in the
+isoform analyzed.
+* A5: Alternative 5’end donor site. Compared to the hypothetical pre-RNA an alternative 5’end
+donor site was used. Since it is compared to the pre-RNA, the donor site used is per definition
+more upstream than the the pre-RNA (the upstream exon is shorter).
+* A3: Alternative 3’end acceptor site. Compared to the hypothetical pre-RNA an alternative
+3’end acceptor site was used. Since it is compared to the pre-RNA, the donor site used is per
+definition more downstream than the the pre-RNA (the downstream exon is shorter).
+* ATSS: Alternative Transcription Start Sites. Compared to the hypothetical pre-RNA an alter-
+native transcription start site was used. Since it is compared to the pre-RNA, the ATSS site
+used is per definition more downstream than the pre-RNA.
+* ATTS: Alternative Transcription Termination Sites. Compared to the hypothetical pre-RNA an
+alternative transcription Termination sites was used. Since it is compared to the pre-RNA, the
+ATTS site used is per definition more upstream than the the pre-RNA.
+
+
+## Splice analysis (significant genes)
+
+```{r, fig.width = 6.85 / 2, fig.asp = .65}
+extractSplicingSummary(switchList,
+        alpha = snakemake@params$dtu_cutoff,
+        dIFcutoff = snakemake@params$dIF_cutoff,
+        plot = FALSE,
+        returnResult = TRUE) %>% 
+    as_tibble() %>% 
+    dplyr::select(AStype, splicingResult, nrGenesWithConsequences) %>% 
+    mutate(splicingResult = if_else(grepl("more", splicingResult), "cold", "room temperature")) %>% 
+    ggplot(aes(AStype, nrGenesWithConsequences)) +
+    geom_bar(aes(fill = splicingResult), stat = "identity")  +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe(sides = "bl") +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5)) +
+    scale_fill_colorblind(name = "isoform used more at") +
+    ylab("Number of genes") +
+    xlab("Alternative splicing category")
+
+
+extractSplicingEnrichment(switchList,
+        alpha = snakemake@params$dtu_cutoff,
+        dIFcutoff = snakemake@params$dIF_cutoff,
+        plot = FALSE,
+        returnResult = TRUE,
+        returnSummary = TRUE) %>% 
+    as_tibble() %>% 
+    dplyr::select(-Comparison, -condition_1, -condition_2) %>% 
+    knitr::kable(format = "html") %>%
+    kableExtra::kable_styling()
+```
+
+## Genome wide splice analysis
+
+```{r}
+extractSplicingGenomeWide(switchList,
+    splicingToAnalyze = c('ES', 'MES', "IR", 'ATSS', "ATTS"),
+    returnResult = FALSE)
+```
+
+## Splice consequences (impact on protein)
+
+```{r}
+n_tot <- extractSwitchSummary(switchList,
+        filterForConsequences = FALSE,
+        dIFcutoff = 0)$nrGenes
+
+n_consequences <- extractSwitchSummary(switchList, 
+        filterForConsequences = TRUE,
+        dIFcutoff = 0)$nrGenes
+
+sprintf("%s of %s genes with DTU show consequences for the predicted protein.",
+    n_consequences, n_tot)
+
+switchList$switchConsequence %>% 
+    as_tibble() %>% 
+    dplyr::select(gene_id, switchConsequence) %>% 
+    tidyr::drop_na() %>%
+    group_by(gene_id) %>% 
+    summarise(switchConsequence = paste(unique(switchConsequence), collapse = ';')) %>% 
+    rename(gene_id = "ensembl_gene_id_version")
+```
+
+```{r, fig.width = 6.85 / 2, fig.asp = .65}
+extractConsequenceSummary(switchList,
+        alpha = snakemake@params$dtu_cutoff,
+        dIFcutoff = snakemake@params$dIF_cutoff,
+        plot = FALSE,
+        returnResult = TRUE) %>% 
+    dplyr::select(featureCompared, switchConsequence, nrGenesWithConsequences) %>% 
+    ggplot(aes(featureCompared, nrGenesWithConsequences)) +
+    geom_bar(aes(fill = switchConsequence), stat = "identity") +
+    scale_fill_viridis_d(name = NULL) +
+    ylab("Number of genes") +
+    xlab(NULL) +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe(sides = "bl") +
+    theme(legend.key.size = unit(.33, "cm")) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5))
+
+
+extractConsequenceEnrichment(switchList,
+        alpha = snakemake@params$dtu_cutoff,
+        dIFcutoff = snakemake@params$dIF_cutoff,
+        plot = FALSE,
+        returnResult = TRUE) %>% 
+    as_tibble() %>% 
+    dplyr::select(-feature, -condition_1, -condition_2) %>% 
+    knitr::kable(format = "html") %>%
+    kableExtra::kable_styling()
+```
+
+
+# Plots
+
+The proportions and counts are from drimseq and therefore only for transcripts that have passed the filter criteria.
+The cross is the proportion estimated by DRIMSeq. The red transcripts are significantly changed.
+Note that sometimes there is an indication of significant DTU at the genelevel, but no 
+single transcript changes significantly.
+
+```{r, results="asis", fig.width = 6.85, fig.asp = .65}
+gene_ids <- switchList$isoformFeatures %>%
+    as_tibble() %>%
+    filter(gene_switch_q_value < snakemake@params$dtu_cutoff) %>%
+    filter(abs(dIF) > snakemake@params$dIF_cutoff) %>% 
+    pull(gene_id) %>% 
+    unique()
+
+for (gene in gene_ids) {
+    
+    cat('\n')  
+    cat("##", gene, "\n") 
+    
+    # transcript ids for subsetting
+    transcripts <- switchList$isoformFeatures %>%
+        as_tibble() %>% 
+        filter(gene_id == gene) %>% 
+        pull(isoform_id)
+      
+
+    # table with transcript level information
+    switchList$isoformFeatures %>%
+        as_tibble() %>% 
+        filter(gene_id == gene) %>% 
+        dplyr::select(gene_id,
+            transcript_id = isoform_id,
+            mgi_symbol = gene_name,
+            gene_biotype,
+            gene = gene_switch_q_value,
+            transcript = isoform_switch_q_value,
+            dIF,
+            proportion_22 = IF1,
+            proportion_4 = IF2) %>% 
+        #left_join(targetP, by = c("ensembl_transcript_id_version" = "# ID")) %>% 
+        #left_join(CPAT, by = "ensembl_transcript_id_version") %>% 
+        #dplyr::rename(padj = "transcript", targetP = "Prediction",
+        #    CPAT = "Coding_prob", ORF_length = "ORF") %>% 
+        knitr::kable(format = "html") %>%
+        kableExtra::kable_styling() %>% 
+        print()
+
+    
+    # plot of isoforms with domains
+    switchplot <- switchPlotTranscript(switchList, gene = gene,
+        localTheme = theme_bw(base_size = 7, base_family = "Helvetica")) +
+        scale_fill_colorblind() +
+        ggtitle(NULL)
+
+    # get order of transcripts from switchplot
+    order <- ggplot_build(switchplot)$layout$panel_params[[1]]$y$get_labels()
+    
+    # plot of counts
+    abundanceplot <- switchList$isoformRepExpression %>% 
+        as_tibble() %>% 
+        filter(isoform_id %in% transcripts) %>% 
+        tidyr::pivot_longer(cols = ends_with("iBAT"),
+            names_to = "sample_id", values_to = "abundance") %>% 
+        left_join(sample_info) %>% 
+        mutate(isoform_id = factor(isoform_id, levels = order)) %>% 
+        mutate(condition_temp = relevel(condition_temp, "22")) %>% 
+        ggplot(aes(isoform_id, abundance)) +
+        geom_point(aes(colour = condition_temp),
+            size = 1,
+            alpha = .5,
+            position = position_dodge2(width = .75)) +
+        stat_summary(aes(colour = condition_temp),
+            fun = mean, geom = "crossbar",
+            position = position_dodge(width = .75),
+            width = 1,
+            fatten = 1, lwd = .5) +
+        stat_summary(aes(colour = condition_temp),
+            geom = "errorbar", fun.data = mean_se,
+            width = .75,
+            lwd = .25,
+            position = position_dodge(width = .75)) +
+        scale_y_continuous(trans = "log1p", breaks = c(0, 1, 3, 10, 30, 100)) +
+        theme_tufte(base_size = 8, base_family = "Helvetica") +
+        geom_rangeframe(sides = 'bl') +
+        xlab(NULL) +
+        ylab("Abundance") +
+        scale_colour_brewer(palette = "Dark2", name = NULL,
+        labels = c("22" = "22°C", "4" = "4°C")) +
+        theme(legend.key.size = unit(.33, "cm")) +
+        theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5))
+
+    
+    # plot of usage
+    usageplot <- switchList$isoformRepExpression %>% 
+        as_tibble() %>% 
+        filter(isoform_id %in% transcripts) %>% 
+        tidyr::pivot_longer(cols = ends_with("iBAT"),
+            names_to = "sample_id", values_to = "abundance") %>% 
+        group_by(sample_id) %>% 
+        mutate(usage = abundance / sum(abundance)) %>% 
+        ungroup() %>% 
+        left_join(sample_info) %>% 
+        mutate(isoform_id = factor(isoform_id, levels = order)) %>% 
+        mutate(condition_temp = relevel(condition_temp, "22")) %>% 
+        ggplot(aes(isoform_id, usage)) +
+        geom_point(aes(colour = condition_temp),
+            size = 1,
+            alpha = .5,
+            position = position_dodge2(width = .75)) +
+        stat_summary(aes(colour = condition_temp),
+            fun = mean, geom = "crossbar",
+            position = position_dodge(width = .75),
+            width = 1,
+            fatten = 1, lwd = .5) +
+        stat_summary(aes(colour = condition_temp),
+            geom = "errorbar", fun.data = mean_se,
+            width = .75,
+            lwd = .25,
+            position = position_dodge(width = .75)) +
+        theme_tufte(base_size = 8, base_family = "Helvetica") +
+        geom_rangeframe(sides = 'bl') +
+        xlab(NULL) +
+        ylab("Isoform usage") +
+        scale_y_continuous(labels = scales::percent) +
+        scale_colour_brewer(palette = "Dark2", name = NULL,
+        labels = c("22" = "22°C", "4" = "4°C")) +
+        theme(legend.key.size = unit(.33, "cm")) +
+        theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5))
+
+    
+    print(switchplot / (abundanceplot + usageplot + plot_layout(guides = 'collect')))
+    
+    cat('\n')  
+}
+```

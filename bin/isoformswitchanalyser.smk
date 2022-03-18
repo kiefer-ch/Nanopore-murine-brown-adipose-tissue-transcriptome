@@ -248,3 +248,16 @@ rule isoformswitchanalyser_importData:
         8
     script:
         "isoformswitchanalyser_importData.R"
+
+
+rule isoformswitchanalyser_report:
+    input:
+        sample_info = config["SAMPLE_INFO"],
+        switchList = "data/drimseq/{dataset}_{annotation}/{dataset}_{annotation}_sal.rds"
+    output:
+        "res/isoformswitchanalyser/{dataset}_{annotation}.html"
+    params:
+        dtu_cutoff = 0.05, # alpha
+        dIF_cutoff = 0.1  # min difference
+    script:
+        "isoformswitchanalyser_report.Rmd"
