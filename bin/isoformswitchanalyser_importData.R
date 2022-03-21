@@ -53,7 +53,7 @@ if(snakemake@wildcards$dataset == "illumina") {
             sub("_.+$", "", .)
     }
 
-} else {
+} else if(snakemake@wildcards$dataset == "cdna"){
 
     counts <- snakemake@input$counts %>%
         purrr::set_names(basename(.) %>%
@@ -69,7 +69,11 @@ if(snakemake@wildcards$dataset == "illumina") {
             sub("_.+$", "", .)
     }
 
-    order <- match(sample_info$cdna, names(counts)) - 1
+    if(grepl("ref", snakemake@wildcards$annotation)) {
+        order <- match(sample_info$cdna, sub("cdna_merged_", '', names(counts))) - 1
+    } else {
+        order <- match(sample_info$cdna, names(counts)) - 1
+    }
 
     names(counts) <- c("isoform_id", sample_info$sample_id[order])
 
@@ -123,7 +127,7 @@ log_info("Prefiltering")
 switchList <- preFilter(switchList,
     geneExpressionCutoff = 3,
     isoformExpressionCutoff = 1,
-    IFcutoff = .1,
+    IFcutoff = .025,
     removeSingleIsoformGenes = TRUE,
     reduceToSwitchingGenes = FALSE
 )

@@ -237,8 +237,8 @@ rule isoformswitchanalyser_importData:
     params:
         aa_path = "data/drimseq/{dataset}_{annotation}/",
         aa_prefix = "{dataset}_{annotation}_isoform",
-        dtu_cutoff = 0.05, # alpha
-        dIF_cutoff = 0.1,  # min difference
+        dtu_cutoff = config["dtu_cutoff"], # alpha
+        dIF_cutoff = config["dIF_cutoff"],  # min difference
         min_feature_expr = 5,
         min_feature_prop = 0.1,
         min_gene_expr = 10
@@ -250,6 +250,58 @@ rule isoformswitchanalyser_importData:
         "isoformswitchanalyser_importData.R"
 
 
+# PFAM
+# apt install hmmer2
+rule get_pfama:
+    output:
+        pfam_hmm = "data/pfam/Pfam-A.hmm",
+        pfam_hmm_dat = "data/pfam/Pfam-A.hmm.dat",
+        pfam_active_site_dat = "data/pfam/active_site.dat"
+    shell:
+        "wget -q -O \
+            - ftp://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/Pfam-A.hmm.gz \
+            | gunzip > {output.pfam_hmm} && \
+        wget -q -O \
+            - ftp://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/Pfam-A.hmm.dat.gz \
+            | gunzip > {output.pfam_hmm_dat} && \
+        wget -q -O \
+            - ftp://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/active_site.dat.gz \
+            | gunzip > {output.pfam_active_site_dat}"
+
+
+rule hmmpress:
+    input:
+        pfam_hmm = "data/pfam/Pfam-A.hmm",
+        pfam_hmm_dat = "data/pfam/Pfam-A.hmm.dat",
+        pfam_active_site_dat = "data/pfam/active_site.dat"
+    output:
+        multiext("data/pfam/Pfam-A.hmm", ".h3f", ".h3i", ".h3m", ".h3p")
+    shell:
+        "hmmpress {input.pfam_hmm}"
+
+
+rule pfam_scan:
+    input:
+        db = "data/pfam/Pfam-A.hmm",
+        fasta = "data/drimseq/{dataset}_{annotation}/{dataset}_{annotation}_isoform_AA.fasta"
+    output:
+        pfam = "data/drimseq/{dataset}_{annotation}/{dataset}_{annotation}_isoform_AA.pfam",
+        tblout = "data/drimseq/{dataset}_{annotation}/{dataset}_{annotation}_isoform_AA.tsv"
+    params:
+    wildcard_constraints:
+        dataset = "cdna|teloprime|illumina|cdna_flair|teloprime_flair"
+    threads:
+        4
+    shell:
+        "hmmscan \
+            -o {output.pfam} \
+            --pfamtblout {output.tblout} \
+            --cpu {threads} \
+            {input.db} \
+            {input.fasta}"
+
+
+# report
 rule isoformswitchanalyser_report:
     input:
         sample_info = config["SAMPLE_INFO"],
@@ -257,7 +309,7 @@ rule isoformswitchanalyser_report:
     output:
         "res/isoformswitchanalyser/{dataset}_{annotation}.html"
     params:
-        dtu_cutoff = 0.05, # alpha
-        dIF_cutoff = 0.1  # min difference
+        dtu_cutoff = config["dtu_cutoff"], # alpha
+        dIF_cutoff = config["dIF_cutoff"],  # min difference
     script:
         "isoformswitchanalyser_report.Rmd"

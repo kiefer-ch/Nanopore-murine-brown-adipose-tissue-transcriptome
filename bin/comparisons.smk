@@ -341,7 +341,7 @@ rule compare_dtu:
     output:
         "res/comparisons/comparisons_dtu.html",
     params:
-        dtu_cutoff = 0.05,
-        dIF_cutoff = 0.1
+        dtu_cutoff = config["dtu_cutoff"], # alpha
+        dIF_cutoff = config["dIF_cutoff"]  # min difference
     script:
         "comparisons_dtu.Rmd"
