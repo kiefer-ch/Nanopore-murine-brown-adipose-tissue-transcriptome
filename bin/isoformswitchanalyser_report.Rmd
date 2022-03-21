@@ -43,9 +43,10 @@ switchList <- read_rds(snakemake@input[["switchList"]])
 #switchList <- analyzeSignalP(switchList,
 #    pathToSignalPresultFile = snakemake@input[["signalP"]])
 
-#switchList <- analyzePFAM(switchList,
-#    pathToPFAMresultFile = snakemake@input[["pfam"]],
-#    showProgress = FALSE)
+switchList <- analyzePFAM(switchList,
+    pathToPFAMresultFile = "data/drimseq/illumina_ref/illumina_ref_isoform_AA.tsv",
+    #snakemake@input[["pfam"]],
+    showProgress = FALSE)
 
 #targetP <- read_tsv(snakemake@input[["targetP"]], skip = 1) %>% 
 #    select("# ID", "Prediction")

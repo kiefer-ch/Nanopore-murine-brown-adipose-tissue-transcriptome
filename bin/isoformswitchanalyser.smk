@@ -282,23 +282,25 @@ rule hmmpress:
 
 rule pfam_scan:
     input:
-        db = "data/pfam/Pfam-A.hmm",
-        fasta = "data/drimseq/{dataset}_{annotation}/{dataset}_{annotation}_isoform_AA.fasta"
+        multiext("data/pfam/Pfam-A.hmm", ".h3f", ".h3i", ".h3m", ".h3p"),
+        fasta = "res/drimseq/{dataset}/{dataset}_isoform_AA.fasta"
     output:
-        pfam = "data/drimseq/{dataset}_{annotation}/{dataset}_{annotation}_isoform_AA.pfam",
-        tblout = "data/drimseq/{dataset}_{annotation}/{dataset}_{annotation}_isoform_AA.tsv"
+        "res/drimseq/{dataset}/{dataset}_isoform_AA.pfam"
     params:
+        pfam_a_dir = "data/pfam/"
     wildcard_constraints:
         dataset = "cdna|teloprime|illumina|cdna_flair|teloprime_flair"
     threads:
-        4
+        5
     shell:
-        "hmmscan \
-            -o {output.pfam} \
-            --pfamtblout {output.tblout} \
-            --cpu {threads} \
-            {input.db} \
-            {input.fasta}"
+        "hmmscan"
+
+        "pfam_scan \
+            -fasta {input.fasta} \
+            -dir {params.pfam_a_dir} \
+            -outfile {output} \
+            -as \
+            -cpu {threads}"
 
 
 # report
