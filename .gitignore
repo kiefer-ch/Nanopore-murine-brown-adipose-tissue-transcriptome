@@ -24,6 +24,9 @@
 !renv/activate.R
 !renv/settings.dcf
 
+# Don't ignore R utility scripts
+!R/*.R
+
 # Root directory
 !Snakefile
 !README.md

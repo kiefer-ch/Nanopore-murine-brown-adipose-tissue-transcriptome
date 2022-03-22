@@ -122,23 +122,51 @@ reference <- df %>%
     split(~id) %>% 
     map(pull, gene_id) %>% 
     map(remove.version)
+```
 
+
+Alle Gene mit p < .1. Referenz/universum = Alle Gene, die die entsprechenden Filter
+in DrimSeq überstanden haben (also für jeden Datensatz unterschiedlich.)
+
+```{r, fig.asp = .65}
 go_res <- df %>% 
     dplyr::select(id, gene_id, gene) %>% 
-    filter(gene < .05) %>% 
+    filter(gene < snakemake@params$dtu_cutoff) %>% 
     split(~id) %>% 
     map(pull, "gene_id") %>% 
     map(remove.version) %>% 
     map2(reference, get_geneList) %>% 
     map2(names(.), make.topGO) %>% 
-    map(get.results)
+    map(get.results, method = "parentchild")
+
+plot.go.summary(go_res, n = 3, n_char = 50) +
+    xlab(NULL) +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe() +
+    scale_fill_viridis_c(direction = -1, trans = "log10", name = "p") +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
 ```
 
+100 genes with smallest p.
+
 ```{r, fig.asp = .65}
-plot.go.summary(go_res) +
+go_res <- df %>% 
+    dplyr::select(id, gene_id, gene) %>% 
+    group_by(id) %>% 
+    slice_min(order_by = gene, n = 100) %>% 
+    ungroup() %>% 
+    split(~id) %>% 
+    map(pull, "gene_id") %>% 
+    map(remove.version) %>% 
+    map2(reference, get_geneList) %>% 
+    map2(names(.), make.topGO) %>% 
+    map(get.results, method = "parentchild")
+
+plot.go.summary(go_res, n = 3, n_char = 50) +
     xlab(NULL) +
     ggplot2::scale_fill_viridis_c(direction = -1, trans = "log10", name = "p") +
     theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe() +
     theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
 ```
 
@@ -165,7 +193,7 @@ reference <- df %>%
 
 reactome_res <- df %>% 
     dplyr::select(id, gene_id, gene) %>% 
-    filter(gene < .05) %>% 
+    filter(gene < snakemake@params$dtu_cutoff) %>% 
     split(~id) %>% 
     set_names(sub("svalue_", "", names(.))) %>% 
     map(pull, gene_id) %>% 
