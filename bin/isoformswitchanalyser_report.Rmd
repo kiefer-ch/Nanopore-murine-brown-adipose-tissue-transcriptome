@@ -28,6 +28,8 @@ suppressPackageStartupMessages({
     library("patchwork")
     library("DRIMSeq")
     library("IsoformSwitchAnalyzeR")
+    library("org.Mm.eg.db")
+    source("R/go.R")
 })
 ```
 
@@ -40,29 +42,15 @@ sample_info <- read_csv(snakemake@input[["sample_info"]],
 
 switchList <- read_rds(snakemake@input[["switchList"]])
 
-#switchList <- analyzeSignalP(switchList,
-#    pathToSignalPresultFile = snakemake@input[["signalP"]])
 
 switchList <- analyzePFAM(switchList,
-    pathToPFAMresultFile = "data/drimseq/illumina_ref/illumina_ref_isoform_AA.tsv",
-    #snakemake@input[["pfam"]],
+    pathToPFAMresultFile = snakemake@input[["pfam"]],
     showProgress = FALSE)
 
-#targetP <- read_tsv(snakemake@input[["targetP"]], skip = 1) %>% 
-#    select("# ID", "Prediction")
 
-#CPAT <- read_tsv(snakemake@input[["cpat"]]) %>% 
-#    select(seq_ID, Coding_prob, ORF) %>% 
-#    tidyr::separate(seq_ID,
-#        c("ensembl_transcript_id_version", "ensembl_gene_id_version"),
-#        sep = '_') %>% 
-#    select(-ensembl_gene_id_version) %>% 
-#    mutate(ensembl_transcript_id_version =  if_else(substr(ensembl_transcript_id_version, 1, 7) == "ENSMUST",
-#        ensembl_transcript_id_version, tolower(ensembl_transcript_id_version)))
-
-#switchList <- analyzeSwitchConsequences(switchList,
-#    c("intron_retention", "ORF_seq_similarity", "NMD_status", 
-#      "domains_identified", "signal_peptide_identified"))
+switchList <- analyzeSwitchConsequences(switchList,
+    c("intron_retention", "ORF_seq_similarity", "NMD_status", 
+      "domains_identified"))
 ```
 
 # Results tables
@@ -222,11 +210,65 @@ gene_ids <- switchList$isoformFeatures %>%
     pull(gene_id) %>% 
     unique()
 
+if(grepl("flair", snakemake@wildcards$annotation)) {
+
+    symbols <- mapIds(
+        keys = remove.version(gene_ids),
+        x = org.Mm.eg.db,
+        column = "SYMBOL",
+        keytype = "ENSEMBL",
+        multiVals = "first")
+    
+} else if(snakemake@wildcards$annotation == "ref") {
+    
+    symbols <- mapIds(
+        keys = gene_ids,
+        x = org.Mm.eg.db,
+        column = "ENSEMBL",
+        keytype = "SYMBOL",
+        multiVals = "first")
+
+} else if(grepl("stringtie", snakemake@wildcards$annotation)) {
+    if(grepl("illumina", snakemake@wildcards$annotation)) {
+     
+        ens <- read_tsv(snakemake@input$illu_tmap) %>% 
+            dplyr::select(qry_gene_id, ref_gene_id) %>% 
+            tibble::deframe()       
+        
+    } else if(grepl("teloprime", snakemake@wildcards$annotation)) {
+
+        ens <- read_tsv(snakemake@input$telo_tmap) %>% 
+            dplyr::select(qry_gene_id, ref_gene_id) %>% 
+            tibble::deframe()       
+        
+    }
+    
+    ens_ids <- ens[gene_ids]
+    
+    symbols <- mapIds(
+        keys = remove.version(ens_ids),
+        x = org.Mm.eg.db,
+        column = "SYMBOL",
+        keytype = "ENSEMBL",
+        multiVals = "first")
+    
+}
+
 for (gene in gene_ids) {
     
     cat('\n')  
-    cat("##", gene, "\n") 
+
+    if(grepl("stringtie", snakemake@wildcards$annotation)) {
+
+        cat("##", symbols[remove.version(ens_ids[gene])], ens_ids[gene], "\n")
+
+    } else {
+        
+        cat("##", symbols[remove.version(gene)], gene, "\n")
+
+    }
     
+                
     # transcript ids for subsetting
     transcripts <- switchList$isoformFeatures %>%
         as_tibble() %>% 
@@ -247,10 +289,6 @@ for (gene in gene_ids) {
             dIF,
             proportion_22 = IF1,
             proportion_4 = IF2) %>% 
-        #left_join(targetP, by = c("ensembl_transcript_id_version" = "# ID")) %>% 
-        #left_join(CPAT, by = "ensembl_transcript_id_version") %>% 
-        #dplyr::rename(padj = "transcript", targetP = "Prediction",
-        #    CPAT = "Coding_prob", ORF_length = "ORF") %>% 
         knitr::kable(format = "html") %>%
         kableExtra::kable_styling() %>% 
         print()
@@ -271,7 +309,7 @@ for (gene in gene_ids) {
         filter(isoform_id %in% transcripts) %>% 
         tidyr::pivot_longer(cols = ends_with("iBAT"),
             names_to = "sample_id", values_to = "abundance") %>% 
-        left_join(sample_info) %>% 
+        left_join(sample_info, by = "sample_id") %>% 
         mutate(isoform_id = factor(isoform_id, levels = order)) %>% 
         mutate(condition_temp = relevel(condition_temp, "22")) %>% 
         ggplot(aes(isoform_id, abundance)) +
@@ -309,7 +347,7 @@ for (gene in gene_ids) {
         group_by(sample_id) %>% 
         mutate(usage = abundance / sum(abundance)) %>% 
         ungroup() %>% 
-        left_join(sample_info) %>% 
+        left_join(sample_info, by = "sample_id") %>% 
         mutate(isoform_id = factor(isoform_id, levels = order)) %>% 
         mutate(condition_temp = relevel(condition_temp, "22")) %>% 
         ggplot(aes(isoform_id, usage)) +

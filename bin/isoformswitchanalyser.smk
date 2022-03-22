@@ -244,6 +244,7 @@ rule isoformswitchanalyser_importData:
         min_gene_expr = 10
     wildcard_constraints:
         dataset = "cdna|illumina",
+        annotation = "ref|cdna_flair|illumina_stringtie|teloprime_stringtie"
     threads:
         8
     script:
@@ -281,21 +282,21 @@ rule hmmpress:
 
 
 rule pfam_scan:
+# can be installed via bioconda
+# conda install -c bioconda pfam_scan
     input:
         multiext("data/pfam/Pfam-A.hmm", ".h3f", ".h3i", ".h3m", ".h3p"),
-        fasta = "res/drimseq/{dataset}/{dataset}_isoform_AA.fasta"
+        fasta = "data/drimseq/{dataset}_{annotation}/{dataset}_{annotation}_isoform_AA.fasta"
     output:
-        "res/drimseq/{dataset}/{dataset}_isoform_AA.pfam"
+        "data/drimseq/{dataset}_{annotation}/{dataset}_{annotation}_isoform_AA.pfam"
     params:
         pfam_a_dir = "data/pfam/"
     wildcard_constraints:
-        dataset = "cdna|teloprime|illumina|cdna_flair|teloprime_flair"
+        dataset = "cdna|illumina"
     threads:
         5
     shell:
-        "hmmscan"
-
-        "pfam_scan \
+        "pfam_scan.pl \
             -fasta {input.fasta} \
             -dir {params.pfam_a_dir} \
             -outfile {output} \
@@ -307,11 +308,17 @@ rule pfam_scan:
 rule isoformswitchanalyser_report:
     input:
         sample_info = config["SAMPLE_INFO"],
-        switchList = "data/drimseq/{dataset}_{annotation}/{dataset}_{annotation}_sal.rds"
+        switchList = "data/drimseq/{dataset}_{annotation}/{dataset}_{annotation}_sal.rds",
+        pfam = "data/drimseq/{dataset}_{annotation}/{dataset}_{annotation}_isoform_AA.pfam",
+        annotation = "data/annotation/annotation_txdb.sqlite",
+        telo_tmap = "data/reannotation/stringtie/gffcmp.teloprime_stringtie.gtf.tmap",
+        illu_tmap = "data/reannotation/stringtie/gffcmp.illumina_stringtie.gtf.tmap"
     output:
         "res/isoformswitchanalyser/{dataset}_{annotation}.html"
     params:
         dtu_cutoff = config["dtu_cutoff"], # alpha
-        dIF_cutoff = config["dIF_cutoff"],  # min difference
+        dIF_cutoff = config["dIF_cutoff"]  # min difference
+    wildcard_constraints:
+        dataset = "cdna|illumina",
     script:
         "isoformswitchanalyser_report.Rmd"
