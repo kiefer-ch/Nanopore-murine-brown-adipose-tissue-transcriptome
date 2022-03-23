@@ -7,13 +7,13 @@
 #' @export
 #'
 read_gtf <- function(file) {
-    read_delim(file = file,
+    readr::read_delim(file = file,
         delim = "\t",
         comment = "#",
         na = c('.'),
         col_names = c("sequence", "source", "feature", "start", "end", "score",
             "strand", "phase", "attributes"),
-        col_types = cols(
+        col_types = readr::cols(
             sequence = col_character(),
             source = col_character(),
             feature = col_character(),
@@ -22,9 +22,9 @@ read_gtf <- function(file) {
             score = col_character(),
             strand = col_character(),
             phase = col_character(),
-            attributes = col_character() ),
+            attributes = col_character()),
         progress = FALSE) %>%
-    filter(strand %in% c('+', '-')) %>%
-    mutate(feature = as.factor(feature),
+    dplyr::filter(strand %in% c('+', '-')) %>%
+    dplyr::mutate(feature = as.factor(feature),
         strand = as.factor(strand))
 }

@@ -1,5 +1,9 @@
 rule browserTrackAdcy3:
     input:
+        "data/bam/illumina/5034_S33_Aligned.sortedByCoord.out.bam.bai",
+        "data/bam/illumina/5035_S34_Aligned.sortedByCoord.out.bam.bai",
+        "data/bam/cdna/merged/cdna_barcode07_genome.bam.bai",
+        "data/bam/cdna/merged/cdna_barcode08_genome.bam.bai",
         txdb = "data/annotation/annotation_txdb.sqlite",
         txdb_flair = "data/reannotation/flair/annotation/cdna_flair.isoforms_txdb.sqlite",
         txdb_stringtie = "data/reannotation/stringtie/teloprime_stringtie_noUnknownStrand_txdb.sqlite",
@@ -28,6 +32,10 @@ rule browserTrackAdcy3:
 
 rule browserTrackCars2:
     input:
+        "data/bam/illumina/5034_S33_Aligned.sortedByCoord.out.bam.bai",
+        "data/bam/illumina/5035_S34_Aligned.sortedByCoord.out.bam.bai",
+        "data/bam/cdna/merged/cdna_barcode07_genome.bam.bai",
+        "data/bam/cdna/merged/cdna_barcode08_genome.bam.bai",
         txdb = "data/annotation/annotation_txdb.sqlite",
         txdb_flair = "data/reannotation/flair/annotation/cdna_flair.isoforms_txdb.sqlite",
         txdb_stringtie = "data/reannotation/stringtie/teloprime_stringtie_noUnknownStrand_txdb.sqlite",

@@ -7,6 +7,7 @@ suppressPackageStartupMessages({
     library("readr")
     library("logger")
     library("AnnotationDbi")
+    source("R/subsetTxdb.R")
 })
 
 
@@ -48,26 +49,6 @@ faidx <- read_tsv(snakemake@input$genome,
 
 
 # function definitions
-subset.txdb <- function(txdb, txdb_dump, gene_id, chrominfo = faidx) {
-
-    all_tx <- suppressMessages(AnnotationDbi::select(txdb, gene_id,
-            c("GENEID", "TXNAME"), "GENEID")) %>%
-        pull(TXNAME)
-
-    all_tx_ids <- txdb_dump[[1]] %>%
-        as_tibble() %>%
-        filter(tx_name %in% all_tx) %>%
-        pull(tx_id)
-
-    new_txdb_dump <- vector("list", 4)
-    new_txdb_dump[1:3] <- txdb_dump[1:3] %>%
-        purrr::map(filter, tx_id %in% all_tx_ids)
-    new_txdb_dump$chrominfo <- chrominfo
-
-    do.call(makeTxDb, new_txdb_dump)
-}
-
-
 plot.transcripts <- function(gene_id, max_cov_illumina = 5,
     extend = 2500, lwd_sashimi_max = 3, temp = "warm") {
 

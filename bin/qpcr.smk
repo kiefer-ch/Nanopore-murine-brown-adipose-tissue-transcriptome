@@ -23,6 +23,12 @@ rule dtu_qpcr:
 
 rule qpcr_dtu_report:
     input:
+        "data/bam/illumina/5034_S33_Aligned.sortedByCoord.out.bam.bai",
+        "data/bam/illumina/5035_S34_Aligned.sortedByCoord.out.bam.bai",
+        "data/bam/cdna/merged/cdna_barcode07_genome.bam.bai",
+        "data/bam/cdna/merged/cdna_barcode08_genome.bam.bai",
+        "data/bam/teloprime/merged/teloprime_barcode01_genome.bam.bai",
+        "data/bam/teloprime/merged/teloprime_barcode02_genome.bam.bai",
         cq = "data/qpcr/dtu_qpcr_cq.rds",
         txdb = "data/annotation/annotation_txdb.sqlite",
         txdb_flair = "data/reannotation/flair/annotation/cdna_flair.isoforms_txdb.sqlite",
@@ -30,12 +36,12 @@ rule qpcr_dtu_report:
         tmap = "data/reannotation/stringtie/gffcmp.teloprime_stringtie.gtf.tmap",
         txdb_stringtie_illumina = "data/reannotation/stringtie/illumina_stringtie_noUnknownStrand_txdb.sqlite",
         tmap_illumina = "data/reannotation/stringtie/gffcmp.illumina_stringtie.gtf.tmap",
-#        illumina_warm = "data/bam/illumina/5034_S33_Aligned.sortedByCoord.out.bam",
-#        illumina_cold = "data/bam/illumina/5035_S34_Aligned.sortedByCoord.out.bam",
-#        cdna_warm = "data/bam/cdna/merged/cdna_barcode07_genome.bam",
-#        cdna_cold = "data/bam/cdna/merged/cdna_barcode08_genome.bam",
-#        teloprime_warm = "data/bam/cdna/merged/cdna_barcode01_genome.bam",
-#        teloprime_cold = "data/bam/cdna/merged/cdna_barcode02_genome.bam",
+        illumina_warm = "data/bam/illumina/5034_S33_Aligned.sortedByCoord.out.bam",
+        illumina_cold = "data/bam/illumina/5035_S34_Aligned.sortedByCoord.out.bam",
+        cdna_warm = "data/bam/cdna/merged/cdna_barcode07_genome.bam",
+        cdna_cold = "data/bam/cdna/merged/cdna_barcode08_genome.bam",
+        teloprime_warm = "data/bam/teloprime/merged/teloprime_barcode01_genome.bam",
+        teloprime_cold = "data/bam/teloprime/merged/teloprime_barcode02_genome.bam",
         genome = "data/annotation/genome.fa.fai",
         primer_stats = "data/qpcr/200331_primer.csv"
     output:
