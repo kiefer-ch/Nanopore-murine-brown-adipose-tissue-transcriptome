@@ -29,6 +29,14 @@ def get_minimapInput(wildcards):
     return file_name
 
 
+def get_minimap_flags(wildcards):
+    if wildcards.dataset == "rna":
+        flags = "-uf"
+    elif wildcards.type in ["teloprime", "cdna"]:
+        flags = "-ub"
+    return flags
+
+
 rule minimap_mapGenome:
     input:
         index = "indices/minimap2/genome_minimap2.mmi",
@@ -36,6 +44,8 @@ rule minimap_mapGenome:
     output:
          "data/bam/{dataset}/{flowcell}/{dataset}_{flowcell}_genome_{barcode}_q7_sort.bam",
     threads: 20
+    params:
+        flags = get_minimap_flags
     wildcard_constraints:
         dataset = "cdna|rna|teloprime",
         flowcell = "flowcell1|flowcell2|merged"
@@ -45,7 +55,7 @@ rule minimap_mapGenome:
             -ax splice \
             -t {threads} \
             --secondary=no \
-            -uf \
+            {params.flags} \
             {input.index} \
             {input.fastq} | \
         samtools sort -l 5 -o {output} -O bam -@ 6"
@@ -58,6 +68,8 @@ rule minimap_mapTranscriptome:
     output:
          "data/bam/{dataset}/{flowcell}/{dataset}_{flowcell}_transcriptome_{barcode}_q7_sort.bam",
     threads: 20
+    params:
+        flags = get_minimap_flags
     wildcard_constraints:
         dataset = "cdna|rna|teloprime",
         flowcell = "flowcell1|flowcell2|merged"
@@ -67,7 +79,7 @@ rule minimap_mapTranscriptome:
             -ax map-ont \
             -t {threads} \
             --secondary=no \
-            -uf \
+            {params.flags} \
             {input.index} \
             {input.fastq} | \
         samtools sort -l 5 -o {output} -O bam -@ 6"
@@ -75,8 +87,8 @@ rule minimap_mapTranscriptome:
 
 rule samtools_merge:
     input:
-        "data/bam/{dataset}/flowcell1/{dataset}_flowcell1_transcriptome_{barcode}_q7_sort.bam",
-        "data/bam/{dataset}/flowcell1/{dataset}_flowcell1_transcriptome_{barcode}_q7_sort.bam"
+        "data/bam/{dataset}/flowcell1/{dataset}_flowcell1_{type}_{barcode}_q7_sort.bam",
+        "data/bam/{dataset}/flowcell2/{dataset}_flowcell2_{type}_{barcode}_q7_sort.bam"
     output:
         "data/bam/{dataset}/merged/{dataset}_{barcode}_{type}.bam"
     threads: 6
