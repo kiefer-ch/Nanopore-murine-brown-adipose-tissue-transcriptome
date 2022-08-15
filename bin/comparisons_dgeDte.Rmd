@@ -19,6 +19,7 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
 ```
 
 ```{r library, include=FALSE}
+save.image()
 source(".Rprofile")
 suppressPackageStartupMessages({
     library("dplyr")

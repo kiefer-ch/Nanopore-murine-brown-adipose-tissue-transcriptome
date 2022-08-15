@@ -124,7 +124,6 @@ rule quantify_minimap:
         "data/quantification/{dataset}/{flowcell}/{dataset}_{flowcell}_{barcode}_quant.tsv"
     wildcard_constraints:
         dataset = "teloprime|cdna|rna",
-        type = "genome|transcriptome",
         flowcell = "flowcell1|flowcell2|merged"
     script:
         "quantify_minimap.R"

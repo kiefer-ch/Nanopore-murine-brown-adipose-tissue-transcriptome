@@ -302,6 +302,8 @@ rule compare_dge:
         "res/comparisons/comparisons_dgeDte.html"
     params:
         cutoff = .05
+    conda:
+        "../conf/environment.yaml"
     script:
         "comparisons_dgeDte.Rmd"
 
