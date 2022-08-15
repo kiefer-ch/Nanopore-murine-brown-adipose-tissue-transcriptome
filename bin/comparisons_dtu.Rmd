@@ -332,6 +332,6 @@ qpcr %>%
     mutate(sign = symnum(qpcr_padj,
                          cutpoints = c(0, .001, .01, .05, .1, 1),
                          symbols = c("***", "**", "*", ".", " ")))  %>% 
-      knitr::kable(format = "html") %>%
+    knitr::kable(format = "html") %>%
     kableExtra::kable_styling()
 ```

@@ -303,7 +303,7 @@ rule compare_dge:
     params:
         cutoff = .05
     conda:
-        "../conf/environment.yaml"
+        "../conf/r.yaml"
     script:
         "comparisons_dgeDte.Rmd"
 

@@ -19,7 +19,6 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
 ```
 
 ```{r library, include=FALSE}
-save.image()
 source(".Rprofile")
 suppressPackageStartupMessages({
     library("dplyr")
@@ -210,6 +209,20 @@ plot.reactome.summary(reactome_res) +
 
 
 ## All genes
+
+```{r}
+df %>% 
+    dplyr::select(starts_with("svalue")) %>% 
+    summarise_all(function(x) sum(x < .05)) %>% 
+    t() %>% 
+    as_tibble(rownames = "id") %>% 
+    tidyr::separate(id, c("s", "dataset", "level")) %>% 
+    dplyr::select(-s) %>% 
+    tidyr::pivot_wider(names_from = level, values_from = V1) %>% 
+    knitr::kable(format = "html") %>%
+    kableExtra::kable_styling()
+```
+
 
 ```{r upset, fig.asp = .65}
 df %>%
