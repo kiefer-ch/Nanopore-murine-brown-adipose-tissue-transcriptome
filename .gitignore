@@ -1,43 +1,15 @@
-# Ignore everything
-*
+# folders with data
+res
+data
+log
+etc
+qc
 
-# Don't ignore directories, so we can recurse into them
-!*/
-
-# Don't ignore .gitignore
-!.gitignore
-
-# Don't ignore scripts
-!bin/*.R
-!bin/*.Rmd
-!bin/*.sh
-!bin/multiqc.conf
-!bin/*.snakefile
-!bin/*.smk
-!bin/*.py
-
-# Don't ignore necessary data
-!data/biotype_groups.csv
-!data/mm10_Gencode_vM20_gencode.bed
-
-# Don't ignore renv
-!renv/activate.R
-!renv/settings.dcf
-
-# Don't ignore R utility scripts
-!R/*.R
-
-# Root directory
-!Snakefile
-!README.md
-!LICENSE
-!renv.lock
-!.renvignore
-!.Rprofile
-
-# Don't ignore config
-!conf/illumina_sample_id.txt
-!conf/sampleInfo.csv
-!conf/config.yaml
-
+# software stuff
+.git
+.snakemake
+.RData
 .Rproj.user
+
+# etc
+README.html

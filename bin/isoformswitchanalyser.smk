@@ -119,7 +119,10 @@ rule minimap_index_reannotation:
         get_minimapIndexInput
     output:
         "indices/minimap2_{dataset}_{method}/minimap2.mmi"
-    threads: 3
+    threads:
+        3
+    conda:
+        "../envs/nanopore.yaml"
     shell:
         "minimap2 \
         -t {threads} \
@@ -142,10 +145,13 @@ rule minimap_mapReannotation:
         fastq = "data/fastq/cdna/{flowcell}/{barcode}_q7.fastq.gz"
     output:
         sam = temp("data/bam/cdna_{dataset}_{method}/{flowcell}_{barcode}_sort.bam")
-    threads: 20
+    threads:
+        20
     wildcard_constraints:
         dataset = "teloprime|cdna|illumina",
         type = "flair|stringtie"
+    conda:
+        "../envs/nanopore.yaml"
     shell:
         "minimap2 \
             -2 \
@@ -164,7 +170,10 @@ rule samtools_merge2:
         "data/bam/cdna_{dataset}_{method}/flowcell2_{barcode}_sort.bam"
     output:
         temp("data/reannotation/cdna_{dataset}_{method}/{barcode}_sort.bam")
-    threads: 6
+    threads:
+        6
+    conda:
+        "../envs/nanopore.yaml"
     wildcard_constraints:
         dataset = "teloprime|cdna|illumina",
         method = "stringtie|flair",
@@ -181,6 +190,8 @@ rule quantify_minimap_reannotated:
     wildcard_constraints:
         dataset = "teloprime|cdna|illumina",
         type = "flair|stringtie"
+    conda:
+        "../envs/r_4.1.2.yaml"
     script:
         "quantify_minimap.R"
 

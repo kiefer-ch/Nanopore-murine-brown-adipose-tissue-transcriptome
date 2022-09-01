@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<Session genome="data/annotation/genome.fa" locus="chr2:173109861-173140158" nextAutoscaleGroup="6" version="8">
+    <Resources>
+        <Resource path="data/bam/illumina/5035_S34_Aligned.sortedByCoord.out.bam" type="bam"/>
+        <Resource path="data/chip/h3k4_cage_combined.bed" type="bed"/>
+        <Resource path="data/reannotation/stringtie/cdna_stringtie.sorted.gtf" type="gtf"/>
+        <Resource path="data/reannotation/stringtie/teloprime_stringtie.sorted.gtf" type="gtf"/>
+        <Resource path="data/chip/cage/mm10.cage_peak_phase1and2combined_coord.bed" type="bed"/>
+        <Resource path="data/reannotation/stringtie/rna_stringtie.sorted.gtf" type="gtf"/>
+        <Resource path="data/bam/cdna/merged/cdna_barcode08_genome.bam" type="bam"/>
+        <Resource path="data/bam/cdna/merged/cdna_barcode07_genome.bam" type="bam"/>
+        <Resource path="data/bam/illumina/5034_S33_Aligned.sortedByCoord.out.bam" type="bam"/>
+        <Resource path="data/annotation/annotation_sort.gtf" type="gtf"/>
+        <Resource path="data/reannotation/flair/annotation/cdna_flair.isoforms.sorted.gtf" type="gtf"/>
+    </Resources>
+    <Panel height="1843" name="Panel1657525151745" width="3421">
+        <Track attributeKey="cdna_barcode07_genome.bam Coverage" autoScale="false" autoscaleGroup="2" clazz="org.broad.igv.sam.CoverageTrack" colorScale="ContinuousColorScale;0.0;33.0;255,255,255;176,176,176" fontSize="10" id="/home/christoph/phd/nanopore_project/nanoporeibat_new/data/bam/cdna/merged/cdna_barcode07_genome.bam_coverage" name="cdna_barcode07_genome.bam Coverage" snpThreshold="0.2" visible="true">
+            <DataRange baseline="0.0" drawBaseline="true" flipAxis="false" maximum="183.0" minimum="0.0" type="LINEAR"/>
+        </Track>
+        <Track attributeKey="cdna_barcode07_genome.bam Junctions" clazz="org.broad.igv.sam.SpliceJunctionTrack" fontSize="10" groupByStrand="false" height="60" id="/home/christoph/phd/nanopore_project/nanoporeibat_new/data/bam/cdna/merged/cdna_barcode07_genome.bam_junctions" name="cdna_barcode07_genome.bam Junctions" visible="false"/>
+        <Track attributeKey="cdna_barcode07_genome.bam" clazz="org.broad.igv.sam.AlignmentTrack" color="185,185,185" displayMode="SQUISHED" experimentType="THIRD_GEN" fontSize="10" id="/home/christoph/phd/nanopore_project/nanoporeibat_new/data/bam/cdna/merged/cdna_barcode07_genome.bam" name="cdna_barcode07_genome.bam" visible="true">
+            <RenderOptions/>
+        </Track>
+    </Panel>
+    <Panel height="1415" name="Panel1657525151768" width="3421">
+        <Track attributeKey="cdna_barcode08_genome.bam Coverage" autoScale="false" autoscaleGroup="2" clazz="org.broad.igv.sam.CoverageTrack" colorScale="ContinuousColorScale;0.0;156.0;255,255,255;176,176,176" fontSize="10" id="/home/christoph/phd/nanopore_project/nanoporeibat_new/data/bam/cdna/merged/cdna_barcode08_genome.bam_coverage" name="cdna_barcode08_genome.bam Coverage" snpThreshold="0.2" visible="true">
+            <DataRange baseline="0.0" drawBaseline="true" flipAxis="false" maximum="183.0" minimum="0.0" type="LINEAR"/>
+        </Track>
+        <Track attributeKey="cdna_barcode08_genome.bam Junctions" clazz="org.broad.igv.sam.SpliceJunctionTrack" fontSize="10" groupByStrand="false" height="60" id="/home/christoph/phd/nanopore_project/nanoporeibat_new/data/bam/cdna/merged/cdna_barcode08_genome.bam_junctions" name="cdna_barcode08_genome.bam Junctions" visible="false"/>
+        <Track attributeKey="cdna_barcode08_genome.bam" clazz="org.broad.igv.sam.AlignmentTrack" color="185,185,185" displayMode="SQUISHED" experimentType="THIRD_GEN" fontSize="10" id="/home/christoph/phd/nanopore_project/nanoporeibat_new/data/bam/cdna/merged/cdna_barcode08_genome.bam" name="cdna_barcode08_genome.bam" visible="true">
+            <RenderOptions/>
+        </Track>
+    </Panel>
+    <Panel height="590" name="Panel1657525158530" width="3421">
+        <Track attributeKey="5034_S33_Aligned.sortedByCoord.out.bam Coverage" autoScale="false" autoscaleGroup="3" clazz="org.broad.igv.sam.CoverageTrack" colorScale="ContinuousColorScale;0.0;102.0;255,255,255;176,176,176" fontSize="10" id="/home/christoph/phd/nanopore_project/nanoporeibat_new/data/bam/illumina/5034_S33_Aligned.sortedByCoord.out.bam_coverage" name="5034_S33_Aligned.sortedByCoord.out.bam Coverage" snpThreshold="0.2" visible="true">
+            <DataRange baseline="0.0" drawBaseline="true" flipAxis="false" maximum="402.0" minimum="0.0" type="LINEAR"/>
+        </Track>
+        <Track attributeKey="5034_S33_Aligned.sortedByCoord.out.bam Junctions" clazz="org.broad.igv.sam.SpliceJunctionTrack" fontSize="10" groupByStrand="false" height="60" id="/home/christoph/phd/nanopore_project/nanoporeibat_new/data/bam/illumina/5034_S33_Aligned.sortedByCoord.out.bam_junctions" name="5034_S33_Aligned.sortedByCoord.out.bam Junctions" visible="true"/>
+        <Track attributeKey="5034_S33_Aligned.sortedByCoord.out.bam" clazz="org.broad.igv.sam.AlignmentTrack" color="185,185,185" displayMode="SQUISHED" experimentType="RNA" fontSize="10" id="/home/christoph/phd/nanopore_project/nanoporeibat_new/data/bam/illumina/5034_S33_Aligned.sortedByCoord.out.bam" name="5034_S33_Aligned.sortedByCoord.out.bam" visible="true">
+            <RenderOptions/>
+        </Track>
+    </Panel>
+    <Panel height="664" name="Panel1657525158554" width="3421">
+        <Track attributeKey="5035_S34_Aligned.sortedByCoord.out.bam Coverage" autoScale="false" autoscaleGroup="3" clazz="org.broad.igv.sam.CoverageTrack" colorScale="ContinuousColorScale;0.0;402.0;255,255,255;176,176,176" fontSize="10" id="/home/christoph/phd/nanopore_project/nanoporeibat_new/data/bam/illumina/5035_S34_Aligned.sortedByCoord.out.bam_coverage" name="5035_S34_Aligned.sortedByCoord.out.bam Coverage" snpThreshold="0.2" visible="true">
+            <DataRange baseline="0.0" drawBaseline="true" flipAxis="false" maximum="402.0" minimum="0.0" type="LINEAR"/>
+        </Track>
+        <Track attributeKey="5035_S34_Aligned.sortedByCoord.out.bam Junctions" clazz="org.broad.igv.sam.SpliceJunctionTrack" fontSize="10" groupByStrand="false" height="60" id="/home/christoph/phd/nanopore_project/nanoporeibat_new/data/bam/illumina/5035_S34_Aligned.sortedByCoord.out.bam_junctions" name="5035_S34_Aligned.sortedByCoord.out.bam Junctions" visible="true"/>
+        <Track attributeKey="5035_S34_Aligned.sortedByCoord.out.bam" clazz="org.broad.igv.sam.AlignmentTrack" color="185,185,185" displayMode="SQUISHED" experimentType="RNA" fontSize="10" id="/home/christoph/phd/nanopore_project/nanoporeibat_new/data/bam/illumina/5035_S34_Aligned.sortedByCoord.out.bam" name="5035_S34_Aligned.sortedByCoord.out.bam" visible="true">
+            <RenderOptions/>
+        </Track>
+    </Panel>
+    <Panel height="513" name="FeaturePanel" width="3421">
+        <Track attributeKey="Reference sequence" clazz="org.broad.igv.track.SequenceTrack" fontSize="10" id="Reference sequence" name="Reference sequence" sequenceTranslationStrandValue="POSITIVE" shouldShowTranslation="false" visible="true"/>
+        <Track attributeKey="annotation_sort.gtf" clazz="org.broad.igv.track.FeatureTrack" displayMode="SQUISHED" featureVisibilityWindow="599395800" fontSize="10" groupByStrand="false" id="/home/christoph/phd/nanopore_project/nanoporeibat_new/data/annotation/annotation_sort.gtf" name="annotation_sort.gtf" visible="true"/>
+        <Track attributeKey="cdna_flair.isoforms.sorted.gtf" clazz="org.broad.igv.track.FeatureTrack" colorScale="ContinuousColorScale;0.0;890.0;255,255,255;0,0,178" displayMode="SQUISHED" fontSize="10" groupByStrand="false" id="/home/christoph/phd/nanopore_project/nanoporeibat_new/data/reannotation/flair/annotation/cdna_flair.isoforms.sorted.gtf" name="cdna_flair.isoforms.sorted.gtf" visible="true"/>
+        <Track attributeKey="cdna_stringtie.sorted.gtf" clazz="org.broad.igv.track.FeatureTrack" displayMode="SQUISHED" featureVisibilityWindow="2147483647" fontSize="10" groupByStrand="false" id="/home/christoph/phd/nanopore_project/nanoporeibat_new/data/reannotation/stringtie/cdna_stringtie.sorted.gtf" name="cdna_stringtie.sorted.gtf" visible="true"/>
+        <Track attributeKey="rna_stringtie.sorted.gtf" clazz="org.broad.igv.track.FeatureTrack" displayMode="SQUISHED" featureVisibilityWindow="75995101" fontSize="10" groupByStrand="false" id="/home/christoph/phd/nanopore_project/nanoporeibat_new/data/reannotation/stringtie/rna_stringtie.sorted.gtf" name="rna_stringtie.sorted.gtf" visible="true"/>
+        <Track attributeKey="teloprime_stringtie.sorted.gtf" clazz="org.broad.igv.track.FeatureTrack" displayMode="SQUISHED" featureVisibilityWindow="75673606" fontSize="10" groupByStrand="false" id="/home/christoph/phd/nanopore_project/nanoporeibat_new/data/reannotation/stringtie/teloprime_stringtie.sorted.gtf" name="teloprime_stringtie.sorted.gtf" visible="true"/>
+        <Track attributeKey="mm10.cage_peak_phase1and2combined_coord.bed" clazz="org.broad.igv.track.FeatureTrack" fontSize="10" groupByStrand="false" id="/home/christoph/phd/nanopore_project/nanoporeibat_new/data/chip/cage/mm10.cage_peak_phase1and2combined_coord.bed" name="mm10.cage_peak_phase1and2combined_coord.bed" visible="true"/>
+        <Track attributeKey="h3k4_cage_combined.bed" clazz="org.broad.igv.track.FeatureTrack" fontSize="10" groupByStrand="false" id="/home/christoph/phd/nanopore_project/nanoporeibat_new/data/chip/h3k4_cage_combined.bed" name="h3k4_cage_combined.bed" visible="true"/>
+    </Panel>
+    <PanelLayout dividerFractions="0.0052677787532923615,0.1202809482001756,0.35030728709394204,0.5030728709394205,0.6777875329236172"/>
+    <HiddenAttributes>
+        <Attribute name="DATA FILE"/>
+        <Attribute name="DATA TYPE"/>
+        <Attribute name="NAME"/>
+    </HiddenAttributes>
+</Session>

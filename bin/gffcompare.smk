@@ -53,6 +53,8 @@ rule filterUnknownStrand_fasta:
         "{file}.gtf"
     output:
         temp("{file}_noUnknownStrand.gtf")
+    conda:
+        "../envs/r_4.1.2.yaml"
     script:
         "gffcompare_filterFasta.R"
 

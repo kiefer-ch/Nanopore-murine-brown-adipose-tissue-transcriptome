@@ -1,0 +1,7 @@
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - nanofilt = 2.3.0
+  - minimap2 = 2.24
+  - samtools = 1.12

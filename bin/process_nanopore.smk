@@ -32,7 +32,7 @@ def get_minimapInput(wildcards):
 def get_minimap_flags(wildcards):
     if wildcards.dataset == "rna":
         flags = "-uf"
-    elif wildcards.type in ["teloprime", "cdna"]:
+    elif wildcards.dataset in ["teloprime", "cdna"]:
         flags = "-ub"
     return flags
 

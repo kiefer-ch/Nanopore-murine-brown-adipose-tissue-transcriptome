@@ -1,0 +1,9 @@
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - fastqc = 0.11.9
+  - cutadapt = 3.7
+  - multiqc = 1.12
+  - samtools = 1.12
+  - bedtools = 2.30.0
