@@ -52,7 +52,7 @@ rule filterUnknownStrand_fasta:
     input:
         "{file}.gtf"
     output:
-        temp("{file}_noUnknownStrand.gtf")
+        "{file}_noUnknownStrand.gtf"
     conda:
         "../envs/r_4.1.2.yaml"
     script:

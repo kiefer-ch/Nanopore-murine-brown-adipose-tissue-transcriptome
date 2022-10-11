@@ -10,7 +10,6 @@ suppressPackageStartupMessages({
     source("R/subsetTxdb.R")
 })
 
-
 log_info("Reading annotation files..")
 txdb_gencode <- loadDb(snakemake@input[["txdb"]])
 txdb_gencode_dump <- as.list(txdb_gencode)
@@ -143,37 +142,58 @@ plot.transcripts <- function(gene_id, max_cov_illumina = 5,
             start = gene_info$TXSTART,
             end = gene_info$TXEND)
 
+    } else if (temp == "both") {
+
+        ont_w <- AlignmentsTrack(snakemake@input[["ont_warm"]],
+            isPaired = FALSE,
+            genome = "mm10",
+            name = "cDNA 22°C",
+            type = c("pileup"),
+            min.height = 2, # minimum height of a read in px, controls how many read are plotted
+            chromosome = gene_info$TXCHROM,
+            start = gene_info$TXSTART,
+            end = gene_info$TXEND)
+
+        ont_c <- AlignmentsTrack(snakemake@input[["ont_cold"]],
+            isPaired = FALSE,
+            genome = "mm10",
+            name = "cDNA 22°C",
+            type = c("pileup"),
+            min.height = 2, # minimum height of a read in px, controls how many read are plotted
+            chromosome = gene_info$TXCHROM,
+            start = gene_info$TXSTART,
+            end = gene_info$TXEND)
+
     }
 
     # illumina
-
     illumina_w <- AlignmentsTrack(snakemake@input[["illumina_warm"]],
-                                isPaired = TRUE,
-                                genome = "mm10",
-                                name = "Illumina 22°C",
-                                type = c("coverage", "sashimi"),
-                                ylim = c(0, max_cov_illumina),
-                                transformation = function(x) log1p(x),
-                                sashimiTransformation = function(x) x,
-                                lwd.sashimiMax = lwd_sashimi_max,
-                                sashimiHeight = .33,
-                                chromosome = gene_info$TXCHROM,
-                                start = gene_info$TXSTART,
-                                end = gene_info$TXEND)
+        isPaired = TRUE,
+        genome = "mm10",
+        name = "Illumina 22°C",
+        type = c("coverage", "sashimi"),
+        ylim = c(0, max_cov_illumina),
+        transformation = function(x) log1p(x),
+        sashimiTransformation = function(x) x,
+        lwd.sashimiMax = lwd_sashimi_max,
+        sashimiHeight = .33,
+        chromosome = gene_info$TXCHROM,
+        start = gene_info$TXSTART,
+        end = gene_info$TXEND)
 
     illumina_c <- AlignmentsTrack(snakemake@input[["illumina_cold"]],
-                                isPaired = TRUE,
-                                genome = "mm10",
-                                name = "Illumina 4°C",
-                                type = c("coverage", "sashimi"),
-                                ylim = c(0, max_cov_illumina),
-                                transformation = function(x) log1p(x),
-                                sashimiTransformation = function(x) x,
-                                lwd.sashimiMax = lwd_sashimi_max,
-                                sashimiHeight = .33,
-                                chromosome = gene_info$TXCHROM,
-                                start = gene_info$TXSTART,
-                                end = gene_info$TXEND)
+        isPaired = TRUE,
+        genome = "mm10",
+        name = "Illumina 4°C",
+        type = c("coverage", "sashimi"),
+        ylim = c(0, max_cov_illumina),
+        transformation = function(x) log1p(x),
+        sashimiTransformation = function(x) x,
+        lwd.sashimiMax = lwd_sashimi_max,
+        sashimiHeight = .33,
+        chromosome = gene_info$TXCHROM,
+        start = gene_info$TXSTART,
+        end = gene_info$TXEND)
 
 
     # chip
@@ -189,11 +209,27 @@ plot.transcripts <- function(gene_id, max_cov_illumina = 5,
     # Plotting
     options(ucscChromosomeNames = FALSE)
 
-    tracks <- list(gtrack,
-        illumina_w, illumina_c,
-        ont,
-        gencodetrack, stringtietrack2, stringtietrack, flairtrack,
-        h3k4me3)
+    if (temp == "both") {
+
+        tracks <- list(gtrack,
+            illumina_w, illumina_c,
+            ont_w, ont_c,
+            gencodetrack, flairtrack,
+            h3k4me3)
+
+        sizes <- c(.1, rep(.33, 2), .5, 1, rep(.25, 2), .25)
+
+    } else {
+
+        tracks <- list(gtrack,
+           illumina_w, illumina_c,
+           ont,
+           gencodetrack, stringtietrack2, stringtietrack, flairtrack,
+           h3k4me3)
+
+        sizes <- c(.1, rep(.33, 2), 1, rep(.25, 4), .25)
+
+    }
 
 
     if(length(extend) == 1) {
@@ -220,7 +256,8 @@ plot.transcripts <- function(gene_id, max_cov_illumina = 5,
         cex.axis = .6,
         sashimiFilter = unique_exons,
         lwd = .25,
-        sizes = c(.1, rep(.33, 2), 1, rep(.25, 4), .25))
+        sizes = sizes,
+        reverseStrand = snakemake@params$reverse_strand)
 
 }
 

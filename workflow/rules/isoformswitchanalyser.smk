@@ -6,7 +6,7 @@ MASHMAP = config["MASHMAP"]
 rule salmon_prepareDecoys_reannotatedStringtie:
     input:
         genome = "data/annotation/genome.fa",
-        annotation = "data/reannotation/stringtie/{dataset}_stringtie_noUnknownStrand.gtf",
+        annotation = "data/reannotation/stringtie/{dataset}_stringtie_nophuchatooStrand.gtf",
         transcripts = "data/reannotation/stringtie/{dataset}_stringtie_noUnknownStrand.fa"
     output:
         "indices/salmon_{dataset}_stringtie/decoy/gentrome.fa",
@@ -256,63 +256,12 @@ rule isoformswitchanalyser_importData:
     wildcard_constraints:
         dataset = "cdna|illumina",
         annotation = "ref|cdna_flair|illumina_stringtie|teloprime_stringtie"
+    conda:
+        "../envs/r_4.1.2.yaml"
     threads:
         8
     script:
-        "isoformswitchanalyser_importData.R"
-
-
-# PFAM
-# apt install hmmer2
-rule get_pfama:
-    output:
-        pfam_hmm = "data/pfam/Pfam-A.hmm",
-        pfam_hmm_dat = "data/pfam/Pfam-A.hmm.dat",
-        pfam_active_site_dat = "data/pfam/active_site.dat"
-    shell:
-        "wget -q -O \
-            - ftp://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/Pfam-A.hmm.gz \
-            | gunzip > {output.pfam_hmm} && \
-        wget -q -O \
-            - ftp://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/Pfam-A.hmm.dat.gz \
-            | gunzip > {output.pfam_hmm_dat} && \
-        wget -q -O \
-            - ftp://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/active_site.dat.gz \
-            | gunzip > {output.pfam_active_site_dat}"
-
-
-rule hmmpress:
-    input:
-        pfam_hmm = "data/pfam/Pfam-A.hmm",
-        pfam_hmm_dat = "data/pfam/Pfam-A.hmm.dat",
-        pfam_active_site_dat = "data/pfam/active_site.dat"
-    output:
-        multiext("data/pfam/Pfam-A.hmm", ".h3f", ".h3i", ".h3m", ".h3p")
-    shell:
-        "hmmpress {input.pfam_hmm}"
-
-
-rule pfam_scan:
-# can be installed via bioconda
-# conda install -c bioconda pfam_scan
-    input:
-        multiext("data/pfam/Pfam-A.hmm", ".h3f", ".h3i", ".h3m", ".h3p"),
-        fasta = "data/drimseq/{dataset}_{annotation}/{dataset}_{annotation}_isoform_AA.fasta"
-    output:
-        "data/drimseq/{dataset}_{annotation}/{dataset}_{annotation}_isoform_AA.pfam"
-    params:
-        pfam_a_dir = "data/pfam/"
-    wildcard_constraints:
-        dataset = "cdna|illumina"
-    threads:
-        5
-    shell:
-        "pfam_scan.pl \
-            -fasta {input.fasta} \
-            -dir {params.pfam_a_dir} \
-            -outfile {output} \
-            -as \
-            -cpu {threads}"
+        "../scripts/isoformswitchanalyser_importData.R"
 
 
 # report
@@ -330,6 +279,15 @@ rule isoformswitchanalyser_report:
         dtu_cutoff = config["dtu_cutoff"], # alpha
         dIF_cutoff = config["dIF_cutoff"]  # min difference
     wildcard_constraints:
-        dataset = "cdna|illumina",
+        dataset = "cdna|illumina"
+    conda:
+        "../envs/r_4.1.2.yaml"
     script:
-        "isoformswitchanalyser_report.Rmd"
+        "../scripts/isoformswitchanalyser_report.Rmd"
+
+
+rule isoformswitchanalyser_all:
+    input:
+        expand("res/isoformswitchanalyser/{dataset}_{annotation}.html",
+            dataset=["cdna", "illumina"],
+            annotation=["cdna_flair", "illumina_stringtie", "ref", "teloprime_stringtie"])

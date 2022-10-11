@@ -290,10 +290,16 @@ switch_conseq %>%
 
 # qPCR validation
 
+Uses only those samples for qPCR statistics, that are also used for the ONT-Seq.
+
 ```{r, fig.width = 6.85 / 2, fig.asp = .65}
 qpcr <- read_csv(snakemake@input$qpcr, show_col_types = FALSE)
 
-df %>%
+qpcr <- qpcr %>% 
+    filter(!mgi_symbol %in% c("Smyd4", "Pex6", "Lipe", "Gnas", "Dipk1b")) %>%  
+    mutate(qpcr_padj = p.adjust(qpcr_p)) 
+
+df_qpcr <- df %>%
     group_by(id, gene_id) %>% 
     summarise(gene = min(gene)) %>% 
     ungroup() %>% 
@@ -313,7 +319,10 @@ df %>%
     mutate(dataset = factor(dataset, levels = c("illumina_ref", "illumina_illumina_stringtie",
                  "illumina_cdna_flair", "illumina_teloprime_stringtie",
                  "cdna_ref", "cdna_illumina_stringtie",
-                 "cdna_cdna_flair", "cdna_teloprime_stringtie", "qpcr"))) %>% 
+                 "cdna_cdna_flair", "cdna_teloprime_stringtie", "qpcr")))
+
+
+df_qpcr %>% 
     ggplot(aes(dataset, mgi_symbol)) +
         geom_tile(aes(fill = padj)) +
         scale_fill_viridis_c(direction = -1, labels = scales::label_pvalue(),
@@ -323,15 +332,10 @@ df %>%
         xlab(NULL) + 
         scale_y_discrete(name = NULL) +
         theme(legend.key.size = unit(.33, "cm"))
-```
 
-```{r}
-qpcr %>% 
-    filter(!mgi_symbol %in% c("Smyd4", "Pex6", "Lipe", "Gnas")) %>%  
-    mutate(qpcr_padj = p.adjust(qpcr_p)) %>%
-    mutate(sign = symnum(qpcr_padj,
-                         cutpoints = c(0, .001, .01, .05, .1, 1),
-                         symbols = c("***", "**", "*", ".", " ")))  %>% 
+df_qpcr %>% 
+    mutate(padj = round(padj, 3)) %>% 
+    tidyr::pivot_wider(values_from = padj, names_from = dataset) %>% 
     knitr::kable(format = "html") %>%
     kableExtra::kable_styling()
 ```

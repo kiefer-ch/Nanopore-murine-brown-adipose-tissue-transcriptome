@@ -14,8 +14,14 @@ editor_options:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
-    cache = FALSE, out.width = 800)
+knitr::opts_chunk$set(
+    echo = FALSE,
+    message = FALSE,
+    warning = FALSE,
+    cache = FALSE,
+    fig.width = 6.85,
+    fig.asp = 0.65,
+    out.width = 800)
 ```
 
 ```{r library, include=FALSE}
@@ -167,20 +173,20 @@ df %>%
         position = position_dodge(width = .75)) +
     facet_wrap(~gene, scales = "free") +
     scale_y_log10(labels = function(x) x) +
-    theme_tufte(base_family = "Helvetica") +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
     geom_rangeframe() +
     ylab("Rel. expr. vs. Gtf2b/Hprt") +
     xlab("Isoform") +
-    scale_colour_brewer(palette = "Dark2", name = NULL)
+    scale_colour_brewer(palette = "Dark2", name = NULL, labels = c("22°C", "4°C"))
 ```
 
 ## Only genes in DTU comparison
 
-```{r}
+```{r, fig.asp=0.65*2/3}
 df %>%
     mutate(condition_temp = relevel(condition_temp, "22")) %>%
     tidyr::separate(gene, c("gene", "isoform"), sep = '_') %>%
-    filter(!gene %in% c("Smyd4", "Pex6", "Lipe", "Gnas")) %>% 
+    filter(!gene %in% c("Smyd4", "Pex6", "Lipe", "Gnas", "Dipk1b")) %>% 
     tidyr::drop_na() %>%
     ggplot(aes(isoform, 2^-dcq)) +
     geom_point(aes(colour = condition_temp),
@@ -197,13 +203,42 @@ df %>%
         width = .75,
         lwd = .25,
         position = position_dodge(width = .75)) +
-    facet_wrap(~gene, scales = "free") +
+    facet_wrap(~gene, scales = "free", nrow = 2) +
     scale_y_log10(labels = function(x) x) +
-    theme_tufte(base_family = "Helvetica") +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
     geom_rangeframe() +
     ylab("Rel. expr. vs. Gtf2b/Hprt") +
     xlab("Isoform") +
-    scale_colour_brewer(palette = "Dark2", name = NULL)
+    scale_colour_brewer(palette = "Dark2", name = NULL, labels = c("22°C", "4°C"))
+
+df %>%
+    mutate(condition_temp = relevel(condition_temp, "22")) %>%
+    tidyr::separate(gene, c("gene", "isoform"), sep = '_') %>%
+    filter(!gene %in% c("Smyd4", "Pex6", "Lipe", "Gnas", "Dipk1b", "Cars2")) %>% 
+    tidyr::drop_na() %>%
+    ggplot(aes(isoform, 2^-dcq)) +
+    geom_point(aes(colour = condition_temp),
+        size = 1,
+        alpha = .5,
+        position = position_dodge2(width = .75)) +
+    stat_summary(aes(colour = condition_temp),
+        fun = mean, geom = "crossbar",
+        position = position_dodge(width = .75),
+        width = 1,
+        fatten = 1, lwd = .5) +
+    stat_summary(aes(colour = condition_temp),
+        geom = "errorbar", fun.data = mean_se,
+        width = .75,
+        lwd = .25,
+        position = position_dodge(width = .75)) +
+    facet_wrap(~gene, scales = "free", nrow = 2) +
+    scale_y_log10(labels = function(x) x) +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe() +
+    ylab("Rel. expr. vs. Gtf2b/Hprt") +
+    xlab("Isoform") +
+    scale_colour_brewer(palette = "Dark2", name = NULL, labels = c("22°C", "4°C")) +
+    theme(legend.position = "none")
 ```
 
 # Statistics
@@ -211,12 +246,38 @@ df %>%
 ## Gene level
 
 This section contains the p value from the interaction terms from linear models.
-It corresponds to the differential transcript usage.
+It corresponds to the differential transcript usage. Uses all samples!
+
+### All genes
 
 ```{r}
 pvalues <- df %>%
     dplyr::select(gene, condition_temp, dcq) %>%
     tidyr::separate(gene, c("gene", "isoform"), sep = '_') %>%
+    tidyr::drop_na() %>%
+    split(.$gene) %>%
+    map(lm, formula = dcq ~ isoform * condition_temp) %>%
+    map(summary.lm) %>%
+    map(function(x) x$coefficients[16]) %>%
+    unlist() %>%
+    tibble::enframe(name = "mgi_symbol", value = "qpcr_p") %>%
+    mutate(qpcr_padj = p.adjust(qpcr_p)) %>%
+    mutate(sign = symnum(qpcr_padj,
+        cutpoints = c(0, .001, .01, .05, .1, 1),
+        symbols = c("***", "**", "*", ".", " ")))
+
+pvalues %>%
+    knitr::kable(format = "html") %>%
+    kableExtra::kable_styling()
+```
+
+### Only selection
+
+```{r}
+pvalues <- df %>%
+    dplyr::select(gene, condition_temp, dcq) %>%
+    tidyr::separate(gene, c("gene", "isoform"), sep = '_') %>%
+    filter(!gene %in% c("Smyd4", "Pex6", "Lipe", "Gnas", "Dipk1b")) %>% 
     tidyr::drop_na() %>%
     split(.$gene) %>%
     map(lm, formula = dcq ~ isoform * condition_temp) %>%
@@ -447,8 +508,8 @@ plot.transcripts <- function(gene_id, max_cov_illumina = 5, max_cov_cdna = 3, lw
         gtrack,
         illumina_w, illumina_c,
         cdna_w, cdna_c,
-        gencodetrack, stringtietrack2, stringtietrack, flairtrack,
-        primerTrack)
+        primerTrack,
+        gencodetrack, stringtietrack2, stringtietrack, flairtrack)
     
     plotTracks(
         tracks,
@@ -466,8 +527,8 @@ plot.transcripts <- function(gene_id, max_cov_illumina = 5, max_cov_cdna = 3, lw
             .1, 
             rep(.5, 2),
             rep(.5, 2),
-            rep(.25, 4), 
-            .1))
+            .1,
+            rep(.25, 4)))
 }
 ```
 
@@ -487,16 +548,21 @@ gene_ids <- tibble(
             "ENSMUSG00000029167.13", "ENSMUSG00000028603.15", NA_character_))
 
 gene_ids <- gene_ids %>% 
-    tidyr::drop_na()
+    tidyr::drop_na() %>% 
+    filter(symbol != "Pde4d")
 
 for (gene in gene_ids$symbol) {
 
+    logger::log_info(gene)
     cat('\n')
     cat("## ", gene, gene_ids$ensembl_gene_id_version[gene_ids$symbol == gene], "\n")
 
-    plot.transcripts(gene_ids$ensembl_gene_id_version[gene_ids$symbol == gene],
-        max_cov_illumina = 5, max_cov_cdna = 5)
-
+    try(
+        plot.transcripts(gene_ids$ensembl_gene_id_version[gene_ids$symbol == gene],
+            max_cov_illumina = 10, max_cov_cdna = 10),
+        silent = TRUE
+    )
+        
     cat('\n')
 }
 

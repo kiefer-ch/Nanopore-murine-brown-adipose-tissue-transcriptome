@@ -551,13 +551,13 @@
     },
     "Gviz": {
       "Package": "Gviz",
-      "Version": "1.38.0",
+      "Version": "1.38.4",
       "Source": "Bioconductor",
       "git_url": "https://git.bioconductor.org/packages/Gviz",
       "git_branch": "RELEASE_3_14",
-      "git_last_commit": "2091331",
-      "git_last_commit_date": "2021-10-26",
-      "Hash": "27930735bd78a8d5314be846e8dafd35",
+      "git_last_commit": "6cde2b9",
+      "git_last_commit_date": "2022-04-07",
+      "Hash": "a74923a4418ac30e76a69212a44d945f",
       "Requirements": [
         "AnnotationDbi",
         "BSgenome",

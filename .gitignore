@@ -10,6 +10,7 @@ qc
 .snakemake
 .RData
 .Rproj.user
+.Rhistory
 
 # etc
 README.html

@@ -4,8 +4,10 @@ rule qpcr_temperature_effect:
         sample_info = config["SAMPLE_INFO"]
     output:
         "res/qpcr/qpcr_temperature_effect.html"
+    conda:
+        "../envs/r_4.1.2.yaml"
     script:
-        "qpcr_temperature_effect.Rmd"
+        "../scripts/qpcr_temperature_effect.Rmd"
 
 
 rule dtu_qpcr:
@@ -15,10 +17,13 @@ rule dtu_qpcr:
         cq3 = "data/qpcr/200611/200611_bl6_dtu_3.txt",
         sample_info = config["SAMPLE_INFO"]
     output:
-        "data/qpcr/dtu_qpcr.csv",
-        "data/qpcr/dtu_qpcr_cq.rds"
+        stats = "data/qpcr/dtu_qpcr.csv",
+        cq = "data/qpcr/dtu_qpcr_cq.rds",
+        dcq = "data/qpcr/dtu_qpcr_dcq.rds"
+    conda:
+        "../envs/r_4.1.2.yaml"
     script:
-        "qpcr_dtu.R"
+        "../scripts/qpcr_dtu.R"
 
 
 rule qpcr_dtu_report:
@@ -30,6 +35,7 @@ rule qpcr_dtu_report:
         "data/bam/teloprime/merged/teloprime_barcode01_genome.bam.bai",
         "data/bam/teloprime/merged/teloprime_barcode02_genome.bam.bai",
         cq = "data/qpcr/dtu_qpcr_cq.rds",
+        stats = "data/qpcr/dtu_qpcr.csv",
         txdb = "data/annotation/annotation_txdb.sqlite",
         txdb_flair = "data/reannotation/flair/annotation/cdna_flair.isoforms_txdb.sqlite",
         txdb_stringtie = "data/reannotation/stringtie/teloprime_stringtie_noUnknownStrand_txdb.sqlite",
@@ -46,5 +52,7 @@ rule qpcr_dtu_report:
         primer_stats = "data/qpcr/200331_primer.csv"
     output:
         "res/qpcr/qpcr_dtu_validation.html"
+    conda:
+        "../envs/r_4.1.2.yaml"
     script:
-        "qpcr_dtu_report.Rmd"
+        "../scripts/qpcr_dtu_report.Rmd"

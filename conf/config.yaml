@@ -16,4 +16,4 @@ SUPPORT_cutoff: 3 # required mappings  for flair to keep a transcript
 
 # DTU/DGE parameter
 dtu_cutoff: .1 # alpha
-dIF_cutoff: 0.1 # hard cutoff for change (10%)
+dIF_cutoff: 0.05 # hard cutoff for change (5%)

@@ -17,15 +17,18 @@ rule browserTrackAdcy3:
         ncd_warm_h3k4me3 = "data/additionalBrowserTracks/200901_rute_chip_adipocytes/2_warm_ncd_H3K4me3.bw",
         ncd_cold_h3k4me3 =  "data/additionalBrowserTracks/200901_rute_chip_adipocytes/7_warm_hfd_H3K4me3.bw",
         genome = "data/annotation/genome.fa.fai"
+    output:
+        "res/browserTracks/Adcy3.pdf"
     params:
         gene_id = "ENSMUSG00000020654.15",
         max_cov_illumina = 5,
         lwd_sashimi_max = 10,
         extend_plot = 0,
         temp = "warm",
+        reverse_strand = False,
         dimension = [6.85, 6]
-    output:
-        "res/browserTracks/Adcy3.pdf"
+    conda:
+        "../envs/r_4.1.2.yaml"
     script:
         "browserTracks.R"
 
@@ -49,15 +52,18 @@ rule browserTrackCars2:
         ncd_warm_h3k4me3 = "data/additionalBrowserTracks/200901_rute_chip_adipocytes/2_warm_ncd_H3K4me3.bw",
         ncd_cold_h3k4me3 =  "data/additionalBrowserTracks/200901_rute_chip_adipocytes/7_warm_hfd_H3K4me3.bw",
         genome = "data/annotation/genome.fa.fai"
+    output:
+        "res/browserTracks/Cars2.pdf"
     params:
         gene_id = "ENSMUSG00000056228.10",
         max_cov_illumina = 6,
         lwd_sashimi_max = 10,
-        temp = "cold",
+        temp = "both",
         extend_plot = 400,
+        reverse_strand = True,
         dimension = [6.85, 6]
-    output:
-        "res/browserTracks/Cars2.pdf"
+    conda:
+        "../envs/r_4.1.2.yaml"
     script:
         "browserTracks.R"
 

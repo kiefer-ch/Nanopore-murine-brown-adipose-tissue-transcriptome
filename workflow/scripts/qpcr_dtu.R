@@ -104,7 +104,7 @@ df <- list(df1, df2, df3)
 
 # export cq values
 df %>%
-    write_rds(snakemake@output[[2]])
+    write_rds(snakemake@output$cq)
 
 
 detect.outliers <- function(df, cutoff = 1) {
@@ -172,6 +172,9 @@ get.averageDCq <- function(df) {
 df <- df %>%
     get.averageDCq()
 
+df %>%
+    saveRDS(snakemake@output$dcq)
+
 # only those samples that are in the RNA seq
 df %>%
     filter(sample_id %in% c("190220_2_iBAT", "190220_4_iBAT", "190220_9_iBAT",
@@ -189,4 +192,4 @@ df %>%
     mutate(sign = symnum(qpcr_padj,
                          cutpoints = c(0, .001, .01, .05, .1, 1),
                          symbols = c("***", "**", "*", ".", " "))) %>%
-    write_csv(snakemake@output[[1]])
+    write_csv(snakemake@output$stats)
