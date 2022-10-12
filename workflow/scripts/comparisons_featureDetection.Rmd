@@ -14,8 +14,14 @@ editor_options:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
-    cache = FALSE, out.width = 800)
+knitr::opts_chunk$set(
+    echo = FALSE,
+    message = FALSE,
+    warning = FALSE,
+    cache = FALSE,
+    fig.width = 6.85,
+    fig.asp = 0.65,
+    out.width = 800)
 ```
 
 ```{r loadPackages}
@@ -24,6 +30,7 @@ library("dplyr")
 library("readr")
 library("ggplot2")
 library("ggthemes")
+library("scattermore")
 library("purrr")
 library("UpSetR")
 library("scales")
@@ -287,7 +294,7 @@ df_gene %>%
 ```
 
 
-```{r, fig.width = 6.85, fig.asp = .65 / 2, dev = "png", dpi = 600}
+```{r, fig.width = 6.85, fig.asp = .65 / 2}
 df_plot <-  df_gene %>%
     select(dataset, counts, id, grouped_biotype) %>% 
     mutate(detected = counts >= snakemake@params$cutoff) %>% 
@@ -318,11 +325,13 @@ df_plot <-  df_gene %>%
     tidyr::drop_na(average_tpm)
 
 
-df_plot %>% 
+df_plot %>%
     ggplot(aes(counts, average_tpm)) +
-    geom_point(aes(colour = detected, pch = grouped_biotype),
-        size = .5, 
-        alpha = .25) +
+    geom_scattermore(
+        aes(colour = detected, pch = grouped_biotype),
+        pointsize = 4,
+        alpha = .5,
+        pixels = c(1024, 1024 * .65)) +
     facet_wrap(~dataset) +
     scale_x_continuous(
         name = "counts",
@@ -411,7 +420,7 @@ df_tx %>%
 ```
 
 
-```{r, fig.width = 6.85, fig.asp = .65 / 2, dev = "png", dpi = 600}
+```{r, fig.width = 6.85, fig.asp = .65 / 2}
 df_plot <-  df_tx %>%
     select(dataset, counts, id, grouped_biotype) %>% 
     mutate(detected = counts >= snakemake@params$cutoff) %>% 
@@ -444,9 +453,11 @@ df_plot <-  df_tx %>%
 
 df_plot %>% 
     ggplot(aes(counts, average_tpm)) +
-    geom_point(aes(colour = detected, pch = grouped_biotype),
-        size = .5, 
-        alpha = .25) +
+    geom_scattermore(
+        aes(colour = detected, pch = grouped_biotype),
+        pointsize = 4,
+        alpha = .5,
+        pixels = c(1024, 1024 * .65)) +
     facet_wrap(~dataset) +
     scale_x_continuous(
         name = "counts",
