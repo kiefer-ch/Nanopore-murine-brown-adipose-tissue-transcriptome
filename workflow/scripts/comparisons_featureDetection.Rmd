@@ -328,7 +328,7 @@ df_plot <-  df_gene %>%
 df_plot %>%
     ggplot(aes(counts, average_tpm)) +
     geom_scattermore(
-        aes(colour = detected, pch = grouped_biotype),
+        aes(colour = detected),
         pointsize = 4,
         alpha = .5,
         pixels = c(1024, 1024 * .65)) +
@@ -454,7 +454,7 @@ df_plot <-  df_tx %>%
 df_plot %>% 
     ggplot(aes(counts, average_tpm)) +
     geom_scattermore(
-        aes(colour = detected, pch = grouped_biotype),
+        aes(colour = detected),
         pointsize = 4,
         alpha = .5,
         pixels = c(1024, 1024 * .65)) +

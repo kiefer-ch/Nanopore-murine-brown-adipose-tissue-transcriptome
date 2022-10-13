@@ -190,6 +190,22 @@ df2 %>%
     theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5))
 ```
 
+```{r, fig.width = 6.85 / 2 / 3, fig.asp = .65 * 3}
+df2 %>% 
+    mutate(structural_category = factor(structural_category, rev(levels(structural_category)))) %>% 
+    ggplot(aes(dataset)) +
+    geom_bar(aes(fill = structural_category)) +
+    scale_fill_brewer(palette = "Paired", name = NULL, limits = levels(df2$structural_category)) +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe(sides = 'bl') +
+    scale_y_continuous(
+        "Reassembled transcripts",
+        labels = label_number(accuracy = 1, scale = 1/1000, suffix = " k")) +
+    xlab(NULL) +
+    theme(legend.position = "none") +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5))
+```
+
 
 ```{r plot_sqanti3, fig.width = 6.85 / 2, fig.asp = .65}
 df2 %>% 
@@ -206,9 +222,27 @@ df2 %>%
 ```
 
 
+```{r, fig.width = 6.85 / 2 / 3, fig.asp = .65 * 3}
+df2 %>% 
+    filter(structural_category == "incomplete-splice_match") %>% 
+    ggplot(aes(dataset)) +
+    geom_bar(aes(fill = subcategory)) +
+    scale_fill_brewer(palette = "Dark2", name = NULL) +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe(sides = 'bl') +
+    scale_y_continuous(
+        "Incomplete splice matches",
+        labels = label_number(accuracy = 1, scale = 1/1000, suffix = " k")) +
+    xlab(NULL) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5)) +
+    theme(legend.position = "none")
+```
+
+
 ```{r}
 knitr::include_graphics("https://github.com/Magdoll/images_public/raw/master/SQANTI2_figures/sqanti2_ISM_subtype.png")
 ```
+
 
 ```{r plot_sqanti4, fig.width = 6.85 / 2, fig.asp = .65}
 df2 %>% 
@@ -223,6 +257,24 @@ df2 %>%
     theme(legend.key.size = unit(.33, "cm")) +
     theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5))
 ```
+
+
+```{r fig.width = 6.85 / 2 / 3, fig.asp = .65 * 3}
+df2 %>% 
+    filter(structural_category %in% c("novel_in_catalog", "novel_not_in_catalog")) %>% 
+    ggplot(aes(dataset)) +
+    geom_bar(aes(fill = subcategory)) +
+    scale_fill_brewer(palette = "Set1", name = NULL) +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe(sides = 'bl') +
+    scale_y_continuous(
+        "Novel transcripts",
+        labels = label_number(accuracy = 1, scale = 1/1000, suffix = " k")) +
+    xlab(NULL) +
+    theme(legend.position = "none") +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5))
+```
+
 
 ```{r}
 knitr::include_graphics("https://github.com/Magdoll/images_public/raw/master/SQANTI2_figures/sqanti2_NIC_subtype.png")

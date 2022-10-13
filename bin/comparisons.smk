@@ -153,10 +153,12 @@ rule coverage_report:
         tpm = "data/deseq/illumina/illumina_transcript_cm_tpm.csv.gz",
         sample_info = config["SAMPLE_INFO"],
         biomaRt_tx = "data/annotation/biomaRt_tx.rds"
+    conda:
+        "../envs/r_4.1.2.yaml"
     output:
         "res/comparisons/comparisons_coverage.html"
     script:
-        "comparisons_coverage.Rmd"
+        "../scripts/comparisons_coverage.Rmd"
 
 
 # dge
@@ -178,49 +180,6 @@ rule compare_dge:
     params:
         cutoff = .05
     conda:
-        "../conf/r.yaml"
-    script:
-        "comparisons_dgeDte.Rmd"
-
-
-# reannotation
-rule compare_reannotation:
-    input:
-        gffcompare =
-            [expand("data/reannotation/flair/annotation/gffcmp.{dataset}_flair.isoforms.gtf.tmap",
-                dataset=["cdna", "teloprime", "rna"]),
-            expand("data/reannotation/stringtie/gffcmp.{dataset}_stringtie.gtf.tmap",
-                dataset=["cdna", "teloprime", "rna", "illumina"])],
-        sqanti =
-            [expand("data/comparisons/reannotation/squanti/stringtie/{dataset}/{dataset}_stringtie_noUnknownStrand_classification.txt",
-                dataset=["cdna", "teloprime", "rna", "illumina"]),
-            expand("data/comparisons/reannotation/squanti/flair/{dataset}/{dataset}_flair.isoforms_classification.txt",
-                dataset=["cdna", "teloprime", "rna"])],
-        gffcompare_stats = "data/comparisons/reannotation/gffcompare/RQ/gffcmp.stats"
-    output:
-        "res/comparisons/comparisons_reannotation.html"
-    script:
-        "comparisons_reannotation.Rmd"
-
-
-rule compare_dtu:
-    input:
-        dtu_res = expand("data/drimseq/{dataset}_{annotation}/{dataset}_{annotation}_dtu_res.csv.gz",
-            dataset = ["illumina", "cdna"],
-            annotation = ["ref", "illumina_stringtie", "cdna_flair", "teloprime_stringtie"]),
-        sal = expand("data/drimseq/{dataset}_{annotation}/{dataset}_{annotation}_sal.rds",
-            dataset = ["illumina", "cdna"],
-            annotation = ["ref", "illumina_stringtie", "cdna_flair", "teloprime_stringtie"]),
-        qpcr = "data/qpcr/dtu_qpcr.csv",
-        annotation = "data/annotation/annotation_txdb.sqlite",
-        telo_tmap = "data/reannotation/stringtie/gffcmp.teloprime_stringtie.gtf.tmap",
-        illu_tmap = "data/reannotation/stringtie/gffcmp.illumina_stringtie.gtf.tmap"
-    output:
-        "res/comparisons/comparisons_dtu.html",
-    params:
-        dtu_cutoff = config["dtu_cutoff"], # alpha
-        dIF_cutoff = config["dIF_cutoff"]  # min difference
-    conda:
         "../envs/r_4.1.2.yaml"
     script:
-        "comparisons_dtu.Rmd"
+        "../scripts/comparisons_dgeDte.Rmd"
