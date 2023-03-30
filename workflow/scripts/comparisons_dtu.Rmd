@@ -271,17 +271,47 @@ can be larger then in the upsetplot above. (This is the reason why fig 5d in che
 et al is an upset plot. It shows which events occur together in a single gene.)
 
 ```{r, fig.width = 6.85 / 2, fig.asp = .65}
+dataset_lookup <- c("ill_ref", "ill_ill_str",
+                 "ill_cdna_flair", "ill_tel_str",
+                 "cdna_ref", "cdna_ill_str",
+                 "cdna_cdna_flair", "cdna_tel_str")
+
+names(dataset_lookup) <- c("illumina_ref", "illumina_illumina_stringtie",
+    "illumina_cdna_flair", "illumina_teloprime_stringtie",
+    "cdna_ref", "cdna_illumina_stringtie",
+    "cdna_cdna_flair", "cdna_teloprime_stringtie")
+
 switch_conseq %>% 
-    mutate(dataset = factor(dataset, levels = c("illumina_ref", "illumina_illumina_stringtie",
-                 "illumina_cdna_flair", "illumina_teloprime_stringtie",
-                 "cdna_ref", "cdna_illumina_stringtie",
-                 "cdna_cdna_flair", "cdna_teloprime_stringtie"))) %>%
+    mutate(dataset = dataset_lookup[dataset]) %>% 
+    mutate(dataset = factor(dataset, levels = dataset_lookup)) %>% 
+    mutate(AStype = case_when(
+        AStype == "ATSS" ~ "alternative TSS",
+        AStype == "ATTS" ~ "alternative TTS",
+        TRUE             ~ "alternative splicing")) %>%
     ggplot(aes(dataset, nrGenesWithConsequences)) +
     geom_bar(aes(fill = AStype), stat = "identity") +
     scale_fill_brewer(palette = "Dark2", name = NULL) +
     theme_tufte(base_size = 8, base_family = "Helvetica") +
     geom_rangeframe(sides = 'bl') +
     ylab("Isoform switching events") +
+    xlab(NULL) +
+    theme(legend.key.size = unit(.33, "cm")) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5))
+
+switch_conseq %>% 
+    mutate(dataset = dataset_lookup[dataset]) %>% 
+    mutate(dataset = factor(dataset, levels = dataset_lookup)) %>% 
+    mutate(AStype = case_when(
+        AStype == "ATSS" ~ "alternative TSS",
+        AStype == "ATTS" ~ "alternative TTS",
+        TRUE             ~ "alternative splicing")) %>% 
+    mutate(p = nrGenesWithConsequences / sum(nrGenesWithConsequences)) %>%
+    ggplot(aes(dataset, p)) +
+    geom_bar(aes(fill = AStype), stat = "identity") +
+    scale_fill_brewer(palette = "Dark2", name = NULL) +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe(sides = 'bl') +
+    scale_y_continuous("Isoform switching events", labels = scales::label_percent()) +
     xlab(NULL) +
     theme(legend.key.size = unit(.33, "cm")) +
     theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5))

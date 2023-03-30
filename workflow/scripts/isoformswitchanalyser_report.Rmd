@@ -49,7 +49,7 @@ switchList <- analyzePFAM(switchList,
 
 
 switchList <- analyzeSwitchConsequences(switchList,
-    c("intron_retention", "ORF_seq_similarity", "NMD_status", 
+    c("intron_retention", "ORF_seq_similarity", "NMD_status",
       "domains_identified"))
 ```
 
@@ -66,9 +66,9 @@ switchList$isoformFeatures %>%
         transcript = isoform_switch_q_value,
         dIF,
         proportion_22 = IF1,
-        proportion_4 = IF2) %>% 
-    filter(gene < snakemake@params$dtu_cutoff) %>% 
-    filter(abs(dIF) > snakemake@params$dIF_cutoff) %>% 
+        proportion_4 = IF2) %>%
+    filter(gene < snakemake@params$dtu_cutoff) %>%
+    filter(abs(dIF) > snakemake@params$dIF_cutoff) %>%
     knitr::kable(format = "html") %>%
     kableExtra::kable_styling() %>%
     kableExtra::scroll_box(width = "100%", height = "600px")
@@ -108,10 +108,10 @@ extractSplicingSummary(switchList,
         alpha = snakemake@params$dtu_cutoff,
         dIFcutoff = snakemake@params$dIF_cutoff,
         plot = FALSE,
-        returnResult = TRUE) %>% 
-    as_tibble() %>% 
-    dplyr::select(AStype, splicingResult, nrGenesWithConsequences) %>% 
-    mutate(splicingResult = if_else(grepl("more", splicingResult), "cold", "room temperature")) %>% 
+        returnResult = TRUE) %>%
+    as_tibble() %>%
+    dplyr::select(AStype, splicingResult, nrGenesWithConsequences) %>%
+    mutate(splicingResult = if_else(grepl("more", splicingResult), "cold", "room temperature")) %>%
     ggplot(aes(AStype, nrGenesWithConsequences)) +
     geom_bar(aes(fill = splicingResult), stat = "identity")  +
     theme_tufte(base_size = 8, base_family = "Helvetica") +
@@ -127,9 +127,9 @@ extractSplicingEnrichment(switchList,
         dIFcutoff = snakemake@params$dIF_cutoff,
         plot = FALSE,
         returnResult = TRUE,
-        returnSummary = TRUE) %>% 
-    as_tibble() %>% 
-    dplyr::select(-Comparison, -condition_1, -condition_2) %>% 
+        returnSummary = TRUE) %>%
+    as_tibble() %>%
+    dplyr::select(-Comparison, -condition_1, -condition_2) %>%
     knitr::kable(format = "html") %>%
     kableExtra::kable_styling()
 ```
@@ -149,19 +149,19 @@ n_tot <- extractSwitchSummary(switchList,
         filterForConsequences = FALSE,
         dIFcutoff = 0)$nrGenes
 
-n_consequences <- extractSwitchSummary(switchList, 
+n_consequences <- extractSwitchSummary(switchList,
         filterForConsequences = TRUE,
         dIFcutoff = 0)$nrGenes
 
 sprintf("%s of %s genes with DTU show consequences for the predicted protein.",
     n_consequences, n_tot)
 
-switchList$switchConsequence %>% 
-    as_tibble() %>% 
-    dplyr::select(gene_id, switchConsequence) %>% 
+switchList$switchConsequence %>%
+    as_tibble() %>%
+    dplyr::select(gene_id, switchConsequence) %>%
     tidyr::drop_na() %>%
-    group_by(gene_id) %>% 
-    summarise(switchConsequence = paste(unique(switchConsequence), collapse = ';')) %>% 
+    group_by(gene_id) %>%
+    summarise(switchConsequence = paste(unique(switchConsequence), collapse = ';')) %>%
     rename(gene_id = "ensembl_gene_id_version")
 ```
 
@@ -170,8 +170,8 @@ extractConsequenceSummary(switchList,
         alpha = snakemake@params$dtu_cutoff,
         dIFcutoff = snakemake@params$dIF_cutoff,
         plot = FALSE,
-        returnResult = TRUE) %>% 
-    dplyr::select(featureCompared, switchConsequence, nrGenesWithConsequences) %>% 
+        returnResult = TRUE) %>%
+    dplyr::select(featureCompared, switchConsequence, nrGenesWithConsequences) %>%
     ggplot(aes(featureCompared, nrGenesWithConsequences)) +
     geom_bar(aes(fill = switchConsequence), stat = "identity") +
     scale_fill_viridis_d(name = NULL) +
@@ -187,9 +187,9 @@ extractConsequenceEnrichment(switchList,
         alpha = snakemake@params$dtu_cutoff,
         dIFcutoff = snakemake@params$dIF_cutoff,
         plot = FALSE,
-        returnResult = TRUE) %>% 
-    as_tibble() %>% 
-    dplyr::select(-feature, -condition_1, -condition_2) %>% 
+        returnResult = TRUE) %>%
+    as_tibble() %>%
+    dplyr::select(-feature, -condition_1, -condition_2) %>%
     knitr::kable(format = "html") %>%
     kableExtra::kable_styling()
 ```
@@ -199,15 +199,15 @@ extractConsequenceEnrichment(switchList,
 
 The proportions and counts are from drimseq and therefore only for transcripts that have passed the filter criteria.
 The cross is the proportion estimated by DRIMSeq. The red transcripts are significantly changed.
-Note that sometimes there is an indication of significant DTU at the genelevel, but no 
+Note that sometimes there is an indication of significant DTU at the genelevel, but no
 single transcript changes significantly.
 
-```{r, results="asis", fig.width = 6.85, fig.asp = .65}
+```{r, results="asis", fig.width = 6.85, fig.asp = .65/2}
 gene_ids <- switchList$isoformFeatures %>%
     as_tibble() %>%
     filter(gene_switch_q_value < snakemake@params$dtu_cutoff) %>%
-    filter(abs(dIF) > snakemake@params$dIF_cutoff) %>% 
-    pull(gene_id) %>% 
+    filter(abs(dIF) > snakemake@params$dIF_cutoff) %>%
+    pull(gene_id) %>%
     unique()
 
 if(grepl("flair", snakemake@wildcards$annotation)) {
@@ -218,9 +218,9 @@ if(grepl("flair", snakemake@wildcards$annotation)) {
         column = "SYMBOL",
         keytype = "ENSEMBL",
         multiVals = "first")
-    
+
 } else if(snakemake@wildcards$annotation == "ref") {
-    
+
     symbols <- mapIds(
         keys = gene_ids,
         x = org.Mm.eg.db,
@@ -230,32 +230,32 @@ if(grepl("flair", snakemake@wildcards$annotation)) {
 
 } else if(grepl("stringtie", snakemake@wildcards$annotation)) {
     if(grepl("illumina", snakemake@wildcards$annotation)) {
-     
-        ens <- read_tsv(snakemake@input$illu_tmap) %>% 
-            dplyr::select(qry_gene_id, ref_gene_id) %>% 
+
+        ens <- read_tsv(snakemake@input$illu_tmap) %>%
+            dplyr::select(qry_gene_id, ref_gene_id) %>%
             tibble::deframe()       
-        
+
     } else if(grepl("teloprime", snakemake@wildcards$annotation)) {
 
-        ens <- read_tsv(snakemake@input$telo_tmap) %>% 
-            dplyr::select(qry_gene_id, ref_gene_id) %>% 
+        ens <- read_tsv(snakemake@input$telo_tmap) %>%
+            dplyr::select(qry_gene_id, ref_gene_id) %>%
             tibble::deframe()       
-        
+
     }
-    
+
     ens_ids <- ens[gene_ids]
-    
+
     symbols <- mapIds(
         keys = remove.version(ens_ids),
         x = org.Mm.eg.db,
         column = "SYMBOL",
         keytype = "ENSEMBL",
         multiVals = "first")
-    
+
 }
 
 for (gene in gene_ids) {
-    
+
     cat('\n')  
 
     if(grepl("stringtie", snakemake@wildcards$annotation)) {
@@ -263,23 +263,23 @@ for (gene in gene_ids) {
         cat("##", symbols[remove.version(ens_ids[gene])], ens_ids[gene], "\n")
 
     } else {
-        
+
         cat("##", symbols[remove.version(gene)], gene, "\n")
 
     }
-    
-                
+
+
     # transcript ids for subsetting
     transcripts <- switchList$isoformFeatures %>%
-        as_tibble() %>% 
-        filter(gene_id == gene) %>% 
+        as_tibble() %>%
+        filter(gene_id == gene) %>%
         pull(isoform_id)
-      
+
 
     # table with transcript level information
     switchList$isoformFeatures %>%
-        as_tibble() %>% 
-        filter(gene_id == gene) %>% 
+        as_tibble() %>%
+        filter(gene_id == gene) %>%
         dplyr::select(gene_id,
             transcript_id = isoform_id,
             mgi_symbol = gene_name,
@@ -288,33 +288,42 @@ for (gene in gene_ids) {
             transcript = isoform_switch_q_value,
             dIF,
             proportion_22 = IF1,
-            proportion_4 = IF2) %>% 
+            proportion_4 = IF2) %>%
         knitr::kable(format = "html") %>%
-        kableExtra::kable_styling() %>% 
+        kableExtra::kable_styling() %>%
         print()
 
-    
+
     # plot of isoforms with domains
-    switchplot <- switchPlotTranscript(switchList, gene = gene,
-        localTheme = theme_bw(base_size = 7, base_family = "Helvetica")) +
+    switchplot <- switchPlotTranscript(
+            switchList,
+            gene = gene,
+            dIFcutoff = snakemake@params$dIF_cutoff,
+            arrowSize = .15,
+            localTheme = theme_bw(base_size = 8, base_family = "Helvetica")) +
         scale_fill_colorblind() +
-        ggtitle(NULL)
+        ggtitle(NULL) +
+        theme(legend.position = "top",
+            legend.margin = margin(t = 0, r = 0, b = 0, l = 0, unit = "cm")) +
+        theme(legend.key.size = unit(.33, "cm"))
+
 
     # get order of transcripts from switchplot
     order <- ggplot_build(switchplot)$layout$panel_params[[1]]$y$get_labels()
-    
+
     # plot of counts
-    abundanceplot <- switchList$isoformRepExpression %>% 
-        as_tibble() %>% 
-        filter(isoform_id %in% transcripts) %>% 
+    abundanceplot <- switchList$isoformRepExpression %>%
+        as_tibble() %>%
+        filter(isoform_id %in% transcripts) %>%
         tidyr::pivot_longer(cols = ends_with("iBAT"),
-            names_to = "sample_id", values_to = "abundance") %>% 
-        left_join(sample_info, by = "sample_id") %>% 
-        mutate(isoform_id = factor(isoform_id, levels = order)) %>% 
-        mutate(condition_temp = relevel(condition_temp, "22")) %>% 
+            names_to = "sample_id", values_to = "abundance") %>%
+        left_join(sample_info, by = "sample_id") %>%
+        filter(isoform_id %in% order) %>%
+        mutate(isoform_id = factor(isoform_id, levels = order)) %>%
+        mutate(condition_temp = relevel(condition_temp, "22")) %>%
         ggplot(aes(isoform_id, abundance)) +
         geom_point(aes(colour = condition_temp),
-            size = 1,
+            size = .5,
             alpha = .5,
             position = position_dodge2(width = .75)) +
         stat_summary(aes(colour = condition_temp),
@@ -330,29 +339,30 @@ for (gene in gene_ids) {
         scale_y_continuous(trans = "log1p", breaks = c(0, 1, 3, 10, 30, 100)) +
         theme_tufte(base_size = 8, base_family = "Helvetica") +
         geom_rangeframe(sides = 'bl') +
-        xlab(NULL) +
+        xlab("Isoform") +
         ylab("Abundance") +
         scale_colour_brewer(palette = "Dark2", name = NULL,
             labels = c("22" = "22°C", "4" = "4°C")) +
         theme(legend.key.size = unit(.33, "cm")) +
-        theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5))
+        scale_x_discrete(labels = 1:20)
 
-    
+
     # plot of usage
-    usageplot <- switchList$isoformRepExpression %>% 
-        as_tibble() %>% 
-        filter(isoform_id %in% transcripts) %>% 
+    usageplot <- switchList$isoformRepExpression %>%
+        as_tibble() %>%
+        filter(isoform_id %in% transcripts) %>%
         tidyr::pivot_longer(cols = ends_with("iBAT"),
-            names_to = "sample_id", values_to = "abundance") %>% 
-        group_by(sample_id) %>% 
-        mutate(usage = abundance / sum(abundance)) %>% 
-        ungroup() %>% 
-        left_join(sample_info, by = "sample_id") %>% 
-        mutate(isoform_id = factor(isoform_id, levels = order)) %>% 
-        mutate(condition_temp = relevel(condition_temp, "22")) %>% 
+            names_to = "sample_id", values_to = "abundance") %>%
+        group_by(sample_id) %>%
+        mutate(usage = abundance / sum(abundance)) %>%
+        ungroup() %>%
+        left_join(sample_info, by = "sample_id") %>%
+        filter(isoform_id %in% order) %>%
+        mutate(isoform_id = factor(isoform_id, levels = order)) %>%
+        mutate(condition_temp = relevel(condition_temp, "22")) %>%
         ggplot(aes(isoform_id, usage)) +
         geom_point(aes(colour = condition_temp),
-            size = 1,
+            size = .5,
             alpha = .5,
             position = position_dodge2(width = .75)) +
         stat_summary(aes(colour = condition_temp),
@@ -367,17 +377,27 @@ for (gene in gene_ids) {
             position = position_dodge(width = .75)) +
         theme_tufte(base_size = 8, base_family = "Helvetica") +
         geom_rangeframe(sides = 'bl') +
-        xlab(NULL) +
+        xlab("Isoform") +
         ylab("Isoform usage") +
         scale_y_continuous(labels = scales::percent) +
+        scale_x_discrete(labels = 1:20) +
         scale_colour_brewer(palette = "Dark2", name = NULL,
-        labels = c("22" = "22°C", "4" = "4°C")) +
-        theme(legend.key.size = unit(.33, "cm")) +
-        theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5))
+            labels = c("22" = "22°C", "4" = "4°C")) +
+        theme(legend.key.size = unit(.33, "cm"))
 
-    
-    print(switchplot / (abundanceplot + usageplot + plot_layout(guides = 'collect')))
-    
+    right_pl <- abundanceplot + usageplot + plot_layout(guides = 'collect') &
+        theme(legend.position = "rigth")
+
+    switchplot <- switchplot +
+        scale_y_discrete()
+
+
+    pl <- switchplot + right_pl +
+        plot_annotation(title = gene,
+            theme = theme(plot.title = element_text(size = 9)))
+
+    print(pl)
+
     cat('\n')  
 }
 ```
