@@ -43,18 +43,28 @@ rule all:
 
 # Include other rules
 include: "bin/annotation.smk"
+
 include: "bin/process_illumina.smk"
 include: "bin/process_nanopore.smk"
+
 include: "bin/rseqc.smk"
+
 include: "bin/comparisons.smk"
+
 include: "bin/deseq.smk"
+
 include: "bin/reannotation.smk"
 include: "bin/reannotation_quant.smk"
-include: "bin/gffcompare.smk"
+
+include: "workflow/rules/sqanti2.smk"
+include: "workflow/rules/gffcompare.smk"
 include: "bin/browserTracks.smk"
+
 include: "workflow/rules/isoformswitchanalyser.smk"
+
 include: "workflow/rules/qpcr.smk"
 include: "workflow/rules/pfam.smk"
+
 include: "workflow/rules/compare_quantification.smk"
 include: "workflow/rules/compare_featureDetection.smk"
 include: "workflow/rules/compare_reannotationDTU.smk"

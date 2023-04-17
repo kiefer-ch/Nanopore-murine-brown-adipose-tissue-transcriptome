@@ -6,12 +6,16 @@ rule compare_reannotation:
                 dataset=["cdna", "teloprime", "rna"]),
             expand("data/reannotation/stringtie/gffcmp.{dataset}_stringtie.gtf.tmap",
                 dataset=["cdna", "teloprime", "rna", "illumina"])],
+        gffcmp_tracking = "data/comparisons/reannotation/gffcompare/R/gffcmp.tracking",
         sqanti =
             [expand("data/comparisons/reannotation/squanti/stringtie/{dataset}/{dataset}_stringtie_noUnknownStrand_classification.txt",
                 dataset=["cdna", "teloprime", "rna", "illumina"]),
             expand("data/comparisons/reannotation/squanti/flair/{dataset}/{dataset}_flair.isoforms_classification.txt",
                 dataset=["cdna", "teloprime", "rna"])],
-        gffcompare_stats = "data/comparisons/reannotation/gffcompare/RQ/gffcmp.stats"
+        gffcompare_stats = "data/comparisons/reannotation/gffcompare/RQ/gffcmp.stats",
+        sal = expand("data/alternativeSpliceAnalysis/{dataset}_sal.rds",
+            dataset = ["flair_cdna", "flair_teloprime", "flair_rna", "stringtie_cdna", "stringtie_teloprime",
+                "stringtie_rna", "stringtie_illumina"])
     conda:
         "../envs/r_4.1.2.yaml"
     output:

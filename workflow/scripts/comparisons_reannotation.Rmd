@@ -19,7 +19,7 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
 ```
 
 ```{r library, include=FALSE}
-source(".Rprofile")
+#source(".Rprofile")
 suppressPackageStartupMessages({
     library("dplyr")
     library("readr")
@@ -61,6 +61,15 @@ df2 <- snakemake@input[["sqanti"]] %>%
             levels = c("full-splice_match", "incomplete-splice_match", "novel_in_catalog",
                 "novel_not_in_catalog", "fusion", "antisense",
                 "genic", "genic_intron", "intergenic")))
+
+tracking <- read_tsv(
+        snakemake@input$gffcmp_tracking,
+        col_names = c("query_transfrag_id", "query_locus_id",
+            "reference_gene_id", "class_code", 
+            "flair_cdna", "flair_teloprime", "flair_rna",
+            "stringtie_cdna", "stringtie_teloprime", "stringtie_rna", "stringtie_illumina"),
+        show_col_types = FALSE,
+        na = "-")
 ```
 
 
@@ -282,7 +291,9 @@ knitr::include_graphics("https://github.com/Magdoll/images_public/raw/master/SQA
 
 # Overlap
 
-Based on sqanti. Comparison between the different methods ability to identify 
+## Squanti
+
+Comparison between the different methods ability to identify 
 transcripts from the reference annotation.
 
 ```{r upset, fig.asp = .65}
@@ -305,22 +316,110 @@ df2 %>%
         text.scale = 1.5)
 ```
 
-```{r upset_stringtie, fig.asp = .65}
-df2 %>% 
-    filter(grepl("^ENS", associated_transcript)) %>%
-    filter(grepl("stringtie", dataset)) %>% 
-    group_by(dataset, associated_transcript) %>% 
-    summarise(n = n()) %>% 
-    ungroup() %>% 
-    tidyr::pivot_wider(names_from = dataset, values_from = n, values_fill = 0) %>% 
-    mutate_if(is.numeric, ~ as.integer(. > 0)) %>% 
+## Gffcompare
+
+Using the tracking file from gffcompare.
+
+### Transcripts in the reference
+
+Similar to the sqanti plot above, just using gffcompare.
+
+The numbers are a little different, because, next to a different algorithm, 
+gffcompare not only matches agains the reference, but matches every query against each other.
+So there can be (and are) multiple matches for one reference transcript. 
+In the sqanti analysis, the question was only "is there anything matching this reference transcript".
+Interpretation should be the same as with sqanti.
+
+####  Class code =.
+
+```{r, fig.asp = .65}
+tracking %>% 
+    filter(class_code %in% c("=")) %>% 
+    dplyr::select(-query_locus_id, -reference_gene_id, -class_code) %>% 
+    mutate(
+        across(
+            !matches("query_transfrag"),
+            ~ if_else(is.na(.x), 0, 1))) %>% 
     as.data.frame() %>%
-    tibble::column_to_rownames("associated_transcript") %>% 
+    tibble::column_to_rownames("query_transfrag_id") %>% 
     upset(nsets = 4, keep.order = TRUE,
         nintersects = 15,
         order.by = "freq",
-        sets = c("illumina_stringtie", "teloprime_stringtie", "cdna_stringtie",
-            "rna_stringtie"),
+        sets = c("stringtie_illumina", "stringtie_teloprime", "stringtie_cdna", 
+            "stringtie_rna", "flair_teloprime", "flair_cdna", "flair_rna"),
+        sets.x.label = "Annotated transcripts",
+        mainbar.y.label = "Shared transcripts\n(based on reference annotation)",
+        text.scale = 1.5)
+```
+
+####  Class code =, c or m.
+
+c and m are equivalent to incomplete splice match in sqanti. So this should resemble
+the old analysis more.
+
+```{r, fig.asp = .65}
+tracking %>% 
+    filter(class_code %in% c("=", "c", "m")) %>% 
+    dplyr::select(-query_locus_id, -reference_gene_id, -class_code) %>% 
+    mutate(
+        across(
+            !matches("query_transfrag"),
+            ~ if_else(is.na(.x), 0, 1))) %>% 
+    as.data.frame() %>%
+    tibble::column_to_rownames("query_transfrag_id") %>% 
+    upset(nsets = 4, keep.order = TRUE,
+        nintersects = 15,
+        order.by = "freq",
+        sets = c("stringtie_illumina", "stringtie_teloprime", "stringtie_cdna", 
+            "stringtie_rna", "flair_teloprime", "flair_cdna", "flair_rna"),
+        sets.x.label = "Annotated transcripts",
+        mainbar.y.label = "Shared transcripts\n(based on reference annotation)",
+        text.scale = 1.5)
+```
+
+
+
+### Transcripts not in the reference
+
+#### Class codes not in  =.
+
+```{r, fig.asp = .65}
+tracking %>% 
+    filter(!class_code %in% c("=")) %>% 
+    dplyr::select(-query_locus_id, -reference_gene_id, -class_code) %>% 
+    mutate(
+        across(
+            !matches("query_transfrag"),
+            ~ if_else(is.na(.x), 0, 1))) %>% 
+    as.data.frame() %>%
+    tibble::column_to_rownames("query_transfrag_id") %>% 
+    upset(nsets = 4, keep.order = TRUE,
+        nintersects = 15,
+        order.by = "freq",
+        sets = c("stringtie_illumina", "stringtie_teloprime", "stringtie_cdna", 
+            "stringtie_rna", "flair_teloprime", "flair_cdna", "flair_rna"),
+        sets.x.label = "Annotated transcripts",
+        mainbar.y.label = "Shared transcripts\n(based on reference annotation)",
+        text.scale = 1.5)
+```
+
+#### Class codes not in  =, m , c.
+
+```{r, fig.asp = .65}
+tracking %>% 
+    filter(!class_code %in% c("=", "m", "c")) %>% 
+    dplyr::select(-query_locus_id, -reference_gene_id, -class_code) %>% 
+    mutate(
+        across(
+            !matches("query_transfrag"),
+            ~ if_else(is.na(.x), 0, 1))) %>% 
+    as.data.frame() %>%
+    tibble::column_to_rownames("query_transfrag_id") %>% 
+    upset(nsets = 4, keep.order = TRUE,
+        nintersects = 15,
+        order.by = "freq",
+        sets = c("stringtie_illumina", "stringtie_teloprime", "stringtie_cdna", 
+            "stringtie_rna", "flair_teloprime", "flair_cdna", "flair_rna"),
         sets.x.label = "Annotated transcripts",
         mainbar.y.label = "Shared transcripts\n(based on reference annotation)",
         text.scale = 1.5)
@@ -328,6 +427,9 @@ df2 %>%
 
 
 # Sensitivity and specificity
+
+Based on gffcompare output. The numbers are entere by hand. Be carefull if something
+changes in the analysis!
 
 ```{r, fig.width = 6.85 / 2, fig.asp = .65}
 tibble(
@@ -344,3 +446,57 @@ tibble(
     scale_y_continuous(name = "Sensitivity", labels = label_percent()) +
     ggrepel::geom_text_repel(aes(label = dataset), size = 2)
 ```
+
+
+# Alternative splicing analysis
+
+Compared to hypothetical longest pre-mRNA.
+
+Get the tables from IsoformSwitchanalyser ($AlternativeSplicingAnalysis).
+
+Had to run isoformswitchanalyser again, using no prefiltering, so even lowly 
+expressed transcripts are analysed (which would never reach significance in 
+DTU analysis and are therefore excluded there.)
+
+```{r}
+# import switch analyzer lists and extract switching type info
+switch_conseq <- snakemake@input$sal %>% 
+    set_names(basename(.) %>% 
+                  sub("_sal.rds$", "", .)) %>% 
+    map(read_rds) %>% 
+    map(`$`, "AlternativeSplicingAnalysis") %>% 
+    map(as_tibble) %>% 
+    map(arrange, isoform_id)
+
+
+%>%
+    bind_rows(.id = "dataset") %>% 
+    mutate(AS = if_else(ES | MEE | MES | IR | A5 | A3, 1, 0)) %>% 
+    dplyr::select(dataset, isoform_id, ATTS, ATSS, AS)
+
+# add class code
+dataset_lookup <- c("illumina_ref", "illumina_illumina_stringtie"  "illumina_cdna_flair"          "illumina_teloprime_stringtie" "cdna_ref"                     "cdna_illumina_stringtie"      "cdna_cdna_flair"             
+[8] "cdna_teloprime_stringtie" )
+
+names(dataset_lookup) <- c("r", "",
+    "illumina_cdna_flair", "illumina_teloprime_stringtie",
+    "cdna_ref", "cdna_illumina_stringtie",
+    "cdna_cdna_flair", "cdna_teloprime_stringtie")
+
+tracking2 <- tracking %>% 
+    dplyr::select(-query_transfrag_id, -query_locus_id, -reference_gene_id) %>% 
+    tidyr::pivot_longer(cols = !matches("class_code"), 
+        names_to = "dataset", values_to = "isoform_id") %>% 
+    tidyr::drop_na() %>% 
+    tidyr::separate(isoform_id, c("gene", "isoform_id"), extra = "drop", sep = "\\|") %>% 
+    dplyr::select(-gene)
+
+
+%>% 
+    mutate(dataset = dataset_lookup[dataset])
+
+
+switch_conseq %>%
+    left_join(tracking2, c("dataset", "isoform_id"))
+```
+

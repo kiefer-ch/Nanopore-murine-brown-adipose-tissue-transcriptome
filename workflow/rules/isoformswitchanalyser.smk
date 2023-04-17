@@ -66,6 +66,25 @@ rule isoformswitchanalyser_importData:
         "../scripts/isoformswitchanalyser_importData.R"
 
 
+rule isoformswitchanalyser_alternativeSplicingAnalysis:
+    input:
+        counts = get_isa_counts,
+        sample_info = config["SAMPLE_INFO"],
+        gtf = get_isa_gtf,
+        transcripts = get_isa_transcripts
+    output:
+        "data/alternativeSpliceAnalysis/{algorithm}_{gtf}_sal.rds"
+    wildcard_constraints:
+        gtf = "ref|illumina|cdna|rna|teloprime",
+        algorithm = "stringtie|flair"
+    conda:
+        "../envs/r_4.1.2.yaml"
+    threads:
+        1
+    script:
+        "../scripts/isoformswitchanalyser_alternativeSplicingAnalysis.R"
+
+
 # report
 rule isoformswitchanalyser_report:
     input:
