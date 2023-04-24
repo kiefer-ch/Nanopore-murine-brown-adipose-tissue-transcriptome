@@ -19,7 +19,7 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
 ```
 
 ```{r library, include=FALSE}
-#source(".Rprofile")
+source(".Rprofile")
 suppressPackageStartupMessages({
     library("dplyr")
     library("readr")
@@ -330,29 +330,7 @@ So there can be (and are) multiple matches for one reference transcript.
 In the sqanti analysis, the question was only "is there anything matching this reference transcript".
 Interpretation should be the same as with sqanti.
 
-####  Class code =.
-
-```{r, fig.asp = .65}
-tracking %>% 
-    filter(class_code %in% c("=")) %>% 
-    dplyr::select(-query_locus_id, -reference_gene_id, -class_code) %>% 
-    mutate(
-        across(
-            !matches("query_transfrag"),
-            ~ if_else(is.na(.x), 0, 1))) %>% 
-    as.data.frame() %>%
-    tibble::column_to_rownames("query_transfrag_id") %>% 
-    upset(nsets = 4, keep.order = TRUE,
-        nintersects = 15,
-        order.by = "freq",
-        sets = c("stringtie_illumina", "stringtie_teloprime", "stringtie_cdna", 
-            "stringtie_rna", "flair_teloprime", "flair_cdna", "flair_rna"),
-        sets.x.label = "Annotated transcripts",
-        mainbar.y.label = "Shared transcripts\n(based on reference annotation)",
-        text.scale = 1.5)
-```
-
-####  Class code =, c or m.
+Class code =, c or m.
 
 c and m are equivalent to incomplete splice match in sqanti. So this should resemble
 the old analysis more.
@@ -373,7 +351,7 @@ tracking %>%
         sets = c("stringtie_illumina", "stringtie_teloprime", "stringtie_cdna", 
             "stringtie_rna", "flair_teloprime", "flair_cdna", "flair_rna"),
         sets.x.label = "Annotated transcripts",
-        mainbar.y.label = "Shared transcripts\n(based on reference annotation)",
+        mainbar.y.label = "Annotated transcript",
         text.scale = 1.5)
 ```
 
@@ -381,29 +359,7 @@ tracking %>%
 
 ### Transcripts not in the reference
 
-#### Class codes not in  =.
-
-```{r, fig.asp = .65}
-tracking %>% 
-    filter(!class_code %in% c("=")) %>% 
-    dplyr::select(-query_locus_id, -reference_gene_id, -class_code) %>% 
-    mutate(
-        across(
-            !matches("query_transfrag"),
-            ~ if_else(is.na(.x), 0, 1))) %>% 
-    as.data.frame() %>%
-    tibble::column_to_rownames("query_transfrag_id") %>% 
-    upset(nsets = 4, keep.order = TRUE,
-        nintersects = 15,
-        order.by = "freq",
-        sets = c("stringtie_illumina", "stringtie_teloprime", "stringtie_cdna", 
-            "stringtie_rna", "flair_teloprime", "flair_cdna", "flair_rna"),
-        sets.x.label = "Annotated transcripts",
-        mainbar.y.label = "Shared transcripts\n(based on reference annotation)",
-        text.scale = 1.5)
-```
-
-#### Class codes not in  =, m , c.
+Class codes not in  =, m , c.
 
 ```{r, fig.asp = .65}
 tracking %>% 
@@ -420,8 +376,8 @@ tracking %>%
         order.by = "freq",
         sets = c("stringtie_illumina", "stringtie_teloprime", "stringtie_cdna", 
             "stringtie_rna", "flair_teloprime", "flair_cdna", "flair_rna"),
-        sets.x.label = "Annotated transcripts",
-        mainbar.y.label = "Shared transcripts\n(based on reference annotation)",
+        sets.x.label = "Novel transcripts",
+        mainbar.y.label = "Novel transcripts",
         text.scale = 1.5)
 ```
 
@@ -458,7 +414,8 @@ Had to run isoformswitchanalyser again, using no prefiltering, so even lowly
 expressed transcripts are analysed (which would never reach significance in 
 DTU analysis and are therefore excluded there.)
 
-```{r}
+```{r, fig.width = 6.85 / 2, fig.asp = .65}
+
 # import switch analyzer lists and extract switching type info
 switch_conseq <- snakemake@input$sal %>% 
     set_names(basename(.) %>% 
@@ -466,22 +423,17 @@ switch_conseq <- snakemake@input$sal %>%
     map(read_rds) %>% 
     map(`$`, "AlternativeSplicingAnalysis") %>% 
     map(as_tibble) %>% 
-    map(arrange, isoform_id)
-
-
-%>%
+    map(arrange, isoform_id) %>%
     bind_rows(.id = "dataset") %>% 
     mutate(AS = if_else(ES | MEE | MES | IR | A5 | A3, 1, 0)) %>% 
     dplyr::select(dataset, isoform_id, ATTS, ATSS, AS)
 
 # add class code
-dataset_lookup <- c("illumina_ref", "illumina_illumina_stringtie"  "illumina_cdna_flair"          "illumina_teloprime_stringtie" "cdna_ref"                     "cdna_illumina_stringtie"      "cdna_cdna_flair"             
-[8] "cdna_teloprime_stringtie" )
+dataset_lookup <- c("illumina_stringtie", "cdna_stringtie", "cdna_flair",  
+    "teloprime_flair", "rna_flair", "teloprime_stringtie", "rna_stringtie")
 
-names(dataset_lookup) <- c("r", "",
-    "illumina_cdna_flair", "illumina_teloprime_stringtie",
-    "cdna_ref", "cdna_illumina_stringtie",
-    "cdna_cdna_flair", "cdna_teloprime_stringtie")
+names(dataset_lookup) <- c("stringtie_illumina", "stringtie_cdna", "flair_cdna",
+    "flair_teloprime", "flair_rna", "stringtie_teloprime", "stringtie_rna")
 
 tracking2 <- tracking %>% 
     dplyr::select(-query_transfrag_id, -query_locus_id, -reference_gene_id) %>% 
@@ -489,14 +441,44 @@ tracking2 <- tracking %>%
         names_to = "dataset", values_to = "isoform_id") %>% 
     tidyr::drop_na() %>% 
     tidyr::separate(isoform_id, c("gene", "isoform_id"), extra = "drop", sep = "\\|") %>% 
-    dplyr::select(-gene)
-
-
-%>% 
+    dplyr::select(-gene) %>% 
     mutate(dataset = dataset_lookup[dataset])
 
+# combine
+df_splice <- switch_conseq %>%
+    left_join(tracking2, c("dataset", "isoform_id")) %>%
+    mutate(status = if_else(class_code %in% c("=", "m" , "c"), "known", "novel")) %>% 
+    dplyr::select(-class_code) %>% 
+    tidyr::pivot_longer(cols = c("ATTS", "ATSS", "AS"),
+        names_to = "splice_type", values_to = "switching") %>% 
+    group_by(dataset, status, splice_type) %>% 
+    summarise(nr_isoforms = sum(switching)) %>% 
+    ungroup() %>% 
+    mutate(
+        dataset = case_when(
+            dataset == "illumina_stringtie"  ~ "illu_strin",
+            dataset == "teloprime_stringtie" ~ "telo_strin",
+            dataset == "cdna_stringtie"      ~ "cdna_strin",
+            dataset == "rna_stringtie"       ~ "rna_strin",
+            dataset == "teloprime_flair"     ~ "telo_flair",
+            dataset == "cdna_flair"          ~ "cdna_flair",
+            dataset == "rna_flair"           ~ "rna_flair")) %>% 
+    mutate(dataset = factor(
+            dataset,
+            levels = c("illu_strin", "telo_strin",
+                "cdna_strin", "rna_strin", "telo_flair", 
+                 "cdna_flair", "rna_flair")))
 
-switch_conseq %>%
-    left_join(tracking2, c("dataset", "isoform_id"))
+df_splice %>% 
+    ggplot(aes(dataset, nr_isoforms)) +
+    geom_bar(aes(fill = splice_type), stat = "identity") +
+    scale_fill_brewer(palette = "Dark2", name = NULL) +
+    theme_tufte(base_size = 8, base_family = "Helvetica") +
+    geom_rangeframe(sides = 'bl') +
+    ylab("Transcripts") +
+    xlab(NULL) +
+    theme(legend.key.size = unit(.33, "cm")) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = .5)) +
+    facet_wrap(~status)
 ```
 

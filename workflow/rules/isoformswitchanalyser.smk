@@ -20,21 +20,38 @@ def get_isa_gtf(wildcards):
         return "data/annotation/annotation.gtf"
     elif wildcards.annotation == "cdna_flair":
         return "data/reannotation/flair/annotation/cdna_flair.isoforms.gtf"
+    elif wildcards.annotation == "cdna_stringtie":
+        return "data/reannotation/stringtie/cdna_stringtie_noUnknownStrand.gtf"
     elif wildcards.annotation == "illumina_stringtie":
         return "data/reannotation/stringtie/illumina_stringtie_noUnknownStrand.gtf"
     elif wildcards.annotation == "teloprime_stringtie":
         return "data/reannotation/stringtie/teloprime_stringtie_noUnknownStrand.gtf"
+    elif wildcards.annotation == "teloprime_flair":
+        return "data/reannotation/flair/annotation/teloprime_flair.isoforms.gtf"
+    elif wildcards.annotation == "rna_flair":
+        return "data/reannotation/flair/annotation/rna_flair.isoforms.gtf"
+    elif wildcards.annotation == "rna_stringtie":
+        return "data/reannotation/stringtie/rna_stringtie_noUnknownStrand.gtf"
+
 
 
 def get_isa_transcripts(wildcards):
     if wildcards.annotation == "ref":
         return "data/annotation/transcripts.fa"
-    elif wildcards.annotation == "cdna_flair":
-        return "data/reannotation/flair/annotation/cdna_flair.isoforms_cleanHeaders.fa"
     elif wildcards.annotation == "illumina_stringtie":
         return "data/reannotation/stringtie/illumina_stringtie_noUnknownStrand.fa"
+    elif wildcards.annotation == "cdna_flair":
+        return "data/reannotation/flair/annotation/cdna_flair.isoforms_cleanHeaders.fa"
+    elif wildcards.annotation == "cdna_stringtie":
+        return "data/reannotation/stringtie/cdna_stringtie_noUnknownStrand.fa"
     elif wildcards.annotation == "teloprime_stringtie":
         return "data/reannotation/stringtie/teloprime_stringtie_noUnknownStrand.fa"
+    elif wildcards.annotation == "teloprime_flair":
+        return "data/reannotation/flair/annotation/teloprime_flair.isoforms_cleanHeaders.fa"
+    elif wildcards.annotation == "rna_flair":
+        return "data/reannotation/flair/annotation/rna_flair.isoforms_cleanHeaders.fa"
+    elif wildcards.annotation == "rna_stringtie":
+        return "data/reannotation/stringtie/rna_stringtie_noUnknownStrand.fa"
 
 
 rule isoformswitchanalyser_importData:
@@ -68,15 +85,11 @@ rule isoformswitchanalyser_importData:
 
 rule isoformswitchanalyser_alternativeSplicingAnalysis:
     input:
-        counts = get_isa_counts,
         sample_info = config["SAMPLE_INFO"],
         gtf = get_isa_gtf,
         transcripts = get_isa_transcripts
     output:
-        "data/alternativeSpliceAnalysis/{algorithm}_{gtf}_sal.rds"
-    wildcard_constraints:
-        gtf = "ref|illumina|cdna|rna|teloprime",
-        algorithm = "stringtie|flair"
+        "data/alternativeSpliceAnalysis/{annotation}_sal.rds"
     conda:
         "../envs/r_4.1.2.yaml"
     threads:

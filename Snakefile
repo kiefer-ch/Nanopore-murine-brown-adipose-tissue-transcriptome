@@ -53,7 +53,8 @@ include: "bin/comparisons.smk"
 
 include: "bin/deseq.smk"
 
-include: "bin/reannotation.smk"
+include: "workflow/rules/stringtie.smk"
+include: "workflow/rules/flair.smk"
 include: "bin/reannotation_quant.smk"
 
 include: "workflow/rules/sqanti2.smk"

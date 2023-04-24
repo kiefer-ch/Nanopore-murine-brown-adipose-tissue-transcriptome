@@ -14,8 +14,8 @@ rule compare_reannotation:
                 dataset=["cdna", "teloprime", "rna"])],
         gffcompare_stats = "data/comparisons/reannotation/gffcompare/RQ/gffcmp.stats",
         sal = expand("data/alternativeSpliceAnalysis/{dataset}_sal.rds",
-            dataset = ["flair_cdna", "flair_teloprime", "flair_rna", "stringtie_cdna", "stringtie_teloprime",
-                "stringtie_rna", "stringtie_illumina"])
+            dataset = ["cdna_flair", "cdna_stringtie", "illumina_stringtie", "teloprime_flair",
+                "teloprime_stringtie", "rna_flair", "rna_stringtie"])
     conda:
         "../envs/r_4.1.2.yaml"
     output:
