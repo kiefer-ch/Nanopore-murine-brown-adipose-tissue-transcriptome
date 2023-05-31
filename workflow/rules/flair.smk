@@ -22,8 +22,10 @@ rule filter_SJout:
         temp("data/reannotation/flair/SJout/{sample}_SJ.out_filtered.tab")
     params:
         threshold = config["SJ_cutoff"]
+    conda:
+        "../envs/r_4.1.2.yaml"
     script:
-        "reannotation_filterSJout.R"
+        "../scripts/reannotation_filterSJout.R"
 
 
 def get_flair_junctions(wildcards):

@@ -69,3 +69,5 @@ include: "workflow/rules/pfam.smk"
 include: "workflow/rules/compare_quantification.smk"
 include: "workflow/rules/compare_featureDetection.smk"
 include: "workflow/rules/compare_reannotationDTU.smk"
+include: "workflow/rules/compare_dge.smk"
+
